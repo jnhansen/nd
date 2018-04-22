@@ -1,16 +1,22 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-import os, sys
-import time
+# import os
+import sys
+# import time
 from osgeo import gdal, osr
 # from sklearn.preprocessing import PolynomialFeatures
 # from sklearn import linear_model
 import multiprocessing as mp
+from functools import partial
 
 # from scipy.ndimage.interpolation import geometric_transform
 from scipy.interpolate import griddata
 from scipy.ndimage.interpolation import map_coordinates
+
+import datetime as DT
+from dateutil.parser import parse as parsedate
+from dateutil.tz import tzutc
 
 # --------------------------------------------------------------- #
 # import resource
@@ -35,12 +41,8 @@ NO_DATA_VALUE = -1
 
 gdal.UseExceptions()
 
+
 # ----------------------------------------------------------------------- #
-import datetime as DT
-from dateutil.parser import parse as parsedate
-from dateutil.tz import tzutc
-
-
 def str2date(string, fmt=None):
     if fmt is None:
         date_object = parsedate(string)
@@ -58,7 +60,7 @@ def parallel_warp(src, output_shape=None):
     arr = src.ReadAsArray()
     gcps = src.GetGCPs()
     grid_y_interp, grid_x_interp = gcps2xygrid(gcps, (N_lat, N_lon))
-    full_extent = latlon_extent(src)
+    # full_extent = latlon_extent(src)
 
     chunks = np.array_split(arr, mp.cpu_count())
 
@@ -72,15 +74,15 @@ def parallel_warp(src, output_shape=None):
 
 def gcps2xygrid(gcps, output_shape, extent=None):
     attrs = ['GCPLine', 'GCPPixel', 'GCPX', 'GCPY', 'GCPZ']
-    gcp_data = [{attr : getattr(gcp, attr) for attr in attrs} for gcp in gcps]
+    gcp_data = [{attr: getattr(gcp, attr) for attr in attrs} for gcp in gcps]
     gcp_df = pd.DataFrame(gcp_data)
     lon = gcp_df['GCPX']
     lat = gcp_df['GCPY']
-    alt = gcp_df['GCPZ']
+    # alt = gcp_df['GCPZ']
 
-    ##
-    ## Prepare the output data array (decide on resolution here).
-    ##
+    #
+    # Prepare the output data array (decide on resolution here).
+    #
     if extent is None:
         lat_range = [lat.min(), lat.max()]
         lon_range = [lon.min(), lon.max()]
@@ -93,9 +95,10 @@ def gcps2xygrid(gcps, output_shape, extent=None):
         np.linspace(lat_range[0], lat_range[1], N_lat)
     )
 
-    ##
-    ## The following grids should contain the (x,y) lookup for the original image.
-    ##
+    #
+    # The following grids should contain the (x,y) lookup for the
+    # original image.
+    #
     # method can be 'nearest', 'linear', or 'cubic'
     grid_y_interp = griddata(gcp_df[['GCPY', 'GCPX']], gcp_df['GCPLine'],
                              (warped_grid_lat, warped_grid_lon),
@@ -108,7 +111,7 @@ def gcps2xygrid(gcps, output_shape, extent=None):
 
 # def gcps2llgrid(gcps, output_shape):
 #     attrs = ['GCPLine', 'GCPPixel', 'GCPX', 'GCPY', 'GCPZ']
-#     gcp_data = [ { attr : getattr(gcp, attr) for attr in attrs } for gcp in gcps ]
+#     gcp_data = [{attr: getattr(gcp, attr) for attr in attrs} for gcp in gcps]
 #     gcp_df = pd.DataFrame(gcp_data)
 #     lon = gcp_df['GCPX']
 #     lat = gcp_df['GCPY']
@@ -123,13 +126,15 @@ def gcps2xygrid(gcps, output_shape, extent=None):
 #     )
 #
 #     grid_x, grid_y = np.mgrid[0:output_shape[0], 0:output_shape[1]]
-#     ##
-#     ## Interpolate the (lat,lon) coordinates for every pixel.
-#     ##
+#     #
+#     # Interpolate the (lat,lon) coordinates for every pixel.
+#     #
 #     # method can be 'nearest', 'linear', or 'cubic'
 #     from scipy.interpolate import griddata
-#     grid_lat = griddata(gcp_df[['GCPLine','GCPPixel']], lat, (grid_x, grid_y), method='linear')
-#     grid_lon = griddata(gcp_df[['GCPLine','GCPPixel']], lon, (grid_x, grid_y), method='linear')
+#     grid_lat = griddata(gcp_df[['GCPLine','GCPPixel']], lat,
+#                         (grid_x, grid_y), method='linear')
+#     grid_lon = griddata(gcp_df[['GCPLine','GCPPixel']], lon,
+#                         (grid_x, grid_y), method='linear')
 #
 #     return grid_lat, grid_lon
 
@@ -155,9 +160,9 @@ def llgrid(src, output_shape=None, interpolate=False):
     tuple of numpy.ndarray
         A tuple of the latitude grid and the longitude grid.
     """
-    ##
-    ## Use polynomial regression.
-    ##
+    #
+    # Use polynomial regression.
+    #
     gcp_df = get_gcp_df(src)
     lon = gcp_df['GCPX']
     lat = gcp_df['GCPY']
@@ -170,9 +175,9 @@ def llgrid(src, output_shape=None, interpolate=False):
         np.linspace(0, src.RasterYSize-1, N_lat)
     )
     if interpolate:
-        ##
-        ## Interpolate the (lat,lon) coordinates for every pixel.
-        ##
+        #
+        # Interpolate the (lat,lon) coordinates for every pixel.
+        #
         # method can be 'nearest', 'linear', or 'cubic'
         grid_lat = griddata(gcp_df[['GCPLine', 'GCPPixel']], lat,
                             (grid_x, grid_y), method='linear')
@@ -188,7 +193,86 @@ def llgrid(src, output_shape=None, interpolate=False):
 
 
 @profile
-def warp(src, output_shape=None, extent=None, nproc=1, fake=False):
+def _get_warp_coords(src, shape=None, extent=None):
+    #
+    # Prepare the output data array (decide on resolution here).
+    #
+    if extent is None:
+        extent = gcp_extent(src)
+    if shape is None:
+        N_lat, N_lon = src.RasterYSize, src.RasterXSize
+    else:
+        N_lat, N_lon = shape
+    # output_lon_start = output_lon_range[0]
+    # output_lat_start = output_lat_range[0]
+    # lonlat_step = 0
+    # latlon_step = 0
+    # lat_step = (output_lat_range[1] - output_lat_range[0]) / (N_lat - 1)
+    # lon_step = (output_lon_range[1] - output_lon_range[0]) / (N_lon - 1)
+
+    ll2xy = latlon_fit(src, degree=3, inverse=True)
+    grid_ll = np.meshgrid(
+        np.linspace(extent[0], extent[2], N_lon),
+        np.linspace(extent[1], extent[3], N_lat),
+        copy=False
+    )
+    lon_flat = grid_ll[0].flatten()
+    lat_flat = grid_ll[1].flatten()
+    ll = np.stack([lon_flat, lat_flat], axis=-1)
+    coords = ll2xy(ll)
+    coords = coords.T
+    coords = coords.reshape((2, N_lat, N_lon))
+    return coords, extent
+
+
+@profile
+def _map_single_raster(arr, coords):
+    if np.iscomplexobj(arr):
+        # interpolate magnitude and phase separately
+        mapped_mag = map_coordinates(np.abs(arr), coords, output=np.float32,
+                                     order=3, cval=NO_DATA_VALUE)
+        mapped_phase = map_coordinates(np.angle(arr), coords,
+                                       output=np.float32, order=3,
+                                       cval=NO_DATA_VALUE)
+        mapped = mapped_mag * np.exp(1j * mapped_phase)
+    else:
+        mapped = map_coordinates(arr, coords, output=np.float32, order=3,
+                                 cval=NO_DATA_VALUE)
+    return mapped
+
+
+def _make_gdal_dataset(data, src):
+    if not isinstance(data, list):
+        data = [data]
+    N_bands = len(data)
+    N_lat, N_lon = data[0].shape
+    tmp = gdal.GetDriverByName('MEM').Create('', N_lon, N_lat, N_bands,
+                                             gdal.GDT_Float32)
+
+    for i in range(N_bands):
+        org_band = src.GetRasterBand(i+1)
+        new_band = tmp.GetRasterBand(i+1)
+        new_band.WriteArray(data[i])
+        new_band.SetNoDataValue(NO_DATA_VALUE)
+        new_band.SetMetadata(org_band.GetMetadata())
+
+    extent = gcp_extent(src)
+    output_lon_start = extent[0]
+    output_lat_start = extent[1]
+    lonlat_step = 0
+    latlon_step = 0
+    lat_step = (extent[3] - extent[1]) / (N_lat - 1)
+    lon_step = (extent[2] - extent[0]) / (N_lon - 1)
+    transform = (output_lon_start, lon_step, lonlat_step,
+                 output_lat_start, latlon_step, lat_step)
+    tmp.SetGeoTransform(transform)
+    tmp.SetMetadata(src.GetMetadata())
+    return tmp
+
+
+@profile
+def warp(src, output_shape=None, extent=None, nproc=1, fake=False,
+         as_gdal=True):
     """
     Warps a GDAL dataset onto a lat-lon grid (equirectangular projection).
 
@@ -213,115 +297,14 @@ def warp(src, output_shape=None, extent=None, nproc=1, fake=False):
         A warped dataset. The georeferencing is encoded in the transform matrix
         that can be accessed as `osgeo.gdal.Dataset.GetGeoTransform()`.
     """
-    # data = src.ReadAsArray()
-    # if len(data.shape) == 2:
-    #     data = np.expand_dims(data, 0)
-    # N_bands = data.shape[0]
     N_bands = src.RasterCount
-    gcp_df = get_gcp_df(src)
-    # points = gcp_df[['GCPLine','GCPPixel']]
-    lon = gcp_df['GCPX']
-    lat = gcp_df['GCPY']
-    alt = gcp_df['GCPZ']
-
-    ##
-    ## Prepare the output data array (decide on resolution here).
-    ##
-    input_lat_range = [lat.min(), lat.max()]
-    input_lon_range = [lon.min(), lon.max()]
-    if extent is None:
-        output_lat_range = input_lat_range
-        output_lon_range = input_lon_range
-    else:
-        output_lon_range = extent[0::2]
-        output_lat_range = extent[1::2]
-
-    # input_lon_start = input_lon_range[0]
-    # input_lat_start = input_lat_range[0]
-    output_lon_start = output_lon_range[0]
-    output_lat_start = output_lat_range[0]
-    lonlat_step = 0
-    latlon_step = 0
-    if output_shape is None:
-        N_lat, N_lon = src.RasterYSize, src.RasterXSize
-    else:
-        N_lat, N_lon = output_shape
-    lat_step = (output_lat_range[1] - output_lat_range[0]) / (N_lat - 1)
-    lon_step = (output_lon_range[1] - output_lon_range[0]) / (N_lon - 1)
-
-    ##
-    ## Interpolate the (lat,lon) coordinates for every pixel.
-    ##
-    # method can be 'nearest', 'linear', or 'cubic'
-    # grid_x, grid_y = np.mgrid[0:data.shape[0], 0:data.shape[1]]
-    # grid_lat = griddata(gcp_df[['GCPLine','GCPPixel']], lat, (grid_x, grid_y), method='cubic')
-    # grid_lon = griddata(gcp_df[['GCPLine','GCPPixel']], lon, (grid_x, grid_y), method='cubic')
-
-    ##
-    ## The following grids should contain the (x,y) lookup for the original image.
-    ##
-    # grid_y_interp, grid_x_interp = gcps2xygrid(gcps, (input_N_lat,input_N_lon))
-    #
-    # def coord_map(coords):
-    #     # if coords[0] >= grid_y_interp.shape[0]
-    #     return (grid_y_interp[coords], grid_x_interp[coords])
-
-    ##
-    ## Alternative approach:
-    ## Regression instead of interpolation
-    ##
-
-    ## Map (lon,lat) to original (x,y)
-    ## Map position on grid to (lon,lat)
-
-    # start = np.array([output_lat_start, output_lon_start])
-    # step = np.array([lat_step, lon_step])
-    # def map_fn(coords):
-    #     ll = start + step * np.array(coords)
-    #     result = ll2xy(ll)
-    #     if result.shape[0] == 1:
-    #         return tuple(result[0])
-    #     else:
-    #         return result
-
-    ll2xy = latlon_fit(src, degree=3, inverse=True)
-    grid_ll = np.meshgrid(
-        np.linspace(output_lon_range[0], output_lon_range[1], N_lon),
-        np.linspace(output_lat_range[0], output_lat_range[1], N_lat),
-        copy=False
-    )
-    ll = np.stack([grid_ll[1].flatten(), grid_ll[0].flatten()], axis=-1)
-    coords = ll2xy(ll).T.reshape((2, N_lat, N_lon))
-
-    # --------------------------------------------------------------------------- #
-    # Trying a more efficient version of map_coordinates.
-    # ll2xy = latlon_fit(src, degree=3, inverse=True)
-    # offset = np.array([output_lon_range[0],output_lat_range[0]])
-    # factor = np.array([lon_step, lat_step])
-    # def coord_map(coords):
-    #     ll = coords*factor + offset
-    #     return ll2xy(ll)
-    # --------------------------------------------------------------------------- #
-
-    # warped = geometric_transform(data, map_fn, (N_lat,N_lon), output=np.float32, order=3, cval=NO_DATA_VALUE)
-
-    ## DEBUGGING:
-    # grid_lat_warped = geometric_transform(grid_lat, coord_map, (N_lat,N_lon), cval=NO_DATA_VALUE)
-    # grid_lon_warped = geometric_transform(grid_lon, coord_map, (N_lat,N_lon), cval=NO_DATA_VALUE)
-
-    ##
-    ## Create GDAL dataset from numpy array.
-    ##
-    tmp = gdal.GetDriverByName('MEM').Create('', N_lon, N_lat, N_bands,
-                                             gdal.GDT_Float32)
+    coords, extent = _get_warp_coords(src, shape=output_shape, extent=extent)
+    N_lat, N_lon = coords.shape[1:]
 
     if nproc == 1:
-        warped = [map_coordinates(src.GetRasterBand(i+1).ReadAsArray(),
-                                  coords, output=np.float32, order=3,
-                                  cval=NO_DATA_VALUE) for i in range(N_bands)]
-        # warped = [efficient_map_coordinates(src.GetRasterBand(i+1).ReadAsArray(), coord_map, output=np.float32, order=3, cval=NO_DATA_VALUE) for i in range(N_bands)]
+        warped = [_map_single_raster(src.GetRasterBand(i+1).ReadAsArray(),
+                                     coords) for i in range(N_bands)]
     else:
-        # warped = [parallel_map_coordinates(src.GetRasterBand(i+1).ReadAsArray(), coords, output=np.float32, order=3, cval=NO_DATA_VALUE, nproc=nproc, fake=fake) for i in range(N_bands)]
         kwargs_list = [dict(input=src.GetRasterBand(i+1).ReadAsArray(),
                             coordinates=coords, output=np.float32, order=3,
                             cval=NO_DATA_VALUE) for i in range(N_bands)]
@@ -331,18 +314,55 @@ def warp(src, output_shape=None, extent=None, nproc=1, fake=False):
         pool.join()
         warped = result.get()
 
-    for i in range(N_bands):
-        org_band = src.GetRasterBand(i+1)
-        new_band = tmp.GetRasterBand(i+1)
-        new_band.WriteArray(warped[i])
-        new_band.SetNoDataValue(NO_DATA_VALUE)
-        new_band.SetMetadata(org_band.GetMetadata())
-    transform = (output_lon_start, lon_step, lonlat_step,
-                 output_lat_start, latlon_step, lat_step)
-    tmp.SetGeoTransform(transform)
-    tmp.SetMetadata(src.GetMetadata())
-    return tmp
+    if as_gdal:
+        #
+        # Create GDAL dataset from numpy array.
+        #
+        return _make_gdal_dataset(warped, src)
+    else:
+        return warped
 
+
+def _read_and_warp(path, **kwargs):
+    src = gdal.Open(path)
+    return warp(src, **kwargs)
+
+
+def read_together(paths, output_shape=None, nproc=None):
+    datasets = [gdal.Open(p) for p in paths]
+    extent = combined_extent(datasets)
+    if output_shape is None:
+        # TODO: automatically determine shape from resolution
+        output_shape = (4000, 4000)
+    if nproc is None:
+        nproc = mp.cpu_count()
+    pool = mp.Pool(nproc)
+    warp_fn = partial(_read_and_warp, output_shape=output_shape, extent=extent,
+                      as_gdal=False)
+    result = pool.map_async(warp_fn, paths)
+    pool.close()
+    pool.join()
+    warped = result.get()
+    warped = [_make_gdal_dataset(w, d) for w, d in zip(warped, datasets)]
+    return warped
+
+
+@profile
+def warp_together(datasets, output_shape=None, nproc=None):
+    extent = combined_extent(datasets)
+    if output_shape is None:
+        output_shape = (4000, 4000)
+    if nproc is None:
+        nproc = mp.cpu_count()
+    pool = mp.Pool(nproc)
+    warp_fn = partial(warp, output_shape=output_shape, extent=extent,
+                      as_gdal=False)
+    result = pool.map_async(warp_fn, datasets)
+    pool.close()
+    pool.join()
+    warped = result.get()
+    warped = [_make_gdal_dataset(w, d) for w, d in zip(warped, datasets)]
+    return warped
 
 # @profile
 # def blockgen(array, bpa):
@@ -350,13 +370,13 @@ def warp(src, output_shape=None, extent=None, nproc=1, fake=False):
 #     https://stackoverflow.com/a/16865342
 #
 #     Creates a generator that yields multidimensional blocks from the given
-#     array(_like); bpa is an array_like consisting of the number of blocks per axis
-#     (minimum of 1, must be a divisor of the corresponding axis size of array). As
-#     the blocks are selected using normal numpy slicing, they will be views rather
-#     than copies; this is good for very large multidimensional arrays that are being
-#     blocked, and for very large blocks, but it also means that the result must be
-#     copied if it is to be modified (unless modifying the original data as well is
-#     intended).
+#     array(_like); bpa is an array_like consisting of the number of blocks
+#     per axis (minimum of 1, must be a divisor of the corresponding axis size
+#     of array). As the blocks are selected using normal numpy slicing, they
+#     will be views rather than copies; this is good for very large
+#     multidimensional arrays that are being blocked, and for very large
+#     blocks, but it also means that the result must be copied if it is to be
+#     modified (unless modifying the original data as well is intended).
 #     """
 #     bpa = np.asarray(bpa) # in case bpa wasn't already an ndarray
 #
@@ -411,7 +431,7 @@ def chunks(l, n):
             yield l[i:i + n]
 
 
-def array_chunks(array, n, axis=0):
+def array_chunks(array, n, axis=0, return_indices=False):
     if axis >= array.ndim:
         raise ValueError("axis {:d} is out of range for given array."
                          .format(axis))
@@ -421,7 +441,10 @@ def array_chunks(array, n, axis=0):
     for i in range_fn(0, arr_len, n):
         indices = [slice(None), ] * array.ndim
         indices[axis] = slice(i, i+n)
-        yield array[indices]
+        if return_indices:
+            yield indices, array[indices]
+        else:
+            yield array[indices]
 
 
 # def blockmerge(array, bpa):
@@ -515,7 +538,7 @@ def block_merge(array_list, blocks):
 
 # def efficient_map_coordinates(input, coord_map, output_shape=None,
 #                               output=np.float32, **kwargs):
-#     ## Generate output array.
+#     # Generate output array.
 #     if output_shape is None:
 #         output_shape = input.shape
 #     result = np.empty(output_shape)
@@ -537,11 +560,11 @@ def parallel_map_coordinates(input, coordinates, nproc=1, fake=False,
     A parallel version of scipy.ndimage.interpolation.map_coordinates().
     """
     # coordinate_chunks = np.array_split(coordinates, nproc, axis=1)
-    blocks = (2,2)
+    blocks = (2, 2)
     coordinate_chunks = [_ for _ in block_split(coordinates, (1,)+blocks)]
-    ##
-    ## Possibly cut input to only cover [chunk.min(),chunk.max()]
-    ##
+    #
+    # Possibly cut input to only cover [chunk.min(),chunk.max()]
+    #
     # ...
     input_chunks = []
     for c in coordinate_chunks:
@@ -561,7 +584,7 @@ def parallel_map_coordinates(input, coordinates, nproc=1, fake=False,
                      for cchunk, ichunk in zip(coordinate_chunks,
                                                input_chunks)]
     # return
-    ## DEBUG: in serial
+    # DEBUG: in serial
     if fake:
         individual_results = [map_coordinates_wrapper(chunk)
                               for chunk in kwargs_chunks]
@@ -724,9 +747,9 @@ def to_xr(src):
     x, y = src.RasterXSize, src.RasterYSize
     meta = src.GetMetadata()
     times = [str2date(meta['ACQUISITION_START_TIME'])]
-    ##
-    ## Determine whether the dataset uses GCPs or GeoTransform.
-    ##
+    #
+    # Determine whether the dataset uses GCPs or GeoTransform.
+    #
     if src.GetGCPCount() > 0:
         lat, lon = llgrid(src)
         ds = xr.Dataset(coords={'lat': (['x', 'y'], lat),
@@ -757,15 +780,15 @@ def merge_datasets(datasets):
     """
     Merge a list of xarray datasets.
     """
-    ##
-    ## Step 1. Regrid onto common lat-lon grid.
-    ##
+    #
+    # Step 1. Regrid onto common lat-lon grid.
+    #
     # Determine individual resolutions. Store as metadata?
     #
 
-    ##
-    ## Step 2. Concatenate along time axis.
-    ##
+    #
+    # Step 2. Concatenate along time axis.
+    #
 
 
 def scaled_gcps(src, output_shape):
@@ -862,9 +885,19 @@ def gcp_extent(src):
     gcp_df = get_gcp_df(src)
     lon = gcp_df['GCPX']
     lat = gcp_df['GCPY']
-    alt = gcp_df['GCPZ']
-    extent = [lon.min(), lat.min(), lon.max(), lat.max()]
-    return extent
+    # alt = gcp_df['GCPZ']
+    return [lon.min(), lat.min(), lon.max(), lat.max()]
+
+
+def combined_extent(datasets):
+    extents = np.array([gcp_extent(d) for d in datasets])
+    combined_extent = [
+        extents[:, 0].min(),
+        extents[:, 1].min(),
+        extents[:, 2].max(),
+        extents[:, 3].max(),
+    ]
+    return combined_extent
 
 
 def read_tiffs(tiffs):
@@ -885,16 +918,9 @@ def read_tiffs(tiffs):
         A list of the warped datasets.
     """
     datasets = [gdal.Open(t) for t in tiffs]
-    extents = np.array([gcp_extent(d) for d in datasets])
-    combined_extent = [
-        extents[:, 0].min(),
-        extents[:, 1].min(),
-        extents[:, 2].max(),
-        extents[:, 3].max(),
-    ]
-    warped = [warp(d, output_shape=(1000, 1000), extent=combined_extent)
+    extent = combined_extent(datasets)
+    warped = [warp(d, output_shape=(1000, 1000), extent=extent)
               for d in datasets]
-
     return warped
 
 
@@ -938,96 +964,97 @@ def latlon_fit(src, degree=2, inverse=False):
         """
         if not type(X) is np.ndarray or not len(X.shape) == 2:
             X = np.array([X])
-        ##
-        ## If X is very large, split into chunks.
-        ##
+        #
+        # If X is very large, split into chunks.
+        #
         # Empirical optimal chunk sizes (approximately):
         # chunk size | len(X) | degree
         # -----------|--------|--------
         # 8000       | 1e8    | 3
         # 8000       | 1e8    | 2
-        res = []
-        for chunk in array_chunks(X, 8000, axis=0):
+        res = np.empty_like(X)
+        for index, chunk in array_chunks(X, 8000, axis=0, return_indices=True):
             p = poly.transform(chunk)
-            res.append(clf.predict(p))
-        return np.concatenate(res)
+            res[index] = clf.predict(p)
+        return res
 
     return fn
 
 
-def read_S1_GRD(path):
-    N = 10
-    data_path = os.path.join(path, 'measurement')
-    tiffs = [os.path.join(data_path, _) for _ in os.listdir(data_path)
-             if _.endswith('.tiff')]
-    ## GET GEO REFERENCE
-    gdata = gdal.Open(tiffs[0])
-    gcp_df = get_gcp_df(gdata)
-    ## INTERPOLATE
-    poly = PolynomialFeatures(degree=2)
-    regressor = poly.fit_transform(gcp_df[['GCPLine', 'GCPPixel']])
-    regressand = gcp_df[['GCPX', 'GCPY']]
-    clf = linear_model.LinearRegression()
-    clf.fit(regressor, regressand)
-    ## SCORE INTERPOLATION
-    # clf.score(regressor,regressand)
-    # from sklearn.metrics import r2_score
-    # pred = clf.predict(regressor)
-    # r2_score(regressand,pred)
+# def read_S1_GRD(path):
+#     N = 10
+#     data_path = os.path.join(path, 'measurement')
+#     tiffs = [os.path.join(data_path, _) for _ in os.listdir(data_path)
+#              if _.endswith('.tiff')]
+#     # GET GEO REFERENCE
+#     gdata = gdal.Open(tiffs[0])
+#     gcp_df = get_gcp_df(gdata)
+#     # INTERPOLATE
+#     poly = PolynomialFeatures(degree=2)
+#     regressor = poly.fit_transform(gcp_df[['GCPLine', 'GCPPixel']])
+#     regressand = gcp_df[['GCPX', 'GCPY']]
+#     clf = linear_model.LinearRegression()
+#     clf.fit(regressor, regressand)
+#     # SCORE INTERPOLATION
+#     # clf.score(regressor,regressand)
+#     # from sklearn.metrics import r2_score
+#     # pred = clf.predict(regressor)
+#     # r2_score(regressand,pred)
+#
+#     # RESAMPLE
+#     xs = range(gdata.RasterXSize)[::N]
+#     ys = range(gdata.RasterYSize)[::N]
+#     xygrid = np.stack(np.meshgrid(xs, ys), axis=-1)
+#
+#     # GENERATE LAT LON GRID
+#     xygrid_flat = xygrid.reshape((-1, 2))
+#     llgrid_flat = clf.predict(poly.fit_transform(xygrid_flat))
+#     ll_grid = llgrid_flat.reshape(xygrid.shape[:2] + llgrid_flat.shape[-1:])
+#     result = ll_grid
+#
+#     for tiff in tiffs:
+#         # OPEN FILE
+#         gdata = gdal.Open(tiff)
+#         data = gdata.ReadAsArray()
+#         # RESAMPLE
+#         data_ = data[::N, ::N]
+#         # APPEND TO RESULT
+#         result = np.concatenate([result,
+#                                  np.expand_dims(data_, axis=2)], axis=2)
+#
+#     return result
 
-    ## RESAMPLE
-    xs = range(gdata.RasterXSize)[::N]
-    ys = range(gdata.RasterYSize)[::N]
-    xygrid = np.stack(np.meshgrid(xs, ys), axis=-1)
-
-    ## GENERATE LAT LON GRID
-    xygrid_flat = xygrid.reshape((-1, 2))
-    llgrid_flat = clf.predict(poly.fit_transform(xygrid_flat))
-    ll_grid = llgrid_flat.reshape(xygrid.shape[:2] + llgrid_flat.shape[-1:])
-    result = ll_grid
-
-    for tiff in tiffs:
-        ## OPEN FILE
-        gdata = gdal.Open(tiff)
-        data = gdata.ReadAsArray()
-        ## RESAMPLE
-        data_ = data[::N, ::N]
-        ## APPEND TO RESULT
-        result = np.concatenate([result,
-                                 np.expand_dims(data_, axis=2)], axis=2)
-
-    return result
 
 # ------------------------------------------------------------------------ #
 # DEBUGGING
 # ------------------------------------------------------------------------ #
-import linecache
-
-
-def display_top(snapshot, key_type='lineno', limit=10):
-    snapshot = snapshot.filter_traces((
-        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-        tracemalloc.Filter(False, "<unknown>"),
-    ))
-    top_stats = snapshot.statistics(key_type)
-
-    print("Top %s lines" % limit)
-    for index, stat in enumerate(top_stats[:limit], 1):
-        frame = stat.traceback[0]
-        # replace "/path/to/module/file.py" with "module/file.py"
-        filename = os.sep.join(frame.filename.split(os.sep)[-2:])
-        print("#%s: %s:%s: %.1f KiB"
-              % (index, filename, frame.lineno, stat.size / 1024))
-        line = linecache.getline(frame.filename, frame.lineno).strip()
-        if line:
-            print('    %s' % line)
-
-    other = top_stats[limit:]
-    if other:
-        size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
-    total = sum(stat.size for stat in top_stats)
-    print("Total allocated size: %.1f KiB" % (total / 1024))
+# import linecache
+#
+#
+# def display_top(snapshot, key_type='lineno', limit=10):
+#     snapshot = snapshot.filter_traces((
+#         tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+#         tracemalloc.Filter(False, "<unknown>"),
+#     ))
+#     top_stats = snapshot.statistics(key_type)
+#
+#     print("Top %s lines" % limit)
+#     for index, stat in enumerate(top_stats[:limit], 1):
+#         frame = stat.traceback[0]
+#         # replace "/path/to/module/file.py" with "module/file.py"
+#         filename = os.sep.join(frame.filename.split(os.sep)[-2:])
+#         print("#%s: %s:%s: %.1f KiB"
+#               % (index, filename, frame.lineno, stat.size / 1024))
+#         line = linecache.getline(frame.filename, frame.lineno).strip()
+#         if line:
+#             print('    %s' % line)
+#
+#     other = top_stats[limit:]
+#     if other:
+#         size = sum(stat.size for stat in other)
+#         print("%s other: %.1f KiB" % (len(other), size / 1024))
+#     total = sum(stat.size for stat in top_stats)
+#     print("Total allocated size: %.1f KiB" % (total / 1024))
 
 
 if __name__ == '__main__':
