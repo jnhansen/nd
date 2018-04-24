@@ -4,7 +4,7 @@ import xarray as xr
 # import os
 import sys
 # import time
-from osgeo import gdal, osr
+from osgeo import gdal, osr, gdal_array
 # from sklearn.preprocessing import PolynomialFeatures
 # from sklearn import linear_model
 import multiprocessing as mp
@@ -54,7 +54,7 @@ def str2date(string, fmt=None):
 # ----------------------------------------------------------------------- #
 
 
-def parallel_warp(src, output_shape=None):
+def parallel_warp(src, shape=None):
     """
     """
     arr = src.ReadAsArray()
@@ -72,7 +72,7 @@ def parallel_warp(src, output_shape=None):
     return np.concatenate(individual_results)
 
 
-def gcps2xygrid(gcps, output_shape, extent=None):
+def gcps2xygrid(gcps, shape, extent=None):
     attrs = ['GCPLine', 'GCPPixel', 'GCPX', 'GCPY', 'GCPZ']
     gcp_data = [{attr: getattr(gcp, attr) for attr in attrs} for gcp in gcps]
     gcp_df = pd.DataFrame(gcp_data)
@@ -89,7 +89,7 @@ def gcps2xygrid(gcps, output_shape, extent=None):
     else:
         lon_range = extent[0::2]
         lat_range = extent[1::2]
-    N_lat, N_lon = output_shape
+    N_lat, N_lon = shape
     warped_grid_lon, warped_grid_lat = np.meshgrid(
         np.linspace(lon_range[0], lon_range[1], N_lon),
         np.linspace(lat_range[0], lat_range[1], N_lat)
@@ -109,7 +109,7 @@ def gcps2xygrid(gcps, output_shape, extent=None):
     return grid_y_interp, grid_x_interp
 
 
-# def gcps2llgrid(gcps, output_shape):
+# def gcps2llgrid(gcps, shape):
 #     attrs = ['GCPLine', 'GCPPixel', 'GCPX', 'GCPY', 'GCPZ']
 #     gcp_data = [{attr: getattr(gcp, attr) for attr in attrs} for gcp in gcps]
 #     gcp_df = pd.DataFrame(gcp_data)
@@ -119,13 +119,13 @@ def gcps2xygrid(gcps, output_shape, extent=None):
 #
 #     lat_range = [lat.min(), lat.max()]
 #     lon_range = [lon.min(), lon.max()]
-#     N_lat, N_lon = output_shape
+#     N_lat, N_lon = shape
 #     warped_grid_lon, warped_grid_lat = np.meshgrid(
 #         np.linspace(lon_range[0], lon_range[1], N_lon),
 #         np.linspace(lat_range[0], lat_range[1], N_lat)
 #     )
 #
-#     grid_x, grid_y = np.mgrid[0:output_shape[0], 0:output_shape[1]]
+#     grid_x, grid_y = np.mgrid[0:shape[0], 0:shape[1]]
 #     #
 #     # Interpolate the (lat,lon) coordinates for every pixel.
 #     #
@@ -140,7 +140,7 @@ def gcps2xygrid(gcps, output_shape, extent=None):
 
 
 @profile
-def llgrid(src, output_shape=None, interpolate=False):
+def llgrid(src, shape=None, interpolate=False):
     """
     Generate a grid with the lat-lon coordinates of a GDAL dataset.
 
@@ -148,10 +148,10 @@ def llgrid(src, output_shape=None, interpolate=False):
     ----------
     src : osgeo.gdal.DataSet
         The input data set.
-    output_shape : tuple, opt
+    shape : tuple, optional
         The shape of the output raster (default: None).
         If None, infer from data.
-    interpolate : bool, opt
+    interpolate : bool, optional
         If True, fill the grid by interpolation from GCPs. Otherwise,
         fit a polynomial to lat(x,y) and lon(x,y). (default: False)
 
@@ -166,10 +166,10 @@ def llgrid(src, output_shape=None, interpolate=False):
     gcp_df = get_gcp_df(src)
     lon = gcp_df['GCPX']
     lat = gcp_df['GCPY']
-    if output_shape is None:
+    if shape is None:
         N_lat, N_lon = src.RasterYSize, src.RasterXSize
     else:
-        N_lat, N_lon = output_shape
+        N_lat, N_lon = shape
     grid_x, grid_y = np.meshgrid(
         np.linspace(0, src.RasterXSize-1, N_lon),
         np.linspace(0, src.RasterYSize-1, N_lat)
@@ -192,17 +192,62 @@ def llgrid(src, output_shape=None, interpolate=False):
     return grid_lat, grid_lon
 
 
+def _get_native_resolution(src):
+    # lon_min, lat_min, lon_max, lat_max = gcp_extent(src)
+    # lon_mean = (lon_min + lon_max) / 2
+    # lat_mean = (lat_min + lat_max) / 2
+    # ll2xy = latlon_fit(src, degree=3, inverse=True)
+    # bounds = ll2xy(np.array([
+    #     [lat_mean, lon_min],
+    #     [lat_mean, lon_max],
+    #     [lat_min, lon_mean],
+    #     [lat_max, lon_mean],
+    # ]))
+    # lon_res = (lon_max - lon_min) / np.linalg.norm(bounds[1] - bounds[0])
+    # lat_res = (lat_max - lat_min) / np.linalg.norm(bounds[3] - bounds[2])
+    # (lon_max - lon_min) / lon_res
+    # (lat_max - lat_min) / lat_res
+
+    # get corner coordinates
+    gcps = get_gcp_df(src)
+    line_extent = [gcps.GCPLine.min(), gcps.GCPLine.max()]
+    pixel_extent = [gcps.GCPPixel.min(), gcps.GCPPixel.max()]
+    corners = gcps.loc[gcps.GCPLine.isin(line_extent)] \
+                  .loc[gcps.GCPPixel.isin(pixel_extent)]
+
+    # set up system of linear equations to solve
+    A = np.array([
+        [(corners.GCPLine.iloc[1] - corners.GCPLine.iloc[0]) ** 2,
+         (corners.GCPPixel.iloc[1] - corners.GCPPixel.iloc[0]) ** 2],
+        [(corners.GCPLine.iloc[2] - corners.GCPLine.iloc[1]) ** 2,
+         (corners.GCPPixel.iloc[2] - corners.GCPPixel.iloc[1]) ** 2]
+    ])
+    b = np.array([
+        (corners.GCPX.iloc[1] - corners.GCPX.iloc[0]) ** 2 +
+        (corners.GCPY.iloc[1] - corners.GCPY.iloc[0]) ** 2,
+        (corners.GCPX.iloc[2] - corners.GCPX.iloc[1]) ** 2 +
+        (corners.GCPY.iloc[2] - corners.GCPY.iloc[1]) ** 2
+    ])
+    return np.sqrt(np.linalg.solve(A, b))
+
+
 @profile
-def _get_warp_coords(src, shape=None, extent=None):
+def _get_warp_coords(src, shape=None, extent=None, resolution=None):
     #
     # Prepare the output data array (decide on resolution here).
+    # If resolution is given, ignore shape.
     #
     if extent is None:
         extent = gcp_extent(src)
-    if shape is None:
-        N_lat, N_lon = src.RasterYSize, src.RasterXSize
+    if shape is None or resolution is not None:
+        if resolution is None:
+            resolution = _get_native_resolution(src)
+        N_lon = int((extent[2] - extent[0]) / resolution[0])
+        N_lat = int((extent[3] - extent[1]) / resolution[1])
     else:
         N_lat, N_lon = shape
+    # else:
+    #     N_lat, N_lon = src.RasterYSize, src.RasterXSize
     # output_lon_start = output_lon_range[0]
     # output_lat_start = output_lat_range[0]
     # lonlat_step = 0
@@ -241,13 +286,18 @@ def _map_single_raster(arr, coords):
     return mapped
 
 
+# def _gdal_to_gtiff(src, filename):
+#     driver = gdal.GetDriverByName("GTiff")
+
+
 def _make_gdal_dataset(data, src):
     if not isinstance(data, list):
         data = [data]
     N_bands = len(data)
     N_lat, N_lon = data[0].shape
+    gdal_dtype = gdal_array.NumericTypeCodeToGDALTypeCode(data[0].dtype)
     tmp = gdal.GetDriverByName('MEM').Create('', N_lon, N_lat, N_bands,
-                                             gdal.GDT_Float32)
+                                             gdal_dtype)
 
     for i in range(N_bands):
         org_band = src.GetRasterBand(i+1)
@@ -271,8 +321,8 @@ def _make_gdal_dataset(data, src):
 
 
 @profile
-def warp(src, output_shape=None, extent=None, nproc=1, fake=False,
-         as_gdal=True):
+def warp(src, shape=None, extent=None, resolution=None, nproc=1,
+         fake=False, as_gdal=True):
     """
     Warps a GDAL dataset onto a lat-lon grid (equirectangular projection).
 
@@ -281,14 +331,17 @@ def warp(src, output_shape=None, extent=None, nproc=1, fake=False,
     Parameters
     ----------
     src : osgeo.gdal.Dataset
-    output_shape : tuple, opt
+    shape : tuple, optional
         The shape of the output raster (default: None).
         If None, infer from data.
-    extent : list, opt
+    extent : list, optional
         The lat-lon extent of the output raster as
         [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat] (default: None).
         If None, infer from data.
-    nproc : int, opt
+    resolution : tuple, optional
+        The lon/lat resolution (default: None).
+        If None, infer from data.
+    nproc : int, optional
         The number of parallel processes to use (default: 1).
 
     Returns
@@ -298,7 +351,8 @@ def warp(src, output_shape=None, extent=None, nproc=1, fake=False,
         that can be accessed as `osgeo.gdal.Dataset.GetGeoTransform()`.
     """
     N_bands = src.RasterCount
-    coords, extent = _get_warp_coords(src, shape=output_shape, extent=extent)
+    coords, extent = _get_warp_coords(src, shape=shape, extent=extent,
+                                      resolution=resolution)
     N_lat, N_lon = coords.shape[1:]
 
     if nproc == 1:
@@ -328,16 +382,16 @@ def _read_and_warp(path, **kwargs):
     return warp(src, **kwargs)
 
 
-def read_together(paths, output_shape=None, nproc=None):
+def read_together(paths, shape=None, nproc=None):
     datasets = [gdal.Open(p) for p in paths]
     extent = combined_extent(datasets)
-    if output_shape is None:
+    if shape is None:
         # TODO: automatically determine shape from resolution
-        output_shape = (4000, 4000)
+        shape = (4000, 4000)
     if nproc is None:
         nproc = mp.cpu_count()
     pool = mp.Pool(nproc)
-    warp_fn = partial(_read_and_warp, output_shape=output_shape, extent=extent,
+    warp_fn = partial(_read_and_warp, shape=shape, extent=extent,
                       as_gdal=False)
     result = pool.map_async(warp_fn, paths)
     pool.close()
@@ -348,14 +402,14 @@ def read_together(paths, output_shape=None, nproc=None):
 
 
 @profile
-def warp_together(datasets, output_shape=None, nproc=None):
+def warp_together(datasets, shape=None, nproc=None):
     extent = combined_extent(datasets)
-    if output_shape is None:
-        output_shape = (4000, 4000)
+    if shape is None:
+        shape = (4000, 4000)
     if nproc is None:
         nproc = mp.cpu_count()
     pool = mp.Pool(nproc)
-    warp_fn = partial(warp, output_shape=output_shape, extent=extent,
+    warp_fn = partial(warp, shape=shape, extent=extent,
                       as_gdal=False)
     result = pool.map_async(warp_fn, datasets)
     pool.close()
@@ -536,12 +590,12 @@ def block_merge(array_list, blocks):
     return result[0]
 
 
-# def efficient_map_coordinates(input, coord_map, output_shape=None,
+# def efficient_map_coordinates(input, coord_map, shape=None,
 #                               output=np.float32, **kwargs):
 #     # Generate output array.
-#     if output_shape is None:
-#         output_shape = input.shape
-#     result = np.empty(output_shape)
+#     if shape is None:
+#         shape = input.shape
+#     result = np.empty(shape)
 #     result[:] = cval
 #     map_coordinates(src.GetRasterBand(i+1).ReadAsArray(), coords,
 #                     output=np.float32, order=3, cval=NO_DATA_VALUE)
@@ -791,7 +845,7 @@ def merge_datasets(datasets):
     #
 
 
-def scaled_gcps(src, output_shape):
+def scaled_gcps(src, shape):
     """
     Given a source dataset, scale the available GCPs to match the specified
     output shape.
@@ -800,7 +854,7 @@ def scaled_gcps(src, output_shape):
     ----------
     src : osgeo.gdal.Dataset
         The dataset, including GCPs.
-    output_shape : tuple
+    shape : tuple
         The shape that the GCPs need to be scaled to.
 
     Returns
@@ -811,8 +865,8 @@ def scaled_gcps(src, output_shape):
     """
     gcps = src.GetGCPs()
     input_shape = (src.RasterYSize, src.RasterXSize)
-    factor_y = float(output_shape[0]) / input_shape[0]
-    factor_x = float(output_shape[1]) / input_shape[1]
+    factor_y = float(shape[0]) / input_shape[0]
+    factor_x = float(shape[1]) / input_shape[1]
     new_gcps = tuple(gdal.GCP(gcp.GCPX, gcp.GCPY, gcp.GCPZ,
                               gcp.GCPPixel*factor_x, gcp.GCPLine*factor_y,
                               gcp.Info, gcp.Id) for gcp in gcps)
@@ -919,7 +973,7 @@ def read_tiffs(tiffs):
     """
     datasets = [gdal.Open(t) for t in tiffs]
     extent = combined_extent(datasets)
-    warped = [warp(d, output_shape=(1000, 1000), extent=extent)
+    warped = [warp(d, shape=(1000, 1000), extent=extent)
               for d in datasets]
     return warped
 
@@ -932,9 +986,9 @@ def latlon_fit(src, degree=2, inverse=False):
     Parameters
     ----------
     src : gdal.DataSet
-    degree : int, opt
+    degree : int, optional
         The polynomial degree to be fitted (default: 2)
-    inverse : bool, opt
+    inverse : bool, optional
         If True, fit x,y as function of lat,lon (default: False).
 
     Returns
@@ -1063,18 +1117,18 @@ if __name__ == '__main__':
 
     path = '/Users/jhansen/ED/indonesia/S1A_IW_GRDH_1SDV_20180111T225606_20180111T225631_020113_0224BA_A598.SAFE/manifest.safe'
     src = gdal.Open(path)
-    output_shape = (10000, 10000)
-    # output_shape=None
-    # lat,lon = llgrid(src, output_shape)
+    shape = (10000, 10000)
+    # shape=None
+    # lat,lon = llgrid(src, shape)
 
     # t1 = time.time()
-    warped = warp(src, output_shape=output_shape)
+    warped = warp(src, shape=shape)
     # t2 = time.time()
     # print('serial:        {:.1f}s'.format(t2-t1))
-    # warped_parallel = warp(src, output_shape=output_shape, nproc=mp.cpu_count())
+    # warped_parallel = warp(src, shape=shape, nproc=mp.cpu_count())
     # t3 = time.time()
     # print('parallel:      {:.1f}s'.format(t3-t2))
-    # warped_parallel_fake = warp(src, output_shape=output_shape, nproc=mp.cpu_count(), fake=True)
+    # warped_parallel_fake = warp(src, shape=shape, nproc=mp.cpu_count(), fake=True)
     # t4 = time.time()
     # print('fake parallel: {:.1f}s'.format(t4-t3))
 
