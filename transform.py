@@ -455,8 +455,6 @@ def read_together(paths, shape=None, extent=None, nproc=None,
     pool.close()
     pool.join()
     warped = result.get()
-    warped = [_make_gdal_dataset(w, d, extent=extent, outfile=o) for w, d, o in
-              zip(warped, datasets, outfiles)]
     return warped
 
 
