@@ -845,9 +845,6 @@ def align_and_merge(src_datasets, resolution=None, mode='union'):
     return res
 
 
-def concatenate
-
-
 def to_xr(src):
     """
     Convert GDAL dataset to xarray dataset.
