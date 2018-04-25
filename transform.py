@@ -382,12 +382,10 @@ def _read_and_warp(path, **kwargs):
     return warp(src, **kwargs)
 
 
-def read_together(paths, shape=None, nproc=None):
+def read_together(paths, shape=None, extent=None, nproc=None):
     datasets = [gdal.Open(p) for p in paths]
-    extent = combined_extent(datasets)
-    if shape is None:
-        # TODO: automatically determine shape from resolution
-        shape = (4000, 4000)
+    if extent is None:
+        extent = combined_extent(datasets)
     if nproc is None:
         nproc = mp.cpu_count()
     pool = mp.Pool(nproc)
@@ -402,10 +400,9 @@ def read_together(paths, shape=None, nproc=None):
 
 
 @profile
-def warp_together(datasets, shape=None, nproc=None):
-    extent = combined_extent(datasets)
-    if shape is None:
-        shape = (4000, 4000)
+def warp_together(datasets, shape=None, extent=None, nproc=None):
+    if extent is None:
+        extent = combined_extent(datasets)
     if nproc is None:
         nproc = mp.cpu_count()
     pool = mp.Pool(nproc)
