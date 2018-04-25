@@ -427,11 +427,13 @@ def _read_and_warp(path, **kwargs):
     return warp(src, **kwargs)
 
 
-def read_together(paths, shape=None, extent=None, nproc=None,
-                  write_to_dir=None):
+def read_together(paths, shape=None, extent=None, resolution=None,
+                  nproc=None, write_to_dir=None):
     datasets = [gdal.Open(p) for p in paths]
     if extent is None:
         extent = combined_extent(datasets)
+    if resolution is None:
+        resolution = combined_resolution(datasets, 'min')
     if nproc is None:
         nproc = mp.cpu_count()
 
@@ -449,7 +451,8 @@ def read_together(paths, shape=None, extent=None, nproc=None,
                                  ) + '.tiff' for p in paths]
 
     kwargs = [{'path': p, 'outfile': o, 'shape': shape, 'extent': extent,
-               'as_gdal': as_gdal} for p, o in zip(paths, outfiles)]
+               'resolution': resolution, 'as_gdal': as_gdal}
+              for p, o in zip(paths, outfiles)]
 
     result = pool.map_async(_read_and_warp_wrapper, kwargs)
     pool.close()
@@ -842,6 +845,9 @@ def align_and_merge(src_datasets, resolution=None, mode='union'):
     return res
 
 
+def concatenate
+
+
 def to_xr(src):
     """
     Convert GDAL dataset to xarray dataset.
@@ -1008,6 +1014,17 @@ def combined_extent(datasets):
         extents[:, 3].max(),
     ]
     return combined_extent
+
+
+def combined_resolution(datasets, mode='min'):
+    resolutions = np.array([_get_native_resolution(d) for d in datasets])
+    if mode == 'min':
+        combined_resolution = resolutions.min(axis=0)
+    elif mode == 'max':
+        combined_resolution = resolutions.max(axis=0)
+    elif mode == 'mean':
+        combined_resolution = resolutions.mean(axis=0)
+    return combined_resolution
 
 
 def read_tiffs(tiffs):
