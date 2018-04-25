@@ -300,7 +300,7 @@ def _get_driver_from_filename(filename):
         return 'MEM'
 
 
-def _make_gdal_dataset(data, src, driver='auto', outfile=None):
+def _make_gdal_dataset(data, src, outfile=None, driver='auto'):
     """
     Create new GDAL dataset from given data.
 
@@ -325,30 +325,35 @@ def _make_gdal_dataset(data, src, driver='auto', outfile=None):
                                               gdal_dtype)
 
     for i in range(N_bands):
-        org_band = src.GetRasterBand(i+1)
         new_band = tmp.GetRasterBand(i+1)
         new_band.WriteArray(data[i])
         new_band.SetNoDataValue(NO_DATA_VALUE)
-        new_band.SetMetadata(org_band.GetMetadata())
+        if src is not None:
+            org_band = src.GetRasterBand(i+1)
+            new_band.SetMetadata(org_band.GetMetadata())
 
-    extent = gcp_extent(src)
-    output_lon_start = extent[0]
-    output_lat_start = extent[1]
-    lonlat_step = 0
-    latlon_step = 0
-    lat_step = (extent[3] - extent[1]) / (N_lat - 1)
-    lon_step = (extent[2] - extent[0]) / (N_lon - 1)
-    transform = (output_lon_start, lon_step, lonlat_step,
-                 output_lat_start, latlon_step, lat_step)
-    tmp.SetGeoTransform(transform)
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG(4326)
-    tmp.SetProjection(srs.ExportToWkt())
-    tmp.SetMetadata(src.GetMetadata())
+    if src is not None:
+        # Copy all metadata and projection information
+        extent = gcp_extent(src)
+        output_lon_start = extent[0]
+        output_lat_start = extent[1]
+        lonlat_step = 0
+        latlon_step = 0
+        lat_step = (extent[3] - extent[1]) / (N_lat - 1)
+        lon_step = (extent[2] - extent[0]) / (N_lon - 1)
+        transform = (output_lon_start, lon_step, lonlat_step,
+                     output_lat_start, latlon_step, lat_step)
+        tmp.SetGeoTransform(transform)
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(4326)
+        tmp.SetProjection(srs.ExportToWkt())
+        tmp.SetMetadata(src.GetMetadata())
+
     if driver != 'MEM':
         # write to disk
         tmp.FlushCache()
         tmp = None
+
     return tmp
 
 
@@ -414,12 +419,14 @@ def _read_and_warp(path, **kwargs):
     return warp(src, **kwargs)
 
 
-def read_together(paths, shape=None, extent=None, nproc=None):
+def read_together(paths, shape=None, extent=None, nproc=None,
+                  write_to_dir=None):
     datasets = [gdal.Open(p) for p in paths]
     if extent is None:
         extent = combined_extent(datasets)
     if nproc is None:
         nproc = mp.cpu_count()
+    # outfile = None if
     pool = mp.Pool(nproc)
     warp_fn = partial(_read_and_warp, shape=shape, extent=extent,
                       as_gdal=False)
@@ -427,7 +434,16 @@ def read_together(paths, shape=None, extent=None, nproc=None):
     pool.close()
     pool.join()
     warped = result.get()
-    warped = [_make_gdal_dataset(w, d) for w, d in zip(warped, datasets)]
+    if write_to_dir is None:
+        outfiles = [None for p in paths]
+    else:
+        outfiles = [os.path.join(write_to_dir,
+                                 os.path.splitext(
+                                    os.path.split(
+                                        os.path.split(p)[0])[1])[0]
+                                 ) + '.tiff' for p in paths]
+    warped = [_make_gdal_dataset(w, d, o) for w, d, o in
+              zip(warped, datasets, outfiles)]
     return warped
 
 
