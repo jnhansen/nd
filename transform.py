@@ -445,7 +445,7 @@ def read_together(paths, shape=None, extent=None, nproc=None,
                                     os.path.split(
                                         os.path.split(p)[0])[1])[0]
                                  ) + '.tiff' for p in paths]
-    warped = [_make_gdal_dataset(w, d, outfile=o) for w, d, o in
+    warped = [_make_gdal_dataset(w, d, extent=extent, outfile=o) for w, d, o in
               zip(warped, datasets, outfiles)]
     return warped
 
