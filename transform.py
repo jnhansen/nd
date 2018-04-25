@@ -9,6 +9,7 @@ from osgeo import gdal, osr, gdal_array
 # from sklearn import linear_model
 import multiprocessing as mp
 from functools import partial
+from itertools import product
 
 # from scipy.ndimage.interpolation import geometric_transform
 from scipy.interpolate import griddata
@@ -417,6 +418,10 @@ def warp(src, shape=None, extent=None, resolution=None, nproc=1,
         return warped
 
 
+def _read_and_warp_wrapper(kwargs):
+    return _read_and_warp(**kwargs)
+
+
 def _read_and_warp(path, **kwargs):
     src = gdal.Open(path)
     return warp(src, **kwargs)
@@ -429,22 +434,27 @@ def read_together(paths, shape=None, extent=None, nproc=None,
         extent = combined_extent(datasets)
     if nproc is None:
         nproc = mp.cpu_count()
-    # outfile = None if
+
     pool = mp.Pool(nproc)
-    warp_fn = partial(_read_and_warp, shape=shape, extent=extent,
-                      as_gdal=False)
-    result = pool.map_async(warp_fn, paths)
-    pool.close()
-    pool.join()
-    warped = result.get()
+
     if write_to_dir is None:
+        as_gdal = False
         outfiles = [None for p in paths]
     else:
+        as_gdal = True
         outfiles = [os.path.join(write_to_dir,
                                  os.path.splitext(
                                     os.path.split(
                                         os.path.split(p)[0])[1])[0]
                                  ) + '.tiff' for p in paths]
+
+    kwargs = [{'path': p, 'outfile': o, 'shape': shape, 'extent': extent,
+               'as_gdal': as_gdal} for p, o in zip(paths, outfiles)]
+
+    result = pool.map_async(_read_and_warp_wrapper, kwargs)
+    pool.close()
+    pool.join()
+    warped = result.get()
     warped = [_make_gdal_dataset(w, d, extent=extent, outfile=o) for w, d, o in
               zip(warped, datasets, outfiles)]
     return warped
