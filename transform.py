@@ -300,7 +300,7 @@ def _get_driver_from_filename(filename):
         return 'MEM'
 
 
-def _make_gdal_dataset(data, src, outfile=None, driver='auto'):
+def _make_gdal_dataset(data, src, extent=None, outfile=None, driver='auto'):
     """
     Create new GDAL dataset from given data.
 
@@ -332,9 +332,8 @@ def _make_gdal_dataset(data, src, outfile=None, driver='auto'):
             org_band = src.GetRasterBand(i+1)
             new_band.SetMetadata(org_band.GetMetadata())
 
-    if src is not None:
-        # Copy all metadata and projection information
-        extent = gcp_extent(src)
+    if extent is not None:
+        # georeference
         output_lon_start = extent[0]
         output_lat_start = extent[1]
         lonlat_step = 0
@@ -347,6 +346,9 @@ def _make_gdal_dataset(data, src, outfile=None, driver='auto'):
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(4326)
         tmp.SetProjection(srs.ExportToWkt())
+
+    if src is not None:
+        # Copy all metadata and projection information
         tmp.SetMetadata(src.GetMetadata())
 
     if driver != 'MEM':
@@ -410,7 +412,7 @@ def warp(src, shape=None, extent=None, resolution=None, nproc=1,
         #
         # Create GDAL dataset from numpy array.
         #
-        return _make_gdal_dataset(warped, src, outfile=outfile)
+        return _make_gdal_dataset(warped, src, extent=extent, outfile=outfile)
     else:
         return warped
 
@@ -443,7 +445,7 @@ def read_together(paths, shape=None, extent=None, nproc=None,
                                     os.path.split(
                                         os.path.split(p)[0])[1])[0]
                                  ) + '.tiff' for p in paths]
-    warped = [_make_gdal_dataset(w, d, o) for w, d, o in
+    warped = [_make_gdal_dataset(w, d, outfile=o) for w, d, o in
               zip(warped, datasets, outfiles)]
     return warped
 
