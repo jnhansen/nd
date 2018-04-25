@@ -353,6 +353,7 @@ def _make_gdal_dataset(data, src, outfile=None, driver='auto'):
         # write to disk
         tmp.FlushCache()
         tmp = None
+        return outfile
 
     return tmp
 
@@ -748,7 +749,7 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
     filled_input = input.copy()
     filled_input[np.isnan(filled_input)] = 0
     result = map_coordinates(filled_input, coords, *args, **kwargs)
-    result[nanmask_mapped] = np.nan
+    result[nanmask_mapped.astype(bool)] = np.nan
     return result
 
 
