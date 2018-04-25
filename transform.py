@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-# import os
+import os
 import sys
 # import time
 from osgeo import gdal, osr, gdal_array
@@ -290,14 +290,39 @@ def _map_single_raster(arr, coords):
 #     driver = gdal.GetDriverByName("GTiff")
 
 
-def _make_gdal_dataset(data, src):
+def _get_driver_from_filename(filename):
+    if filename is None:
+        return 'MEM'
+    ext = os.path.splitext(filename)[1]
+    if ext == '.tiff':
+        return 'GTiff'
+    else:
+        return 'MEM'
+
+
+def _make_gdal_dataset(data, src, driver='auto', outfile=None):
+    """
+    Create new GDAL dataset from given data.
+
+    Parameters
+    ----------
+    data :
+    src : gdal.Dataset
+    driver : GDAL driver, optional
+    outfile : optional
+    """
     if not isinstance(data, list):
         data = [data]
     N_bands = len(data)
     N_lat, N_lon = data[0].shape
     gdal_dtype = gdal_array.NumericTypeCodeToGDALTypeCode(data[0].dtype)
-    tmp = gdal.GetDriverByName('MEM').Create('', N_lon, N_lat, N_bands,
-                                             gdal_dtype)
+    if driver == 'auto':
+        driver = _get_driver_from_filename(outfile)
+    if driver == 'MEM':
+        outfile = ''
+
+    tmp = gdal.GetDriverByName(driver).Create(outfile, N_lon, N_lat, N_bands,
+                                              gdal_dtype)
 
     for i in range(N_bands):
         org_band = src.GetRasterBand(i+1)
@@ -316,13 +341,20 @@ def _make_gdal_dataset(data, src):
     transform = (output_lon_start, lon_step, lonlat_step,
                  output_lat_start, latlon_step, lat_step)
     tmp.SetGeoTransform(transform)
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    tmp.SetProjection(srs.ExportToWkt())
     tmp.SetMetadata(src.GetMetadata())
+    if driver != 'MEM':
+        # write to disk
+        tmp.FlushCache()
+        tmp = None
     return tmp
 
 
 @profile
 def warp(src, shape=None, extent=None, resolution=None, nproc=1,
-         fake=False, as_gdal=True):
+         fake=False, as_gdal=True, outfile=None):
     """
     Warps a GDAL dataset onto a lat-lon grid (equirectangular projection).
 
@@ -372,7 +404,7 @@ def warp(src, shape=None, extent=None, resolution=None, nproc=1,
         #
         # Create GDAL dataset from numpy array.
         #
-        return _make_gdal_dataset(warped, src)
+        return _make_gdal_dataset(warped, src, outfile=outfile)
     else:
         return warped
 
@@ -986,13 +1018,13 @@ def latlon_fit(src, degree=2, inverse=False):
     degree : int, optional
         The polynomial degree to be fitted (default: 2)
     inverse : bool, optional
-        If True, fit x,y as function of lat,lon (default: False).
+        If True, fit x,y as function of lon,lat (default: False).
 
     Returns
     -------
     function
         If `inverse` is False, the returned function converts (y,x) to
-        (lat,lon). Otherwise, the function returns (lat,lon) for an input of
+        (lon,lat). Otherwise, the function returns (lon,lat) for an input of
         (y,x).
 
     """
@@ -1001,17 +1033,17 @@ def latlon_fit(src, degree=2, inverse=False):
     df = get_gcp_df(src)
     poly = PolynomialFeatures(degree=degree)
     if inverse:
-        regressor = poly.fit_transform(df[['GCPY', 'GCPX']])
+        regressor = poly.fit_transform(df[['GCPX', 'GCPY']])
         regressand = df[['GCPLine', 'GCPPixel']]
     else:
         regressor = poly.fit_transform(df[['GCPLine', 'GCPPixel']])
-        regressand = df[['GCPY', 'GCPX']]
+        regressand = df[['GCPX', 'GCPY']]
     clf = linear_model.LinearRegression()
     clf.fit(regressor, regressand)
 
     def fn(X):
         """
-        This function maps from (x,y) to (lat,lon) (or the reverse).
+        This function maps from (x,y) to (lon,lat) (or the reverse).
         """
         if not type(X) is np.ndarray or not len(X.shape) == 2:
             X = np.array([X])
