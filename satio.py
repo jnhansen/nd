@@ -32,7 +32,8 @@ def _make_gdal_dataset(data, src, extent=None, outfile=None, driver='auto'):
     """
     Create new GDAL dataset from given data.
 
-    TODO: implement
+    TODO: Implement. Right now this is the legacy code and it should be altered
+    to accept an xarray Dataset.
 
     Parameters
     ----------
@@ -329,12 +330,14 @@ def _assemble_complex(ds):
 
         try:
             # Treat data as dask array
-            v_cmplx = da.stack([new_ds[vn + '__re'], new_ds[vn + '__im']], axis=-1)
+            v_cmplx = da.stack([new_ds[vn + '__re'], new_ds[vn + '__im']],
+                               axis=-1)
             # Make sure the last axis (complex) is not chunked!
             v_cmplx = v_cmplx.rechunk(v_cmplx.chunks[:-1] + ((2,),))
         except NameError:
             # Treat data as regular numpy array
-            v_cmplx = np.stack([new_ds[vn + '__re'], new_ds[vn + '__im']], axis=-1)
+            v_cmplx = np.stack([new_ds[vn + '__re'], new_ds[vn + '__im']],
+                               axis=-1)
 
         new_ds[vn] = (dims, v_cmplx.view(dtype=cmplx_dtype)[..., 0])
         del new_ds[vn + '__re']
