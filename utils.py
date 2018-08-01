@@ -1,5 +1,11 @@
+"""
+This module provides several helper functions.
+"""
 import sys
 import numpy as np
+import xarray as xr
+import multiprocessing as mp
+from dask import delayed
 import datetime
 from dateutil.tz import tzutc
 from dateutil.parser import parse as parsedate
@@ -15,6 +21,10 @@ def str2date(string, fmt=None):
     if date_object.tzinfo is None:
         date_object = date_object.replace(tzinfo=tzutc())
     return date_object
+
+
+def xygrid(ncols, nrows):
+    return np.meshgrid(np.arange(nrows), np.arange(ncols), copy=False)
 
 
 # @profile
@@ -201,3 +211,104 @@ def block_merge(array_list, blocks):
         result = [np.concatenate(_, axis=axis)
                   for _ in chunks(result, nblocks)]
     return result[0]
+
+
+def xr_split(ds, dim, chunks, buffer=0):
+    """Split an xarray Dataset into chunks.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The original dataset
+    dim : str
+        The dimension along which to split.
+    chunks : int
+        The number of chunks to generate.
+
+    Yields
+    ------
+    xarray.Dataset
+        An individual chunk.
+    """
+    n = ds.sizes[dim]
+    chunksize = int(np.ceil(n / chunks))
+    for i in range(chunks):
+        low = max(i * chunksize - buffer, 0)
+        high = min((i+1) * chunksize + buffer, n)
+        idx = slice(low, high)
+        chunk = ds.isel(**{dim: idx})
+        yield chunk
+
+
+def xr_merge(ds_list, dim, buffer=0):
+    """Reverse split().
+
+    Parameters
+    ----------
+    ds_list : list of xarray.Dataset
+    dim : str
+        The dimension along which to concatenate.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
+    if buffer > 0:
+        idx_first = slice(None, -buffer)
+        idx_middle = slice(buffer, -buffer)
+        idx_end = slice(buffer, None)
+        parts = [ds_list[0].isel(**{dim: idx_first})] + \
+                [ds.isel(**{dim: idx_middle}) for ds in ds_list[1:-1]] + \
+                [ds_list[-1].isel(**{dim: idx_end})]
+    else:
+        parts = ds_list
+    return xr.concat(parts, dim=dim)
+
+
+def parallel(fn, dim=None, chunks=None, buffer=0, compute=True):
+    """
+    Parallelize a function that takes an xarray dataset as first argument.
+
+    Parameters
+    ----------
+    fn : function
+        *Must* take an xarray.Dataset as first argument.
+    dim : str, optional
+        The dimension along which to split the dataset for parallel execution.
+        If not passed, try 'lat' as default dimension.
+    chunks : int, optional
+        The number of chunks to execute in parallel. If not passed, use the
+        number of available CPUs.
+    buffer : int, optional
+        (default: 0)
+    compute : bool, optional
+        If True, return the computed result. Otherwise, return the dask
+        computation object (default: True).
+
+    Returns
+    -------
+    function
+        A parallelized function that may be called with exactly the same
+        arguments as `fn`.
+    """
+    if dim is None:
+        dim = 'lat'
+    if chunks is None:
+        chunks = mp.cpu_count()
+
+    def wrapper(ds, *args, **kwargs):
+        if not isinstance(ds, xr.Dataset):
+            raise ValueError("`parallel` may only be used on functions "
+                             "accepting an xarray.Dataset as first argument.")
+        if dim not in ds:
+            raise ValueError("The dataset has no dimension '{}'."
+                             .format(dim))
+        parts = [delayed(fn)(part, *args, **kwargs) for part in
+                 xr_split(ds, dim=dim, chunks=chunks, buffer=buffer)]
+        result = delayed(xr_merge)(parts, dim=dim, buffer=buffer)
+        if compute:
+            return result.compute()
+        else:
+            return result
+
+    return wrapper
