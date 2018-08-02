@@ -1,6 +1,6 @@
 **/__pycache__
 **/*.lprof
-**/*.pyx
+**/*.pyc
 .vscode
 .ipynb_checkpoints
 **/*.nc
