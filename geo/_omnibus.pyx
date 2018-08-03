@@ -2,7 +2,7 @@ cimport cython
 import numpy as np
 cimport numpy as np
 from scipy.stats import chi2
-from libc.math cimport abs, log
+from libc.math cimport abs, log, isnan
 from cython cimport floating
 
 ctypedef np.float64_t DOUBLE
@@ -148,3 +148,72 @@ cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n):
 
     result = _P1 + omega2 * (_P2 - _P1)
     return result
+
+
+ctypedef unsigned char BOOL
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cpdef np.ndarray[BOOL, ndim=1] change_list_to_bool(np.ndarray[floating, ndim=1] c):
+    """Given an array of changepoint indices as generated from the change detection method,
+    extract a boolean array that is True where a valid change was detected
+    and False everywhere else.
+    """
+    cdef:
+        size_t k = c.shape[0]
+        size_t last_change = 0
+        size_t idx
+        size_t i
+        np.ndarray[BOOL, ndim=1] res = np.zeros(k, dtype=np.uint8)
+
+    for i in range(k):
+        idx = int(c[i])
+        if not isnan(c[i]) and idx > last_change:
+            res[idx] = 1
+            last_change = idx
+
+    return res
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cpdef np.ndarray[BOOL, ndim=3] change_array_to_bool(np.ndarray[floating, ndim=3] c):
+    """Given an array of changepoint indices as generated from the change detection method,
+    extract a boolean array that is True where a valid change was detected
+    and False everywhere else.
+
+    NOTE: Cython doesn't yet support boolean arrays, so the output is char and 
+    should be converted to bool later if desired.
+
+    Parameters
+    ----------
+    c : np.ndarray, shape (T, M, N)
+        The detected change indices. The first dimension is time.
+    
+    Returns
+    -------
+    np.ndarray, shape (T, M, N)
+        The boolean array.
+    """
+    cdef:
+        size_t k = c.shape[0]
+        size_t nrows = c.shape[1]
+        size_t ncols = c.shape[2]
+        size_t t, i, j
+        size_t idx, last_change
+        np.ndarray[BOOL, ndim=3] res = np.zeros((k, nrows, ncols), dtype=np.uint8)
+        floating _pixel
+    
+    for i in range(nrows):
+        for j in range(ncols):
+            last_change = 0
+            for t in range(k):
+                _pixel = c[t, i, j]
+                idx = int(_pixel)
+                if not isnan(_pixel) and idx > last_change:
+                    res[idx, i, j] = 1
+                    last_change = idx
+    
+    return res
