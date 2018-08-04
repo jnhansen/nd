@@ -7,7 +7,7 @@ need to update the metadata!
 
 """
 import lxml.etree as ET
-from osgeo import gdal, osr
+from osgeo import gdal, osr, gdal_array
 import os
 # import glob
 # import numpy as np
@@ -16,9 +16,8 @@ import os
 import numpy as np
 import pandas as pd
 import xarray as xr
-import dask.array as da
 from scipy.ndimage.interpolation import map_coordinates
-import utils
+from . import utils
 
 try:
     type(profile)
@@ -26,6 +25,16 @@ except NameError:
     def profile(fn): return fn
 
 NO_DATA_VALUE = np.nan
+
+
+def _get_driver_from_filename(filename):
+    if filename is None:
+        return 'MEM'
+    ext = os.path.splitext(filename)[1]
+    if ext == '.tiff':
+        return 'GTiff'
+    else:
+        return 'MEM'
 
 
 def _make_gdal_dataset(data, src, extent=None, outfile=None, driver='auto'):
@@ -307,7 +316,32 @@ def from_netcdf(path, *args, **kwargs):
     return ds
 
 
-def _assemble_complex(ds):
+def _disassemble_complex(ds):
+    """Disassemble complex valued data into real and imag parts.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+    """
+    new_ds = ds.copy()
+    #
+    # Find all complex variables and disassemble into their real and
+    # imaginary parts.
+    #
+    for vn, var in ds.data_vars.items():
+        if not np.iscomplexobj(var):
+            continue
+
+        new_ds[vn + '__re'] = var.real
+        new_ds[vn + '__im'] = var.imag
+        del new_ds[vn]
+
+    # reapply chunks
+    new_ds = new_ds.chunk(ds.chunks)
+    return new_ds
+
+
+def _assemble_complex(ds, inplace=False):
     """Reassemble complex valued data.
 
     NOTE: Changes the dataset (view) in place!
@@ -316,7 +350,10 @@ def _assemble_complex(ds):
     ----------
     ds : xarray.Dataset
     """
-    new_ds = ds.copy()
+    if inplace:
+        new_ds = ds
+    else:
+        new_ds = ds.copy()
     # find all variables that are meant to be complex
     var_names = [key for key in ds.data_vars
                  if key.endswith('__re') or key.endswith('__im')]
@@ -324,28 +361,14 @@ def _assemble_complex(ds):
     for vn in new_var_names:
         if vn + '__re' not in var_names or vn + '__im' not in var_names:
             continue
-        dims = new_ds[vn + '__re'].dims
-        cmplx_dtype = np.complex64 if new_ds[vn + '__re'].dtype == np.float32 \
-            else np.complex128
-
-        try:
-            # Treat data as dask array
-            v_cmplx = da.stack([new_ds[vn + '__re'], new_ds[vn + '__im']],
-                               axis=-1)
-            # Make sure the last axis (complex) is not chunked!
-            v_cmplx = v_cmplx.rechunk(v_cmplx.chunks[:-1] + ((2,),))
-        except NameError:
-            # Treat data as regular numpy array
-            v_cmplx = np.stack([new_ds[vn + '__re'], new_ds[vn + '__im']],
-                               axis=-1)
-
-        new_ds[vn] = (dims, v_cmplx.view(dtype=cmplx_dtype)[..., 0])
+        new_ds[vn] = new_ds[vn + '__re'] + new_ds[vn + '__im'] * 1j
         del new_ds[vn + '__re']
         del new_ds[vn + '__im']
 
     # reapply chunks
-    new_ds = new_ds.chunk(ds.chunks)
-    return new_ds
+    if not inplace:
+        # new_ds = new_ds.chunk(ds.chunks)
+        return new_ds
 
 
 def _get_gcp_df(gdal_ds):
