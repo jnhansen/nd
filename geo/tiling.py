@@ -28,7 +28,7 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
     path : str
     prefix : str, optional
     chunks : dict, optional
-    buffer : int, optional
+    buffer : int or dict, optional
         The number of overlapping pixels to store around each tile
         (default: 0).
     """
@@ -49,11 +49,12 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
     for dim, chunk_lens in chunked.chunks.items():
         start = 0
         slices[dim] = []
+        _buf = buffer if isinstance(buffer, int) else buffer[dim]
         for l in chunk_lens:
             # Apply buffer
-            _start = max(0, start - buffer)
+            _start = max(0, start - _buf)
             slices[dim].append(
-                slice(_start, start + l + buffer)
+                slice(_start, start + l + _buf)
             )
             start += l
 
@@ -71,10 +72,8 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
 
 
 def map_over_tiles(globexpr, fn, args=(), kwargs={}, path=None, suffix='',
-                   buffer=0, merge=True, overwrite=False, compute=True):
+                   merge=True, overwrite=False, compute=True):
     """Apply function to each tile.
-
-    TODO: implement buffer
 
     Parameters
     ----------
@@ -92,8 +91,6 @@ def map_over_tiles(globexpr, fn, args=(), kwargs={}, path=None, suffix='',
     suffix : str, optional
         If input file is `part.0.nc`, will create `part.0{suffix}.nc`.
         (default: '')
-    buffer : int, optional
-        The number of overlapping pixels stored around each tile (default: 0).
     merge : bool, optional
         If True, return a merged view of the result (default: True).
     overwrite : bool, optional
@@ -138,12 +135,13 @@ def map_over_tiles(globexpr, fn, args=(), kwargs={}, path=None, suffix='',
 
     if merge:
         result = delayed(auto_merge)(results)
-        if compute:
-            return result.compute()
-        else:
-            return result
     else:
-        result = delayed(results).compute()
+        result = delayed(results)
+
+    if compute:
+        return result.compute()
+    else:
+        return result
 
 
 def auto_merge(datasets, buffer=0):
@@ -162,6 +160,10 @@ def auto_merge(datasets, buffer=0):
         xarray.open_mfdataset, or a list of xarray datasets. If a list of
         datasets is passed, you should make sure that they are represented
         as dask arrays to avoid reading the whole dataset into memory.
+    buffer : int or dict, optional
+        The number of overlapping pixels stored around each tile (default: 0).
+        This must be the same argument as passed to `tiling.tile` when
+        the tiles were generated.
 
     Returns
     -------
@@ -176,8 +178,6 @@ def auto_merge(datasets, buffer=0):
     if isinstance(datasets[0], str):
         # Pass chunks={} to ensure the dataset is read as a dask array
         datasets = [xr.open_dataset(path, chunks={}) for path in datasets]
-
-    # Apply buffer?
 
     def _combine_along_last_dim(datasets):
         merged = []
@@ -198,10 +198,12 @@ def auto_merge(datasets, buffer=0):
                 key=lambda ds: tuple(ds[d].values[0] for d in split_dims[:-1])
                 ):
             # Apply buffer?
-            if buffer > 0:
-                idx_first = {concat_dim: slice(None, -buffer)}
-                idx_middle = {concat_dim: slice(buffer, -buffer)}
-                idx_end = {concat_dim: slice(buffer, None)}
+            _buf = buffer if isinstance(buffer, int) else buffer[concat_dim]
+            if _buf > 0:
+                idx_first = {concat_dim: slice(None, -_buf)}
+                idx_middle = {concat_dim: slice(_buf, -_buf)}
+                idx_end = {concat_dim: slice(_buf, None)}
+                # Requires that group is sorted by concat_dim
                 group = list(group)
                 group = [group[0].isel(idx_first)] + \
                         [_.isel(idx_middle) for _ in group[1:-1]] + \
