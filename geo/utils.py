@@ -9,6 +9,7 @@ from dask import delayed
 import datetime
 from dateutil.tz import tzutc
 from dateutil.parser import parse as parsedate
+import itertools
 
 PY2 = sys.version_info < (3, 0)
 
@@ -69,6 +70,13 @@ def xygrid(ncols, nrows):
 #     for idxs in np.ndindex(*bpa):
 #         blockbounds = tuple(c[j][idxs[j]] for j in range(bpa.size))
 #         yield array[blockbounds]
+
+
+def dict_product(d):
+    """Like itertools.product, but works with dictionaries.
+    """
+    return (dict(zip(d, x))
+            for x in itertools.product(*d.values()))
 
 
 def chunks(l, n):
@@ -265,9 +273,12 @@ def xr_merge(ds_list, dim, buffer=0):
     return xr.concat(parts, dim=dim)
 
 
-def parallel(fn, dim=None, chunks=None, buffer=0, compute=True):
+def parallel(fn, dim=None, chunks=None, chunksize=None, buffer=0,
+             compute=True):
     """
     Parallelize a function that takes an xarray dataset as first argument.
+
+    TODO: make accept numpy arrays as well.
 
     Parameters
     ----------
@@ -279,6 +290,8 @@ def parallel(fn, dim=None, chunks=None, buffer=0, compute=True):
     chunks : int, optional
         The number of chunks to execute in parallel. If not passed, use the
         number of available CPUs.
+    chunksize : int, optional
+        ... to be implemented
     buffer : int, optional
         (default: 0)
     compute : bool, optional
@@ -297,14 +310,24 @@ def parallel(fn, dim=None, chunks=None, buffer=0, compute=True):
         chunks = mp.cpu_count()
 
     def wrapper(ds, *args, **kwargs):
-        if not isinstance(ds, xr.Dataset):
-            raise ValueError("`parallel` may only be used on functions "
-                             "accepting an xarray.Dataset as first argument.")
+        # if not isinstance(ds, xr.Dataset):
+        #     raise ValueError("`parallel` may only be used on functions "
+        #                      "accepting an xarray.Dataset as "
+        #                      "first argument.")
         if dim not in ds:
             raise ValueError("The dataset has no dimension '{}'."
                              .format(dim))
+        #
+        # Prechunk the dataset to align memory access with dask
+        #
+        n = ds.sizes[dim]
+        chunksize = int(np.ceil(n / chunks))
+        prechunked = ds.chunk({dim: chunksize})
+        print(prechunked)
+
+        # Split into parts
         parts = [delayed(fn)(part, *args, **kwargs) for part in
-                 xr_split(ds, dim=dim, chunks=chunks, buffer=buffer)]
+                 xr_split(prechunked, dim=dim, chunks=chunks, buffer=buffer)]
         result = delayed(xr_merge)(parts, dim=dim, buffer=buffer)
         if compute:
             return result.compute()
