@@ -2,8 +2,6 @@
 This module may be used to mosaic and tile multiple satellite image products.
 
 TODO: Contain buffer information in NetCDF metadata?
-TODO: auto-detect buffer in auto_merge()
-TODO: allow different buffers for each dimension
 
 """
 from . import satio, utils
@@ -18,9 +16,6 @@ from dask import delayed
 def tile(ds, path, prefix='part', chunks=None, buffer=0):
     """Split dataset into tiles and write to disk. If `chunks` is not given,
     use chunks in dataset.
-
-    TODO: make work with arbitrary dimensions √
-    TODO: implement buffer √
 
     Parameters
     ----------
@@ -49,7 +44,14 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
     for dim, chunk_lens in chunked.chunks.items():
         start = 0
         slices[dim] = []
-        _buf = buffer if isinstance(buffer, int) else buffer[dim]
+
+        if isinstance(buffer, int):
+            _buf = buffer
+        elif isinstance(buffer, dict):
+            _buf = buffer[dim] if dim in buffer else 0
+        else:
+            _buf = 0
+
         for l in chunk_lens:
             # Apply buffer
             _start = max(0, start - _buf)
@@ -71,13 +73,13 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
     return
 
 
-def map_over_tiles(globexpr, fn, args=(), kwargs={}, path=None, suffix='',
+def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
                    merge=True, overwrite=False, compute=True):
     """Apply function to each tile.
 
     Parameters
     ----------
-    globexpr : str or list of str
+    files : str or list of str
         A glob expression matching all tiles. May also be a list of file paths.
     fn : function
         The function to apply to each tile.
@@ -94,7 +96,7 @@ def map_over_tiles(globexpr, fn, args=(), kwargs={}, path=None, suffix='',
     merge : bool, optional
         If True, return a merged view of the result (default: True).
     overwrite : bool, optional
-        Force overwriting existing files (default: False)
+        Force overwriting existing files (default: False).
     compute : bool, optional
         If True, compute result immediately. Otherwise, return a dask.delayed
         object (default: True).
@@ -103,10 +105,8 @@ def map_over_tiles(globexpr, fn, args=(), kwargs={}, path=None, suffix='',
     -------
     xarray.Dataset
     """
-    if isinstance(globexpr, str):
-        files = glob.glob(globexpr)
-    else:
-        files = globexpr
+    if isinstance(files, str):
+        files = glob.glob(files)
 
     if path is not None:
         os.makedirs(path, exist_ok=True)
@@ -144,14 +144,11 @@ def map_over_tiles(globexpr, fn, args=(), kwargs={}, path=None, suffix='',
         return result
 
 
-def auto_merge(datasets, buffer=0):
+def auto_merge(datasets, buffer='auto'):
     """
     Automatically merge a split xarray Dataset. This is designed to behave like
     `xarray.open_mfdataset`, except it supports concatenation along multiple
     dimensions.
-
-    TODO: implement buffer √
-    TODO: auto-detect buffer?
 
     Parameters
     ----------
@@ -160,10 +157,12 @@ def auto_merge(datasets, buffer=0):
         xarray.open_mfdataset, or a list of xarray datasets. If a list of
         datasets is passed, you should make sure that they are represented
         as dask arrays to avoid reading the whole dataset into memory.
-    buffer : int or dict, optional
-        The number of overlapping pixels stored around each tile (default: 0).
-        This must be the same argument as passed to `tiling.tile` when
-        the tiles were generated.
+    buffer : 'auto' or int or dict, optional
+        * If 'auto' (default), attempt to automatically detect the buffer for
+        each dimension.
+        * If int, it is the number of overlapping pixels stored around each
+        tile
+        * If dict, this is the amount of buffer per dimension
 
     Returns
     -------
@@ -174,10 +173,16 @@ def auto_merge(datasets, buffer=0):
     if isinstance(datasets, str):
         datasets = glob.glob(datasets)
 
+    if len(datasets) == 0:
+        raise ValueError("No files found!")
+
     # Treat `datasets` as a list of file paths
     if isinstance(datasets[0], str):
         # Pass chunks={} to ensure the dataset is read as a dask array
         datasets = [xr.open_dataset(path, chunks={}) for path in datasets]
+
+    if buffer == 'auto':
+        buf_cache = {}
 
     def _combine_along_last_dim(datasets):
         merged = []
@@ -197,17 +202,39 @@ def auto_merge(datasets, buffer=0):
                 sorted_ds,
                 key=lambda ds: tuple(ds[d].values[0] for d in split_dims[:-1])
                 ):
-            # Apply buffer?
-            _buf = buffer if isinstance(buffer, int) else buffer[concat_dim]
+            group = list(group)
+
+            # Auto-detect buffer?
+            if buffer == 'auto':
+                if concat_dim in buf_cache:
+                    _buf = buf_cache[concat_dim]
+                else:
+                    # Determine overlap along concat_dim
+                    diff = group[1][concat_dim].values - \
+                        group[0][concat_dim].values[-1]
+                    _buf = int((np.argmin(np.abs(diff)) + 1) / 2)
+                    buf_cache[concat_dim] = _buf
+
+            elif isinstance(buffer, int):
+                _buf = buffer
+
+            elif isinstance(buffer, dict):
+                _buf = buffer[concat_dim] if concat_dim in buffer else 0
+
+            else:
+                _buf = 0
+
+            # Apply buffer
             if _buf > 0:
                 idx_first = {concat_dim: slice(None, -_buf)}
                 idx_middle = {concat_dim: slice(_buf, -_buf)}
                 idx_end = {concat_dim: slice(_buf, None)}
                 # Requires that group is sorted by concat_dim
-                group = list(group)
                 group = [group[0].isel(idx_first)] + \
                         [_.isel(idx_middle) for _ in group[1:-1]] + \
                         [group[-1].isel(idx_end)]
+
+            # Merge along concat_dim
             merged.append(xr.auto_combine(group, concat_dim=concat_dim))
 
         return merged
