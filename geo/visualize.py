@@ -1,3 +1,9 @@
+"""
+Quickly visualize datasets.
+
+TODO: Update to work with xarray Dataset rather than GDAL.
+
+"""
 import numpy as np
 import skimage.transform
 import matplotlib.pyplot as plt
@@ -21,10 +27,10 @@ def plot_image(src, name, N=1):
     """
     try:
         data = src.ReadAsArray()
-    except:
+    except AttributeError:
         data = src
 
-    ## RESAMPLE
+    # RESAMPLE
     data_ = data[::N, ::N]
 
     plt.figure(figsize=(20, 20))
@@ -50,7 +56,7 @@ def plot_basemap(src, name, *args, **kwargs):
     data = src.ReadAsArray()
     ndv = src.GetRasterBand(1).GetNoDataValue()
     data[data == ndv] = np.nan
-    ## RESCALE to 2000px max dimension
+    # RESCALE to 2000px max dimension
     if max(data.shape) > 2000:
         new_shape = tuple(int(_) for _ in
                           np.array(data.shape) / max(data.shape) * 2000)
@@ -61,9 +67,9 @@ def plot_basemap(src, name, *args, **kwargs):
 
     extent = latlon_extent(src)
     fig = plt.figure(figsize=(10, 6), dpi=300)
-    #ax = fig.add_axes([0.05,0.05,0.9,0.85])
+    # ax = fig.add_axes([0.05,0.05,0.9,0.85])
 
-    ## Plot data with a 20% margin around
+    # Plot data with a 20% margin around
     margin = 0.2
     llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat = extent
     lon_extent = urcrnrlon - llcrnrlon
@@ -87,7 +93,7 @@ def plot_basemap(src, name, *args, **kwargs):
     m.drawmeridians(np.arange(0, 360, 1), labels=[False, False, True, True])
     m.drawparallels(np.arange(-90, 90, 1), labels=[True, True, False, False])
 
-    ## ADD DATA TO MAP
+    # ADD DATA TO MAP
     xs = np.linspace(extent[0], extent[2], data_.shape[2])
     ys = np.linspace(extent[1], extent[3], data_.shape[1])
     lon_grid, lat_grid = np.meshgrid(xs, ys, copy=False)
@@ -107,7 +113,8 @@ def plot_basemap(src, name, *args, **kwargs):
     if 'cmap' not in kwargs:
         kwargs['cmap'] = plt.cm.jet
 
-    # rgba = np.stack([data_[1,:,:],data_[0,:,:],data_[1,:,:],255*np.ones(data_.shape[1:])],axis=-1) / 255.0
+    # rgba = np.stack([data_[1,:,:],data_[0,:,:],data_[1,:,:],255*np.ones(
+    # data_.shape[1:])],axis=-1) / 255.0
     # raveled_pixel_shape = (rgba.shape[0]*rgba.shape[1], rgba.shape[2])
     # color_tuple = rgba.transpose((1,0,2)).reshape(raveled_pixel_shape)
 
@@ -128,9 +135,12 @@ def plot_basemap(src, name, *args, **kwargs):
     color_tuple = np.insert(color_tuple, 3, alpha, 1)
 
 
-    # # colors = np.array([data_[0,:,:].flatten(),data_[1,:,:].flatten(),data_[0,:,:].flatten(), np.zeros(data_.shape[1:]).flatten()]) / 255
-    # colors = np.stack([data_[1,:,:],data_[1,:,:],data_[1,:,:],255*np.ones(data_.shape[1:])],axis=-1).reshape(-1,4) / 255.0
-    # # colors = np.stack([data_[1,:,:].flatten(),data_[1,:,:].flatten(),data_[1,:,:].flatten(),255*np.ones(data_.shape[1:]).flatten()],axis=-1) / 255.0
+    # # colors = np.array([data_[0,:,:].flatten(),data_[1,:,:].flatten(),
+    # data_[0,:,:].flatten(), np.zeros(data_.shape[1:]).flatten()]) / 255
+    # colors = np.stack([data_[1,:,:],data_[1,:,:],data_[1,:,:],255*np.ones(
+    # data_.shape[1:])],axis=-1).reshape(-1,4) / 255.0
+    # # colors = np.stack([data_[1,:,:].flatten(),data_[1,:,:].flatten(),
+    # data_[1,:,:].flatten(),255*np.ones(data_.shape[1:]).flatten()],axis=-1) / 255.0
     # # .transpose([2,1,0])
     # colors[colors < 0.0] = 0.0
     # colors[colors > 1.0] = 1.0
@@ -139,11 +149,13 @@ def plot_basemap(src, name, *args, **kwargs):
     # # colorTuple = tuple(colors.transpose().tolist())
     # # im = m.pcolormesh(x,y, data_, **kwargs)
 
-    # im = m.imshow(rgb.transpose((1,2,0)),extent=[extent[0],extent[2],extent[1],extent[3]])
+    # im = m.imshow(rgb.transpose((1,2,0)),
+    # extent=[extent[0], extent[2], extent[1], extent[3]])
     im = m.pcolormesh(lon_grid, lat_grid, data_[1, :, :], color=color_tuple,
                       latlon=True, **kwargs)
     # im = m.pcolormesh(x,y, data_[1,:,:], vmin=0, vmax=255, cmap=plt.cm.jet)
-    # im = m.pcolormesh(x,y, _data, cmap=cmap, vmin=_data.min(), vmax=_data.max())
+    # im = m.pcolormesh(x,y, _data, cmap=cmap, 
+    #                   vmin=_data.min(), vmax=_data.max())
     # im = m.pcolormesh(x,y, data_small.T, cmap=cmap, vmin=0, vmax=255)
     cb = plt.colorbar(orientation='vertical', fraction=0.10, shrink=0.7)
     plt.savefig(name)
