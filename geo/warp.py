@@ -11,6 +11,7 @@ from osgeo import gdal, osr
 import numpy as np
 import pandas as pd
 import xarray as xr
+from dask import delayed
 # import multiprocessing as mp
 from scipy.ndimage.interpolation import map_coordinates
 # from transform import map_coordinates_wrapper
@@ -380,16 +381,21 @@ def _common_extent_and_resolution(datasets):
     return common_extent, common_resolution
 
 
-def align(datasets):
+def align(datasets, compute=True):
     """
     Resample datasets to common extent and resolution.
     """
     extent, resolution = _common_extent_and_resolution(datasets)
-    aligned = []
+    tasks = []
     for ds in datasets:
-        _resampled = resample_grid(ds, extent=extent, resolution=resolution)
-        aligned.append(_resampled)
-    return aligned
+        tasks.append(
+            delayed(resample_grid)(ds, extent=extent, resolution=resolution)
+        )
+    result = delayed(tasks)
+    if compute:
+        return result.compute()
+    else:
+        return result
 
 
 def resample_grid(dataset, extent, shape=None, resolution=None):
