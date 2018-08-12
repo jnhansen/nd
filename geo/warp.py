@@ -14,7 +14,7 @@ import xarray as xr
 # import multiprocessing as mp
 from scipy.ndimage.interpolation import map_coordinates
 # from transform import map_coordinates_wrapper
-from utils import array_chunks
+from .utils import array_chunks
 
 try:
     type(profile)
@@ -349,26 +349,85 @@ def _coord_transform(coords, new_coords):
     return im_coords
 
 
-def resample_grid(dataset, shape, extent):
-    """Resample a dataset to a new shape and extent.
+def _common_extent_and_resolution(datasets):
+    extents = []
+    resolutions = []
+    for ds in datasets:
+        lon_min = ds.lon.min()
+        lat_min = ds.lat.min()
+        lon_max = ds.lon.max()
+        lat_max = ds.lat.max()
+        extents.append([lon_min, lat_min, lon_max, lat_max])
+        # can only calculate resolution if `lat` and `lon` are
+        # dimensions, i.e. one-dimensional arrays
+        if ds.lat.ndim == 1:
+            res_lon = (lon_max - lon_min) / ds.lon.shape[0]
+            res_lat = (lat_max - lat_min) / ds.lat.shape[0]
+            resolutions.append([res_lon, res_lat])
+
+    # Get largest extent:
+    extents = np.array(extents)
+    common_extent = np.concatenate((extents[:, :2].min(axis=0),
+                                    extents[:, 2:].max(axis=0)))
+
+    # Get best resolution:
+    if len(resolutions) == 0:
+        common_resolution = None
+    else:
+        resolutions = np.array(resolutions)
+        common_resolution = resolutions.min(axis=0)
+
+    return common_extent, common_resolution
+
+
+def align(datasets):
+    """
+    Resample datasets to common extent and resolution.
+    """
+    extent, resolution = _common_extent_and_resolution(datasets)
+    aligned = []
+    for ds in datasets:
+        _resampled = resample_grid(ds, extent=extent, resolution=resolution)
+        aligned.append(_resampled)
+    return aligned
+
+
+def resample_grid(dataset, extent, shape=None, resolution=None):
+    """Resample a dataset to a new extent.
 
     Parameters
     ----------
     dataset : xarray.Dataset
         The dataset to resample.
-    shape : tuple
-        The shape of the output dataset.
     extent : array_like
         The extent of the output dataset.
+    shape : tuple, optional
+        The shape of the output dataset.
+        Ignored if `resolution` is also passed.
+    resolution : tuple, optional
+        The resolution of the output dataset.
 
     Returns
     -------
     xarray.Dataset
         A new dataset with shape `shape` and extent `extent`.
     """
+    lon_min, lat_min, lon_max, lat_max = extent
+    if resolution is not None:
+        lon_res, lat_res = resolution
+        # Set shape (a passed shape will be ignored).
+        lon_shape = (lon_max - lon_min) // lon_res
+        lat_shape = (lat_max - lat_min) // lat_res
+        shape = (lat_shape, lon_shape)
+    elif shape is None:
+        # Automatically determine shape?
+        raise ValueError("Need to pass either shape or resolution!")
+    else:
+        lat_shape, lon_shape = shape
+
     new_coords = dict(dataset.coords)
-    new_coords['lat'] = np.linspace(extent[0], extent[2], shape[0])
-    new_coords['lon'] = np.linspace(extent[1], extent[3], shape[1])
+    new_coords['lat'] = np.linspace(lat_min, lat_max, lat_shape)
+    new_coords['lon'] = np.linspace(lon_min, lon_max, lon_shape)
 
     lon_grid, lat_grid = np.meshgrid(new_coords['lon'], new_coords['lat'],
                                      copy=False)
