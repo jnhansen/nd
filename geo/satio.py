@@ -18,6 +18,9 @@ import pandas as pd
 import xarray as xr
 from scipy.ndimage.interpolation import map_coordinates
 from . import utils
+import affine
+import re
+
 
 try:
     type(profile)
@@ -117,9 +120,9 @@ def from_beam_dimap(path, read_data=True):
     -------
     xarray.Dataset
     """
-    #
+    # -------------------------------------------------------------------------
     # Read metadata
-    #
+    # -------------------------------------------------------------------------
     basepath = os.path.split(path)[0]
     meta = {}
     tree = ET.parse(path)
@@ -167,110 +170,124 @@ def from_beam_dimap(path, read_data=True):
     meta['lon_range'] = (min(lons), max(lons))
     meta['lat_range'] = (min(lats), max(lats))
 
-    # GCPs
-    # NOTE: These are for the three original bursts!
-    # --> not useful ...
-    # -----------------------------------------------------------------
-    # grid_points = root.findall('.//MDElem[@name="geolocationGridPointList"]/'
-    #                            'MDElem[@name="geolocationGridPoint"]')
-    # tie_point_dict = \
-    #     [{'GCPX': float(tp.find('./MDATTR[@name="longitude"]').text),
-    #       'GCPY': float(tp.find('./MDATTR[@name="latitude"]').text),
-    #       'GCPPixel': int(tp.find('./MDATTR[@name="pixel"]').text),
-    #       'GCPLine': int(tp.find('./MDATTR[@name="line"]').text)}
-    #      for tp in grid_points]
-    # # create a GCP dataframe:
-    # tie_points = pd.DataFrame(tie_point_dict)
-    # -----------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Determine the geolocation.
+    # -------------------------------------------------------------------------
 
-    #
-    # NOTE: This is all the old stuff:
-    #
-    # -----------------------------------------------------------------
-    # raster_files = [_ for _ in os.listdir(path)
-    #                 if os.path.splitext(_)[1] == '.img']
-    # datasets = {_: gdal.Open(os.path.join(path, _)) for _ in raster_files}
+    # OPTION A:
+    # Affine coordinate transform
+    # ---------------------------
+    crs_info = root.find('./Coordinate_Reference_System/WKT')
+    transf_info = root.find('./Geoposition/IMAGE_TO_MODEL_TRANSFORM')
 
-    #
-    # Make complex valued dual pol data
-    # NOTE: This shouldn't be done during reading, but at a
-    # later processing stage.
-    #
-    # d = datasets['i_VV.img']
-    # dualpol = np.empty((d.RasterYSize, d.RasterXSize, 2, 2),
-    #                    dtype=np.float32)
-    # dualpol[:, :, 0, 0] = datasets['i_VV.img'].ReadAsArray()
-    # dualpol[:, :, 0, 1] = datasets['q_VV.img'].ReadAsArray()
-    # dualpol[:, :, 1, 0] = datasets['i_VH.img'].ReadAsArray()
-    # dualpol[:, :, 1, 1] = datasets['q_VH.img'].ReadAsArray()
-    # dualpol[:, :, 0] = 1j * q_VV + i_VV
-    # dualpol[:, :, 1] = 1j * q_VH + i_VH
-    # -----------------------------------------------------------------
-
-    #
-    # Read tie point grids for coordinates
-    #
+    # OPTION B:
+    # Ground Control Points (Tie Point Grids)
+    # ---------------------------------------
     tp_grids = {}
     for tf in tie_point_grid_files:
         p = os.path.splitext(tf)[0] + '.img'
         name = os.path.split(os.path.splitext(tf)[0])[1]
         tp_grids[name] = gdal.Open(p).ReadAsArray()
 
-    # NOTE: In future, read these from the metadata.
-    xstep = (meta['ncols'] - 1) / (tp_grids['latitude'].shape[1] - 1)
-    ystep = (meta['nrows'] - 1) / (tp_grids['latitude'].shape[0] - 1)
+    #
+    # Is an affine coord transform specified?
+    #
+    if crs_info is not None and transf_info is not None:
+        #
+        # Extract the GeoTransform.
+        #
+        transf = np.array([float(_) for _ in transf_info.text.split(',')])
+        # The transform is in a weird order, reorder to GDAL standard:
+        transf_gdal = transf[::-1].reshape((3, 2)).T.flatten()
+        # Now reorder to affine transformation:
+        aff = affine.Affine.from_gdal(*transf_gdal)
+        # Store in metadata:
+        meta['GeoTransform'] = transf_gdal
 
-    xs = np.linspace(0, meta['ncols'] - 1, tp_grids['latitude'].shape[1])
-    ys = np.linspace(0, meta['nrows'] - 1, tp_grids['latitude'].shape[0])
-    xi, yi = xs.astype(int), ys.astype(int)
-    xg, yg = np.meshgrid(xi, yi, copy=False)
-    # convert to integers so they can actually be assigned to pixels
-    # don't want to carry over the error from the integer truncation,
-    # therefore do an interpolation:
-    # tpg_index = np.stack((yi, xi), axis=0)
-    # xy_scaled = tpg_index.astype(float) / np.array((ystep, xstep))
-    x_scaled = xg.astype(float) / xstep
-    y_scaled = yg.astype(float) / ystep
-    map_xy = np.stack((y_scaled, x_scaled), axis=0)
-    tp_grids_int = {}
-    for name, tpg in tp_grids.items():
-        tp_grids_int[name] = map_coordinates(tpg, map_xy, output=tpg.dtype,
-                                             order=3, cval=np.nan)
+        #
+        # Create coordinates
+        #
+        if aff.b == 0 and aff.d == 0:
+            # The image is north-up, no need to store tie point grid.
+            meta['pixel_height'] = np.abs(aff.a)
+            meta['pixel_width'] = np.abs(aff.e)
+            ys = np.stack([np.arange(meta['nrows']), np.zeros(meta['nrows'])])
+            xs = np.stack([np.zeros(meta['ncols']), np.arange(meta['ncols'])])
+            lat = (aff * ys)[0]
+            lon = (aff * xs)[1]
+            data_coords = ('lat', 'lon')
+            coords = {'lat': lat, 'lon': lon}
 
-    # Create GCP dataframe ...
-    # gcp_data = {'GCPLine': y.flatten(), 'GCPPixel': x.flatten(),
-    #             'GCPX': lon.flatten(), 'GCPY': lat.flatten()}
-    # gcps = pd.DataFrame(gcp_data)
-
-    # Create tie point grids as sparse matrix
-    # (np.nan wherever there is no entry)
-    tp_grids_sparse = {}
-    # tpg_index = np.stack((y, x), axis=-1)
-    for name, tpg in tp_grids_int.items():
-        tpg_sparse = np.full((meta['nrows'], meta['ncols']), np.nan)
-        tpg_sparse[yi[:, np.newaxis], xi] = tpg
-        tp_grids_sparse[name] = tpg_sparse
+        else:
+            # The image is not north up.
+            # Don't store additional coordinate data.
+            # tpg_sparse = np.full((meta['nrows'], meta['ncols']), np.nan)
+            data_coords = ('y', 'x')
+            coords = {}
 
     #
-    # Create xarray dataset
+    # Are there tie point grids for latitude and longitude?
+    #
+    elif 'latitude' in tp_grids and 'longitude' in tp_grids:
+        # NOTE: In future, read these from the metadata.
+        xstep = (meta['ncols'] - 1) / (tp_grids['latitude'].shape[1] - 1)
+        ystep = (meta['nrows'] - 1) / (tp_grids['latitude'].shape[0] - 1)
+
+        xs = np.linspace(0, meta['ncols'] - 1, tp_grids['latitude'].shape[1])
+        ys = np.linspace(0, meta['nrows'] - 1, tp_grids['latitude'].shape[0])
+        xi, yi = xs.astype(int), ys.astype(int)
+        xg, yg = np.meshgrid(xi, yi, copy=False)
+        # convert to integers so they can actually be assigned to pixels
+        # don't want to carry over the error from the integer truncation,
+        # therefore do an interpolation:
+        # tpg_index = np.stack((yi, xi), axis=0)
+        # xy_scaled = tpg_index.astype(float) / np.array((ystep, xstep))
+        x_scaled = xg.astype(float) / xstep
+        y_scaled = yg.astype(float) / ystep
+        map_xy = np.stack((y_scaled, x_scaled), axis=0)
+        tp_grids_int = {}
+        for name, tpg in tp_grids.items():
+            tp_grids_int[name] = map_coordinates(tpg, map_xy, output=tpg.dtype,
+                                                 order=3, cval=np.nan)
+
+        # Create GCP dataframe ...
+        # gcp_data = {'GCPLine': y.flatten(), 'GCPPixel': x.flatten(),
+        #             'GCPX': lon.flatten(), 'GCPY': lat.flatten()}
+        # gcps = pd.DataFrame(gcp_data)
+
+        # Create tie point grids as sparse matrix
+        # (np.nan wherever there is no entry)
+        tp_grids_sparse = {}
+        # tpg_index = np.stack((y, x), axis=-1)
+        for name, tpg in tp_grids_int.items():
+            tpg_sparse = np.full((meta['nrows'], meta['ncols']), np.nan)
+            tpg_sparse[yi[:, np.newaxis], xi] = tpg
+            tp_grids_sparse[name] = tpg_sparse
+
+        data_coords = ('y', 'x')
+        coords = {'lat': (data_coords, tp_grids_sparse['latitude']),
+                  'lon': (data_coords, tp_grids_sparse['longitude'])}
+
+    #
+    # Create xarray dataset.
+    # `data_coords` and `coords` should have been defined at this point.
     #
     times = [utils.str2date(meta['time_start'])]
-    data_coords = ('y', 'x')
-    ds = xr.Dataset(coords={'lat': (data_coords, tp_grids_sparse['latitude']),
-                            'lon': (data_coords, tp_grids_sparse['longitude']),
-                            'time': times},
-                    attrs=meta)
+    coords['time'] = times
+    ds = xr.Dataset(coords=coords, attrs=meta)
 
     if read_data:
         for rpath in data_files:
             # we don't want to open the ENVI .hdr file...
             im_path = os.path.splitext(rpath)[0] + '.img'
-            name = os.path.split(im_path)[1]
+            name = os.path.splitext(os.path.split(im_path)[1])[0]
             band = gdal.Open(im_path)
             data = band.ReadAsArray()
             # ndv = band.GetNoDataValue()
             # data[data == ndv] = np.nan
             ds[name] = (data_coords, data)
+
+    ds = _assemble_complex(ds)
 
     return ds
 
@@ -289,12 +306,7 @@ def to_netcdf(ds, path):
     path : str
         The path of the target NetCDF file.
     """
-    write = ds.copy()
-    for name, var in ds.data_vars.items():
-        if np.iscomplexobj(var):
-            write[name + '__re'] = np.real(var)
-            write[name + '__im'] = np.imag(var)
-            del write[name]
+    write = _disassemble_complex(ds)
     return write.to_netcdf(path)
 
 
@@ -311,6 +323,9 @@ def from_netcdf(path, *args, **kwargs):
     -------
     xarray.Dataset
     """
+    # Make sure to load as lazy dask arrays:
+    if 'chunks' not in kwargs:
+        kwargs['chunks'] = {}
     ds = xr.open_dataset(path, *args, **kwargs)
     ds = _assemble_complex(ds)
     return ds
@@ -355,15 +370,27 @@ def _assemble_complex(ds, inplace=False):
     else:
         new_ds = ds.copy()
     # find all variables that are meant to be complex
-    var_names = [key for key in ds.data_vars
-                 if key.endswith('__re') or key.endswith('__im')]
-    new_var_names = set([v[:-4] for v in var_names])
+    endings = {'re': ['_real', '__re'],
+               'im': ['_imag', '__im']}
+    rex = {}
+    matches = {}
+    for part, end in endings.items():
+        rex[part] = re.compile('(?P<stem>.*)(?:{})'.format('|'.join(end)))
+        matches[part] = [rex[part].match(vn) for vn in ds.data_vars]
+        matches[part] = [_ for _ in matches[part] if _ is not None]
+
+    new_var_names = set([m.group('stem') for m in
+                         matches['re'] + matches['im']])
+
     for vn in new_var_names:
-        if vn + '__re' not in var_names or vn + '__im' not in var_names:
-            continue
-        new_ds[vn] = new_ds[vn + '__re'] + new_ds[vn + '__im'] * 1j
-        del new_ds[vn + '__re']
-        del new_ds[vn + '__im']
+        vn_re = utils.select(matches['re'], lambda x: x.group(1) == vn,
+                             first=True)
+        vn_im = utils.select(matches['im'], lambda x: x.group(1) == vn,
+                             first=True)
+        if vn_re is not None and vn_im is not None:
+            new_ds[vn] = new_ds[vn_re.group(0)] + new_ds[vn_im.group(0)] * 1j
+            del new_ds[vn_re.group(0)]
+            del new_ds[vn_im.group(0)]
 
     # reapply chunks
     if not inplace:
