@@ -335,3 +335,49 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, buffer=0,
             return result
 
     return wrapper
+
+
+def select(objects, fn, unlist=True, first=False):
+    """Returns a subset of `objects` that matches a range of criteria.
+
+    Parameters
+    ----------
+    objects : list of obj
+        The collection of objects to filter.
+    fn : lambda expression
+        Filter objects by whether fn(obj) returns True.
+    first: bool, optional
+        If True, return first entry only (default: False).
+    unlist : bool, optional
+        If True and the result has length 1 and objects is a list, return the
+        object directly, rather than the list (default: True).
+
+    Returns
+    -------
+    list
+        A list of all items in `objects` that match the specified criteria.
+
+    Examples
+    --------
+    >>> select([{'a': 1, 'b': 2}, {'a': 2, 'b': 2}, {'a': 1, 'b': 1}],
+                lambda o: o['a'] == 1)
+    [{'a': 1, 'b': 2}, {'a': 1, 'b': 1}]
+    """
+    filtered = objects
+    if type(objects) is list:
+        filtered = [obj for obj in filtered if fn(obj)]
+    elif type(objects) is dict:
+        filtered = {obj_key: obj for obj_key, obj
+                    in filtered.items() if fn(obj)}
+    if first:
+        if len(filtered) == 0:
+            return None
+        elif type(filtered) is list:
+            return filtered[0]
+        elif type(filtered) is dict:
+            return filtered[list(filtered.keys())[0]]
+    elif unlist and len(filtered) == 1 and \
+            type(filtered) is list:
+        return filtered[0]
+    else:
+        return filtered
