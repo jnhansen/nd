@@ -10,7 +10,7 @@ import xarray as xr
 from scipy import ndimage
 from scipy.stats import chi2
 import dask.array as da
-from ._omnibus import array_omnibus
+from ._omnibus import array_omnibus, change_array_to_bool
 
 
 try:
@@ -301,40 +301,65 @@ def change_detection(ds, alpha=0.01, ml=None, n=1):
 
     # Need to keep track of the changes found or rejected.
     k = ds_m.sizes['time']
-    # Let l go from 0 to k-2
-    # for l in range(k - 1):
+    nrows = ds_m.sizes['lat']
+    ncols = ds_m.sizes['lon']
 
     #
     # NOTE: For now, only do l=0 and find only the _first_ significant change.
     #
-    _l = 0
-    # Select ds[l:] in the time dimension
-    # subset = ds.isel(time=slice(l, None))
+
+    # t0 = 0
+    # Select ds[t0:] in the time dimension
+    # subset = ds.isel(time=slice(t0, None))
     # Compute the change probability in an omnibus test for subset
     # p_H0 = omnibus_test(subset)
     # no_changes = (p_H0 < alpha)
 
-    first_change = np.full((ds_m.sizes['lat'], ds_m.sizes['lon']), np.nan)
+    def first_change_after(ds, t0, alpha, n):
+        k = ds.sizes['time']
+        nrows = ds_m.sizes['lat']
+        ncols = ds_m.sizes['lon']
+        first_change = np.full((nrows, ncols), np.nan, dtype=np.float32)
 
-    # j is the number of time points to consider in the omnibus tests
-    for j in range(2, k - _l):
-        subsubset = ds_m.isel(time=slice(_l, _l + j))
-        p_H0 = omnibus(subsubset, n=n)
-        # continue until first significant change
-        changes = (p_H0 >= 1 - alpha)
-        new_first_change = np.logical_and(changes, np.isnan(first_change))
-        first_change[new_first_change] = _l + j - 1
+        # j is the number of time points to consider in the omnibus tests
+        for j in range(2, k - t0):
+            subset = ds_m.isel(time=slice(t0, t0 + j))
+            p_H0 = omnibus(subset, n=n)
+            # continue until first significant change
+            changes = (p_H0 >= 1 - alpha)
+            new_first_change = np.logical_and(changes, np.isnan(first_change))
+            first_change[new_first_change] = t0 + j - 1
 
-    # Create a new dataset to be returned, delete all variables
+        return first_change
+        # Create a new dataset to be returned, delete all variables
+
+        # change_ds = ds_m.copy()
+        # for var in ds_m.data_vars:
+        #     del change_ds[var]
+        # change_ds['first_change'] = (('lat', 'lon'), first_change)
+
+        # return change_ds
+
+    # Iteratively set the start index, but skip the last one (t0 == k - 1),
+    # as the changepoint detection make no sense for a single time step.
+    changes = np.empty((k - 1, nrows, ncols), dtype=np.float32)
+    for t0 in range(k - 1):
+        first_change = first_change_after(ds_m, t0=t0, alpha=alpha, n=n)
+        changes[t0, :, :] = first_change
+
+    # Determine the changes
+    changes_bool = change_array_to_bool(changes).astype(bool)
+
+    # return changes_bool
+
+    # Create a dataset of all the change points.
     change_ds = ds_m.copy()
     for var in ds_m.data_vars:
         del change_ds[var]
-    change_ds['first_change'] = (('lat', 'lon'), first_change)
+    change_ds['time'] = ds_m['time'][:-1]
+    change_ds['changes'] = (('time', 'lat', 'lon'), changes_bool)
 
     return change_ds
-
-    # r = j-1
-    # l += r
 
 
 if __name__ == '__main__':
