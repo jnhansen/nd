@@ -20,14 +20,14 @@
   <node id="Write">
     <operator>Write</operator>
     <sources>
-      <sourceProduct refid="Terrain-Correction"/>
+      <sourceProduct refid="Read"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <!-- <file>${in}_Orb_Cal_Deb_ML_TF_Spk_TC.dim</file> -->
       <!-- <formatName>GeoTIFF-BigTIFF</formatName> -->
       <!-- <file>${in}.cal.dim</file> -->
       <!-- <formatName>BEAM-DIMAP</formatName> -->
-      <file>${in}.cal.nc</file>
+      <file>${in}_converted.nc</file>
       <formatName>NetCDF4-BEAM</formatName>
     </parameters>
   </node>
