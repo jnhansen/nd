@@ -1,3 +1,7 @@
+<!--
+  Usage:
+  $ gpt s1_slc_calibration.xml -Pin="<inputfile>"
+-->
 <graph id="Graph">
   <version>1.0</version>
   <!--
@@ -7,7 +11,6 @@
     <operator>Read</operator>
     <sources/>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <!-- <file>/Users/jhansen/data/S1B_IW_SLC__1SSV_20161125T093700_20161125T093727_003113_0054AD_3BD2.SAFE/manifest.safe</file> -->
       <file>${in}</file>
       </parameters>
   </node>
@@ -62,17 +65,35 @@
   <!--
     MULTILOOK
   -->
-  <node id="Multilook">
+  <!-- <node id="Multilook">
     <operator>Multilook</operator>
     <sources>
       <sourceProduct refid="TOPSAR-Deburst"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
-      <nRgLooks>4</nRgLooks>
-      <nAzLooks>1</nAzLooks>
+      <nRgLooks>8</nRgLooks>
+      <nAzLooks>2</nAzLooks>
       <outputIntensity>false</outputIntensity>
       <grSquarePixel>true</grSquarePixel>
+    </parameters>
+  </node> -->
+  <!--
+    POLARIMETRIC SPECKLE FILTER
+  -->
+  <node id="Polarimetric-Speckle-Filter">
+    <operator>Polarimetric-Speckle-Filter</operator>
+    <sources>
+      <sourceProduct refid="TOPSAR-Deburst"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <filter>Refined Lee Filter</filter>
+      <filterSize>5</filterSize>
+      <numLooksStr>1</numLooksStr>
+      <windowSize>7x7</windowSize>
+      <targetWindowSizeStr>3x3</targetWindowSizeStr>
+      <anSize>50</anSize>
+      <sigmaStr>0.9</sigmaStr>
     </parameters>
   </node>
   <!--
@@ -81,16 +102,16 @@
   <!-- <node id="Terrain-Flattening">
     <operator>Terrain-Flattening</operator>
     <sources>
-      <sourceProduct refid="Multilook"/>
+      <sourceProduct refid="Polarimetric-Speckle-Filter"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
       <demName>SRTM 1Sec HGT</demName>
-      <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
+      <demResamplingMethod>BICUBIC_INTERPOLATION</demResamplingMethod>
       <externalDEMFile/>
       <externalDEMNoDataValue>0.0</externalDEMNoDataValue>
       <outputSimulatedImage>false</outputSimulatedImage>
-      <reGridMethod>false</reGridMethod>
+      <reGridMethod>true</reGridMethod>
     </parameters>
   </node> -->
   <!--
@@ -119,10 +140,10 @@
   <!--
     TERRAIN CORRECTION
   -->
-  <!-- <node id="Terrain-Correction">
+  <node id="Terrain-Correction">
     <operator>Terrain-Correction</operator>
     <sources>
-      <sourceProduct refid="Speckle-Filter"/>
+      <sourceProduct refid="Polarimetric-Speckle-Filter"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
@@ -161,20 +182,23 @@
       <auxFile>Latest Auxiliary File</auxFile>
       <externalAuxFile/>
     </parameters>
-  </node> -->
+  </node>
   <!--
     WRITE OUTPUT FILE
   -->
   <node id="Write">
     <operator>Write</operator>
     <sources>
-      <sourceProduct refid="Multilook"/>
+      <sourceProduct refid="Terrain-Correction"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <!-- <file>${in}_Orb_Cal_Deb_ML_TF_Spk_TC.dim</file> -->
-      <file>${out}</file>
-      <!-- <file>out.dim</file> -->
+      <!-- <file>${out}</file> -->
+      <file>${in}.cal.dim</file>
+      <!-- <file>${in}.cal.nc</file> -->
+      <!-- <formatName>GeoTIFF-BigTIFF</formatName> -->
       <formatName>BEAM-DIMAP</formatName>
+      <!-- <formatName>NetCDF4-BEAM</formatName> -->
     </parameters>
   </node>
   <applicationData id="Presentation">
@@ -191,20 +215,20 @@
     <node id="TOPSAR-Deburst">
       <displayPosition x="220.0" y="100.0"/>
     </node>
-    <node id="Multilook">
+    <!-- <node id="Multilook">
+      <displayPosition x="220.0" y="140.0"/>
+    </node> -->
+    <node id="Polarimetric-Speckle-Filter">
       <displayPosition x="220.0" y="140.0"/>
     </node>
     <node id="Terrain-Flattening">
       <displayPosition x="220.0" y="180.0"/>
     </node>
-    <node id="Speckle-Filter">
+    <node id="Terrain-Correction">
       <displayPosition x="220.0" y="220.0"/>
     </node>
-    <node id="Terrain-Correction">
-      <displayPosition x="220.0" y="260.0"/>
-    </node>
     <node id="Write">
-      <displayPosition x="420.0" y="260.0"/>
+      <displayPosition x="420.0" y="220.0"/>
     </node>
   </applicationData>
 </graph>
