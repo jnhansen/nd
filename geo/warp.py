@@ -11,11 +11,14 @@ from osgeo import gdal, osr
 import numpy as np
 import pandas as pd
 import xarray as xr
-from dask import delayed
-# import multiprocessing as mp
+import os
+import glob
 from scipy.ndimage.interpolation import map_coordinates
-# from transform import map_coordinates_wrapper
 from .utils import array_chunks
+from ._warp import c_grid, c_valid
+from . import satio
+
+import time
 
 try:
     type(profile)
@@ -197,16 +200,38 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
     An extension of map_coordinates that can handle np.nan values in the
     input array.
     """
-    nanmask = np.isnan(input).astype(np.float32)
-    if nanmask.sum() > 0:
-        nanmask_mapped = map_coordinates(nanmask, coords, output=np.float32,
+    #
+    # Deal with NaN values
+    #
+    nanmask = np.isnan(input)
+    if nanmask.any():
+        nanmask_mapped = map_coordinates(nanmask.astype(np.float32), coords,
                                          cval=1) > 0.9
     else:
-        nanmask_mapped = np.zeros_like(coords)
-    filled_input = input.copy()
-    filled_input[np.isnan(filled_input)] = 0
-    result = map_coordinates(filled_input, coords, *args, **kwargs)
-    result[nanmask_mapped.astype(bool)] = np.nan
+        nanmask_mapped = np.zeros_like(coords).astype(bool)
+    data = input.copy()
+    data[nanmask] = 0
+
+    #
+    # Deal with complex data
+    #
+    if np.iscomplexobj(data):
+        # interpolate magnitude and phase separately
+        out_dtype = np.float32 if data.dtype is np.complex64 \
+                    else np.float64
+        cplx_kwargs = kwargs.copy()
+        cplx_kwargs['output'] = out_dtype
+        mapped_mag = map_coordinates(np.abs(data), coords,
+                                     *args, **cplx_kwargs)
+        mapped_phase = map_coordinates(np.angle(data), coords,
+                                       *args, **cplx_kwargs)
+        result = mapped_mag * np.exp(1j * mapped_phase)
+    else:
+        result = map_coordinates(data, coords, *args, **kwargs)
+
+    # Reapply NaN values
+    result[nanmask_mapped] = np.nan
+
     return result
 
 
@@ -381,21 +406,40 @@ def _common_extent_and_resolution(datasets):
     return common_extent, common_resolution
 
 
-def align(datasets, compute=True):
+def align(datasets, path):
     """
     Resample datasets to common extent and resolution.
     """
-    extent, resolution = _common_extent_and_resolution(datasets)
-    tasks = []
-    for ds in datasets:
-        tasks.append(
-            delayed(resample_grid)(ds, extent=extent, resolution=resolution)
-        )
-    result = delayed(tasks)
-    if compute:
-        return result.compute()
+    #
+    # Doing this in parallel is apparently too heavy on memory...
+    #
+    # Treat `datasets` as a glob expression
+    if isinstance(datasets, str):
+        datasets = glob.glob(datasets)
+
+    if len(datasets) == 0:
+        raise ValueError("No files found!")
+
+    # Treat `datasets` as a list of file paths
+    if isinstance(datasets[0], str):
+        # Pass chunks={} to ensure the dataset is read as a dask array
+        products = [os.path.splitext(os.path.split(_)[1])[0] for _ in datasets]
+        datasets = [satio.from_netcdf(path) for path in datasets]
     else:
-        return result
+        products = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
+                    for ds in datasets]
+
+    extent, resolution = _common_extent_and_resolution(datasets)
+
+    os.makedirs(path, exist_ok=True)
+
+    for name, ds in zip(products, datasets):
+        resampled = resample_grid(ds, extent=extent, resolution=resolution)
+        outfile = os.path.join(path, name + '_aligned.nc')
+        satio.to_netcdf(resampled, outfile)
+        # Explicitly close datasets
+        del resampled
+        ds.close()
 
 
 def resample_grid(dataset, extent, shape=None, resolution=None):
@@ -418,40 +462,65 @@ def resample_grid(dataset, extent, shape=None, resolution=None):
     xarray.Dataset
         A new dataset with shape `shape` and extent `extent`.
     """
+    t = time.time()
+    print('Start resampling ...')
+    # Get new shape and extent
     lon_min, lat_min, lon_max, lat_max = extent
     if resolution is not None:
         lon_res, lat_res = resolution
         # Set shape (a passed shape will be ignored).
-        lon_shape = (lon_max - lon_min) // lon_res
-        lat_shape = (lat_max - lat_min) // lat_res
-        shape = (lat_shape, lon_shape)
+        lon_size = int((lon_max - lon_min) / lon_res)
+        lat_size = int((lat_max - lat_min) / lat_res)
     elif shape is None:
-        # Automatically determine shape?
         raise ValueError("Need to pass either shape or resolution!")
     else:
-        lat_shape, lon_shape = shape
+        lat_size, lon_size = shape
+
+    # Get original shape and extent
+    o_lat_size = dataset.sizes['lat']
+    o_lon_size = dataset.sizes['lon']
+    o_extent = (dataset.lon.values.min(), dataset.lat.values.min(),
+                dataset.lon.values.max(), dataset.lat.values.max())
 
     new_coords = dict(dataset.coords)
-    new_coords['lat'] = np.linspace(lat_min, lat_max, lat_shape)
-    new_coords['lon'] = np.linspace(lon_min, lon_max, lon_shape)
+    new_coords['lat'] = np.linspace(lat_max, lat_min, lat_size)
+    new_coords['lon'] = np.linspace(lon_min, lon_max, lon_size)
 
-    lon_grid, lat_grid = np.meshgrid(new_coords['lon'], new_coords['lat'],
-                                     copy=False)
-    latlon_grid = np.stack([lat_grid, lon_grid], axis=0)
+    # Calculate coordinate grid based on original/new shape/extent
+    print(o_extent, tuple((o_lat_size, o_lon_size)),
+          tuple(extent), tuple((lat_size, lon_size)))
+    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+    print('calculate coord grid')
+    coord_grid = c_grid(o_extent, tuple((o_lat_size, o_lon_size)),
+                        tuple(extent), tuple((lat_size, lon_size)))
+    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
 
-    org_ll_min = np.array([[[dataset.lat.min()]], [[dataset.lon.min()]]])
-    org_ll_range = np.array([[[dataset.lat.max()]],
-                             [[dataset.lon.max()]]]) - org_ll_min
-    org_ll_shape = np.array([[[dataset.sizes['lat']]],
-                             [[dataset.sizes['lon']]]]) - 1
-    coord_grid = (latlon_grid - org_ll_min) * (org_ll_shape/org_ll_range)
-
+    print('Initiating dataset')
     result = xr.Dataset(coords=new_coords, attrs=dataset.attrs)
+    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+
+    # Exclude all coordinates that extend beyond the coordinate
+    # range of the original data.
+    print('calculate valid coords')
+    out_of_range, valid_coords = c_valid(coord_grid,
+                                         shape=(o_lat_size, o_lon_size))
+    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+
+    def _resample(values):
+        resampled = np.full((lat_size, lon_size), np.nan, dtype=values.dtype)
+        resampled[~out_of_range] = map_coordinates_with_nan(
+            values, valid_coords, order=2, cval=np.nan)
+        return resampled
+
     for var in dataset.data_vars:
-        result[var] = (('lat', 'lon'),
-                       map_coordinates_with_nan(dataset[var].values,
-                                                coord_grid, output=np.float32,
-                                                order=2, cval=np.nan))
+        if 'lat' not in dataset[var].coords or \
+                'lon' not in dataset[var].coords:
+            result[var] = dataset[var]
+        else:
+            print('resampling {}'.format(var))
+            result[var] = (('lat', 'lon'),
+                           _resample(dataset[var].values))
+            print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
 
     return result
 
@@ -533,6 +602,7 @@ def warp_dataset(ds, extent=None, shape=None):
     dimensions.
 
     TODO: parallelize
+    TODO: make work with already orthorectified datasets
 
     Parameters
     ----------

@@ -2,15 +2,18 @@ from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
 import numpy
 
+ext_modules = [
+    Extension("geo._omnibus", ["geo/_omnibus.pyx"]),
+    Extension("geo._warp", ["geo/_warp.pyx"])
+]
 
-ext_modules = [Extension("geo._omnibus", ["geo/_omnibus.pyx"],)]
-
-setup(name='geotools',
-      packages=find_packages(),
-      cmdclass={'build_ext': build_ext},
-      ext_modules=ext_modules,
-      include_dirs=[numpy.get_include()],
-      install_requires=[
+setup(
+    name='geotools',
+    packages=find_packages(),
+    cmdclass={'build_ext': build_ext},
+    ext_modules=ext_modules,
+    include_dirs=[numpy.get_include()],
+    install_requires=[
         "numpy",
         "scipy",
         "xarray",
@@ -21,5 +24,7 @@ setup(name='geotools',
         "pandas",
         "python-dateutil",
         "scikit-image",
-        "matplotlib"
-      ])
+        "matplotlib",
+        "affine"
+    ]
+)
