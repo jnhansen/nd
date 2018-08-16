@@ -292,7 +292,7 @@ def from_beam_dimap(path, read_data=True):
     return ds
 
 
-def to_netcdf(ds, path):
+def to_netcdf(ds, path, *args, **kwargs):
     """Write an xarray Dataset to disk.
 
     In addition to xarray.to_netcdf, this function allows to store complex
@@ -307,7 +307,10 @@ def to_netcdf(ds, path):
         The path of the target NetCDF file.
     """
     write = _disassemble_complex(ds)
-    return write.to_netcdf(path)
+    if 'encoding' not in kwargs:
+        comp = dict(zlib=True, complevel=5)
+        kwargs['encoding'] = {var: comp for var in write.data_vars}
+    return write.to_netcdf(path, *args, **kwargs)
 
 
 def from_netcdf(path, *args, **kwargs):
