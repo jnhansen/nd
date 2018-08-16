@@ -205,7 +205,9 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
     #
     nanmask = np.isnan(input)
     if nanmask.any():
-        nanmask_mapped = map_coordinates(nanmask.astype(np.float32), coords,
+        # NOTE: Apparently float32 dtype sometimes causes a crash in scipy's
+        # spline_filter (in older versions?)
+        nanmask_mapped = map_coordinates(nanmask.astype(np.float64), coords,
                                          cval=1) > 0.9
     else:
         nanmask_mapped = np.zeros_like(coords).astype(bool)
@@ -442,6 +444,11 @@ def align(datasets, path):
         ds.close()
 
 
+#
+# TODO: This should be incorporated into the warp_dataset() function,
+# as it is just a special case where the dataset is already in lat-lon
+# coordinates.
+#
 def resample_grid(dataset, extent, shape=None, resolution=None):
     """Resample a dataset to a new extent.
 
