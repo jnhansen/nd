@@ -23,7 +23,7 @@ cdef double _rho(double p, double k, double n):
     rho = 1 - (2 * p**2 - 1) / (6 * (k - 1) * p) * (k/n - 1/(n*k))
     return rho
 
-    
+
 @cython.cdivision(True)
 cdef double _omega2(double p, double k, double n, double rho):
     cdef double omega2
@@ -54,16 +54,16 @@ cpdef floating _z(floating [:, :] ts, unsigned int n):
         floating z
         floating prob
         size_t i
-    
+
     # Compute the individual matrix determinants and the sum along the
     # time dimension.
     for i in range(k):
-        prod_of_dets *= ((ts[i, 0] * ts[i, 3]) - (ts[i, 1]**2 + ts[i, 2]**2))        
+        prod_of_dets *= ((ts[i, 0] * ts[i, 3]) - (ts[i, 1]**2 + ts[i, 2]**2))
         c11sum += ts[i, 0]
         c12rsum += ts[i, 1]
         c12isum += ts[i, 2]
         c22sum += ts[i, 3]
-    
+
     # The determinant of the sum of all matrices.
     det_of_sum = ((c11sum * c22sum) - (c12rsum**2 + c12isum**2))
 
@@ -91,7 +91,7 @@ cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts, unsig
         size_t i, j
         double p = 2
         double f, rho, omega2
-        
+
         # np.ndarray[floating, ndim=2] _single_ts = np.empty((k, 4), dtype=dtype)
         floating [:, :] _single_ts # = np.empty((k, 4), dtype=dtype)
         # np.ndarray[floating, ndim=2] zs = np.empty((nrows, ncols), dtype=dtype)
@@ -102,7 +102,7 @@ cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts, unsig
         # floating [:, :] _P2 # = np.zeros((nrows, ncols), dtype=np.float64)
         np.ndarray[floating, ndim=2] result = np.empty((nrows, ncols), dtype=dtype)
         # floating [:, :] result = np.empty((nrows, ncols), dtype=dtype)
-    
+
     for i in range(nrows):
         for j in range(ncols):
             _single_ts = ts[:, i, j, :]
@@ -138,7 +138,7 @@ cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n):
         floating z
         floating _P1, _P2
         floating result
-    
+
     f = _f(p, k, n)
     rho = _rho(p, k, n)
     omega2 = _omega2(p, k, n, rho)
@@ -184,14 +184,14 @@ cpdef np.ndarray[BOOL, ndim=3] change_array_to_bool(np.ndarray[floating, ndim=3]
     extract a boolean array that is True where a valid change was detected
     and False everywhere else.
 
-    NOTE: Cython doesn't yet support boolean arrays, so the output is char and 
+    NOTE: Cython doesn't yet support boolean arrays, so the output is char and
     should be converted to bool later if desired.
 
     Parameters
     ----------
     c : np.ndarray, shape (T, M, N)
         The detected change indices. The first dimension is time.
-    
+
     Returns
     -------
     np.ndarray, shape (T, M, N)
@@ -205,7 +205,7 @@ cpdef np.ndarray[BOOL, ndim=3] change_array_to_bool(np.ndarray[floating, ndim=3]
         size_t idx, last_change
         np.ndarray[BOOL, ndim=3] res = np.zeros((k, nrows, ncols), dtype=np.uint8)
         floating _pixel
-    
+
     for i in range(nrows):
         for j in range(ncols):
             last_change = 0
@@ -215,5 +215,5 @@ cpdef np.ndarray[BOOL, ndim=3] change_array_to_bool(np.ndarray[floating, ndim=3]
                 if not isnan(_pixel) and idx > last_change:
                     res[idx, i, j] = 1
                     last_change = idx
-    
+
     return res
