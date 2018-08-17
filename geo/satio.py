@@ -401,6 +401,14 @@ def _assemble_complex(ds, inplace=False):
         return new_ds
 
 
+def _add_time(ds):
+    result = ds.copy()
+    if 'time' not in result.coords:
+        times = [utils.str2date(ds.attrs['start_date'])]
+        result.coords['time'] = times
+    return result
+
+
 def _get_gcp_df(gdal_ds):
     """Converts the GCPs from the GDAL dataset into a pandas.DataFrame.
 

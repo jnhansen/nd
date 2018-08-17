@@ -179,7 +179,8 @@ def auto_merge(datasets, buffer='auto'):
     # Treat `datasets` as a list of file paths
     if isinstance(datasets[0], str):
         # Pass chunks={} to ensure the dataset is read as a dask array
-        datasets = [xr.open_dataset(path, chunks={}) for path in datasets]
+        datasets = [satio._add_time(xr.open_dataset(path, chunks={}))
+                    for path in datasets]
 
     if buffer == 'auto':
         buf_cache = {}
