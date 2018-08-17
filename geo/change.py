@@ -188,6 +188,8 @@ def multilook(ds, w=3):
     """
     ds_m = ds.copy()
     for vn, v in ds_m.data_vars.items():
+        if 'lat' not in v.dims or 'lon' not in v.dims:
+            continue
         axes = tuple(v.dims.index(_) for _ in ('lat', 'lon'))
         ds_m[vn] = (v.dims, _multilook_array(v, w=w, axes=axes))
     return ds_m
