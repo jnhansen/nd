@@ -63,10 +63,18 @@ cpdef double[:, :, :] c_grid(tuple o_extent,
         double [:] new_coords_lat, new_coords_lon
         double [:] new_coords_y, new_coords_x
 
-    lon_ll, lat_ll, lon_ur, lat_ur = extent
-    lat_size, lon_size = shape
-    o_lon_ll, o_lat_ll, o_lon_ur, o_lat_ur = o_extent
-    o_lat_size, o_lon_size = o_shape
+    lon_ll = extent[0]
+    lat_ll = extent[1]
+    lon_ur = extent[2]
+    lat_ur = extent[3]
+    lat_size = shape[0]
+    lon_size = shape[1]
+    o_lon_ll = o_extent[0]
+    o_lat_ll = o_extent[1]
+    o_lon_ur = o_extent[2]
+    o_lat_ur = o_extent[3]
+    o_lat_size = o_shape[0]
+    o_lon_size = o_shape[1]
 
     o_lat_range = o_lat_ur - o_lat_ll
     o_lon_range = o_lon_ur - o_lon_ll
