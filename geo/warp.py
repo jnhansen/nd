@@ -12,6 +12,7 @@ from osgeo import gdal, osr
 import numpy as np
 import pandas as pd
 import xarray as xr
+from dask import delayed
 import os
 import glob
 from scipy.ndimage.interpolation import map_coordinates
@@ -408,7 +409,7 @@ def _common_extent_and_resolution(datasets):
     return common_extent, common_resolution
 
 
-def align(datasets, path):
+def align(datasets, path, parallel=False, compute=True):
     """
     Resample datasets to common extent and resolution.
     """
@@ -423,25 +424,45 @@ def align(datasets, path):
         raise ValueError("No files found!")
 
     # Treat `datasets` as a list of file paths
+    products = datasets
     if isinstance(datasets[0], str):
         # Pass chunks={} to ensure the dataset is read as a dask array
-        products = [os.path.splitext(os.path.split(_)[1])[0] for _ in datasets]
+        product_names = [os.path.splitext(os.path.split(_)[1])[0]
+                         for _ in products]
         datasets = [satio.from_netcdf(path) for path in datasets]
     else:
-        products = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
-                    for ds in datasets]
+        product_names = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
+                         for ds in datasets]
 
     extent, resolution = _common_extent_and_resolution(datasets)
 
     os.makedirs(path, exist_ok=True)
 
-    for name, ds in zip(products, datasets):
+    def _align(ds, path):
+        if isinstance(ds, str):
+            ds = satio.from_netcdf(ds)
         resampled = resample_grid(ds, extent=extent, resolution=resolution)
-        outfile = os.path.join(path, name + '_aligned.nc')
         satio.to_netcdf(resampled, outfile)
         # Explicitly close datasets
         del resampled
         ds.close()
+
+    tasks = []
+    for name, ds in zip(product_names, products):
+        outfile = os.path.join(path, name + '_aligned.nc')
+        if parallel:
+            tasks.append(
+                delayed(_align)(ds, outfile)
+            )
+        else:
+            _align(ds, outfile)
+
+    if parallel:
+        result = delayed(tasks)
+        if compute:
+            return result.compute()
+        else:
+            return result
 
 
 #
