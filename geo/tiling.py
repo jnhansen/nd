@@ -33,6 +33,10 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
     elif not os.path.isdir(path):
         os.makedirs(path)
 
+    #  Treat `ds` as a file path
+    if isinstance(ds, str):
+        ds = xr.open_dataset(ds)
+
     # Prepare chunk sizes
     if chunks is None:
         chunked = ds
@@ -60,15 +64,28 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
             )
             start += l
 
-    # 2. Then apply itertools to the slices.
-    for slice_dict in utils.dict_product(slices):
+    #
+    # Assume that the original chunks (ds.chunks) corresponds
+    # to the natural splitting in files. Hence, optimize for
+    # handling a single file at a time.
+    #
+    # ordered_keys = sorted(ds.chunks.keys(), key=lambda k: -len(ds.chunks[k]))
+    # ordered_slices = OrderedDict()
+    # for k in ordered_keys:
+    #     ordered_slices[k] = slices[k]
+
+    def _write_tile(slices):
         # Slice the dataset and write to disk.
-        subset = chunked.isel(slice_dict)
+        subset = ds.isel(slice_dict)
         suffix = '.'.join(
             [f'{dim}_{s.start}' for dim, s in slice_dict.items()]
         )
         tile_name = f'{prefix}.{suffix}.nc'
         satio.to_netcdf(subset, os.path.join(path, tile_name))
+
+    # 2. Then apply itertools to the slices.
+    for slice_dict in utils.dict_product(slices):
+        _write_tile(slice_dict)
 
     return
 
@@ -144,7 +161,7 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
         return result
 
 
-def auto_merge(datasets, buffer='auto'):
+def auto_merge(datasets, buffer='auto', chunks={}):
     """
     Automatically merge a split xarray Dataset. This is designed to behave like
     `xarray.open_mfdataset`, except it supports concatenation along multiple
@@ -179,7 +196,7 @@ def auto_merge(datasets, buffer='auto'):
     # Treat `datasets` as a list of file paths
     if isinstance(datasets[0], str):
         # Pass chunks={} to ensure the dataset is read as a dask array
-        datasets = [satio._add_time(xr.open_dataset(path, chunks={}))
+        datasets = [satio._add_time(xr.open_dataset(path, chunks=chunks))
                     for path in datasets]
 
     if buffer == 'auto':
