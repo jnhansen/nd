@@ -7,6 +7,7 @@ TODO: remove clutter in main()
 
 """
 # somehow need to import gdal first ...
+from . import satio
 from osgeo import gdal, osr
 import numpy as np
 import pandas as pd
@@ -16,7 +17,6 @@ import glob
 from scipy.ndimage.interpolation import map_coordinates
 from .utils import array_chunks
 from ._warp import c_grid, c_valid
-from . import satio
 
 import time
 
@@ -651,9 +651,10 @@ def warp_dataset(ds, extent=None, shape=None):
     #
     # Create new dataset
     #
-    ds_warped = xr.Dataset(coords={'lat': new_lats, 'lon': new_lons,
-                                   'time': ds.time},
-                           attrs=ds.attrs)
+    coords = {'lat': new_lats, 'lon': new_lons}
+    if 'time' in ds.coords:
+        coords['time'] = ds.time
+    ds_warped = xr.Dataset(coords=coords, attrs=ds.attrs)
     # Warp the data variables
     for name, var in ds.data_vars.items():
         new_data = resample(var.values, new_image_coords)
