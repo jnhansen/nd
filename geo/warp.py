@@ -662,6 +662,8 @@ def warp(ds, extent=None, shape=None, resolution=None):
             # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
             extent = (ds.lon.min(), ds.lat.min(),
                       ds.lon.max(), ds.lat.max())
+        else:
+            extent = tuple(extent)
         lon_min, lat_min, lon_max, lat_max = extent
         if resolution is not None:
             # Compute shape (a passed shape will be ignored).
