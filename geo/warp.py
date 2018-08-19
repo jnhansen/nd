@@ -243,6 +243,7 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
 def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
     """Fit a polynomial to the input coordinates.
 
+    TODO: Make work with shape (2, M, N)
     NOTE: This function will not need to be called in the public API.
 
     Parameters
@@ -356,9 +357,11 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
         return fn
 
 
-def _coord_transform(coords, new_coords):
+def _coord_transform(coords, new_coords, cdim=2):
     """Generate an array of image space coordinates that will transform
     from `coords` to `new_coords`.
+
+    TODO: Make work with shape (2, M, N)
 
     Parameters
     ----------
@@ -573,9 +576,9 @@ def resample(data, new_coords, coords=None, order=3):
     ----------
     data : numpy.array, shape (M, N, L)
         The original data, L is the number of bands.
-    new_coords : numpy.array, shape (Y, X, 2)
+    new_coords : numpy.array, shape (2, Y, X)
         The new coordinates for which to resample data.
-    coords : numpy.array, shape (M, N, 2), optional
+    coords : numpy.array, shape (2, M, N), optional
         The coordinates of each pixel in `data`. If None, it is assumed that
         `new_coords` is already in image coordinates (default: None).
     order : int, optional
@@ -594,16 +597,15 @@ def resample(data, new_coords, coords=None, order=3):
         raise ValueError("`data` has an unsupported shape: %s" % data.shape)
 
     M, N, L = channels.shape
-    Y, X, _ = new_coords.shape
+    _, Y, X = new_coords.shape
 
     # from coords and new_coords figure out the corresponding
     # image coordinates.
     if coords is None:
         im_coords = new_coords
     else:
-        im_coords = _coord_transform(coords, new_coords)
-
-    im_coords = im_coords.transpose((2, 0, 1))
+        im_coords = _coord_transform(coords, new_coords, cdim=0)
+        im_coords = im_coords.transpose((2, 0, 1))
 
     mapped = np.empty((Y, X, L), dtype=data.dtype)
 
