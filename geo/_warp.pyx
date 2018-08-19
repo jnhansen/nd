@@ -3,6 +3,7 @@ cimport cython
 import numpy as np
 cimport numpy as np
 from cython cimport floating
+# from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from libc.math cimport isnan, abs
 import xarray as xr
 from scipy.ndimage.interpolation import map_coordinates, affine_transform
@@ -10,7 +11,7 @@ from scipy.ndimage.interpolation import map_coordinates, affine_transform
 
 ctypedef np.float64_t DOUBLE
 ctypedef np.float32_t FLOAT
-ctypedef size_t SIZE_TYPE
+ctypedef Py_ssize_t SIZE_TYPE
 ctypedef np.uint8_t BOOL
 
 ctypedef fused data_type:
@@ -148,7 +149,8 @@ cpdef tuple c_valid(coord_type[:, :, :] coords,
     lat_size = coords.shape[1]
     lon_size = coords.shape[2]
     out_of_range = np.empty((lat_size, lon_size), dtype=np.uint8)
-    valid_coords = np.empty((2, lat_size * lon_size))
+    c_dtype = np.float32 if coord_type is float else np.float64
+    valid_coords = np.empty((2, lat_size * lon_size), dtype=c_dtype)
     counter = 0
     for i_lat in range(lat_size):
         for i_lon in range(lon_size):
