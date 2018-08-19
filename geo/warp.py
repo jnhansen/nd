@@ -660,6 +660,7 @@ def warp(ds, extent=None, shape=None, resolution=None):
     # Use lat/lon coordinate arrays
     #
     if 'lat' in ds.dims and 'lon' in ds.dims:
+        print(f'Computing new image coordinates ...'); t = time.time()
         if extent is None:
             # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
             extent = (ds.lon.min(), ds.lat.min(),
@@ -693,6 +694,7 @@ def warp(ds, extent=None, shape=None, resolution=None):
 
         # Generate coordinate grid
         new_image_coords = c_grid(o_extent, o_shape, extent, shape)
+        print('--- {:.1f}s'.format(time.time() - t))
 
     #
     # USE GCPs
@@ -727,12 +729,14 @@ def warp(ds, extent=None, shape=None, resolution=None):
 
     # Warp the data variables
     for var in ds.data_vars:
+        print(f'Warping {var} ...'); t = time.time()
         if 'lat' not in ds[var].coords or \
                 'lon' not in ds[var].coords:
             ds_warped[var] = ds[var]
         else:
             new_data = resample(ds[var].values, new_image_coords)
             ds_warped[var] = (('lat', 'lon'), new_data)
+        print('--- {:.1f}s'.format(time.time() - t))
 
     return ds_warped
 
