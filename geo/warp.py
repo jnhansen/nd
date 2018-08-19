@@ -68,25 +68,27 @@ NO_DATA_VALUE = np.nan
 #     return coords, extent
 
 
-@profile
-def _map_single_raster(arr, coords):
-    if np.iscomplexobj(arr):
-        # interpolate magnitude and phase separately
-        mapped_mag = map_coordinates(np.abs(arr), coords, output=np.float32,
-                                     order=3, cval=NO_DATA_VALUE)
-        mapped_phase = map_coordinates(np.angle(arr), coords,
-                                       output=np.float32, order=3,
-                                       cval=NO_DATA_VALUE)
-        mapped = mapped_mag * np.exp(1j * mapped_phase)
-    else:
-        mapped = map_coordinates(arr, coords, output=np.float32, order=3,
-                                 cval=NO_DATA_VALUE)
-    return mapped
+# DEPRECATED
+# @profile
+# def _map_single_raster(arr, coords):
+#     if np.iscomplexobj(arr):
+#         # interpolate magnitude and phase separately
+#         mapped_mag = map_coordinates(np.abs(arr), coords, output=np.float32,
+#                                      order=3, cval=NO_DATA_VALUE)
+#         mapped_phase = map_coordinates(np.angle(arr), coords,
+#                                        output=np.float32, order=3,
+#                                        cval=NO_DATA_VALUE)
+#         mapped = mapped_mag * np.exp(1j * mapped_phase)
+#     else:
+#         mapped = map_coordinates(arr, coords, output=np.float32, order=3,
+#                                  cval=NO_DATA_VALUE)
+#     return mapped
 
 
-def _efficient_map_coordinates(arr, coords, order, cval):
-    return map_coordinates(arr, coords, output=np.float32, order=order,
-                           cval=cval)
+# DEPRECATED
+# def _efficient_map_coordinates(arr, coords, order, cval):
+#     return map_coordinates(arr, coords, output=np.float32, order=order,
+#                            cval=cval)
 
 
 # @profile
@@ -208,7 +210,7 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
     if nanmask.any():
         # NOTE: Apparently float32 dtype sometimes causes a crash in scipy's
         # spline_filter (in older versions?)
-        nanmask_mapped = map_coordinates(nanmask.astype(np.float64), coords,
+        nanmask_mapped = map_coordinates(nanmask.astype(np.float32), coords,
                                          cval=1) > 0.9
     else:
         nanmask_mapped = np.zeros_like(coords).astype(bool)
@@ -441,7 +443,7 @@ def align(datasets, path, parallel=False, compute=True):
     def _align(ds, path):
         if isinstance(ds, str):
             ds = satio.from_netcdf(ds)
-        resampled = resample_grid(ds, extent=extent, resolution=resolution)
+        resampled = warp(ds, extent=extent, resolution=resolution)
         satio.to_netcdf(resampled, outfile)
         # Explicitly close datasets
         del resampled
@@ -466,91 +468,96 @@ def align(datasets, path, parallel=False, compute=True):
 
 
 #
-# TODO: This should be incorporated into the warp_dataset() function,
+# TODO: This should be incorporated into the warp() function,
 # as it is just a special case where the dataset is already in lat-lon
 # coordinates.
 #
-def resample_grid(dataset, extent, shape=None, resolution=None):
-    """Resample a dataset to a new extent.
+# def resample_grid(dataset, extent, shape=None, resolution=None):
+#     """Resample a dataset to a new extent.
 
-    Parameters
-    ----------
-    dataset : xarray.Dataset
-        The dataset to resample.
-    extent : array_like
-        The extent of the output dataset.
-    shape : tuple, optional
-        The shape of the output dataset.
-        Ignored if `resolution` is also passed.
-    resolution : tuple, optional
-        The resolution of the output dataset.
+#     Parameters
+#     ----------
+#     dataset : xarray.Dataset
+#         The dataset to resample.
+#     extent : array_like
+#         The extent of the output dataset.
+#     shape : tuple, optional
+#         The shape of the output dataset.
+#         Ignored if `resolution` is also passed.
+#     resolution : tuple, optional
+#         The resolution of the output dataset.
 
-    Returns
-    -------
-    xarray.Dataset
-        A new dataset with shape `shape` and extent `extent`.
-    """
-    t = time.time()
-    print('Start resampling ...')
-    # Get new shape and extent
-    lon_min, lat_min, lon_max, lat_max = extent
-    if resolution is not None:
-        lon_res, lat_res = resolution
-        # Set shape (a passed shape will be ignored).
-        lon_size = int((lon_max - lon_min) / lon_res)
-        lat_size = int((lat_max - lat_min) / lat_res)
-    elif shape is None:
-        raise ValueError("Need to pass either shape or resolution!")
-    else:
-        lat_size, lon_size = shape
+#     Returns
+#     -------
+#     xarray.Dataset
+#         A new dataset with shape `shape` and extent `extent`.
+#     """
+#     t = time.time()
+#     print('Start resampling ...')
+#     # Get new shape and extent
+#     lon_min, lat_min, lon_max, lat_max = extent
+#     if resolution is not None:
+#         lon_res, lat_res = resolution
+#         # Set shape (a passed shape will be ignored).
+#         lon_size = int((lon_max - lon_min) / lon_res)
+#         lat_size = int((lat_max - lat_min) / lat_res)
+#     elif shape is None:
+#         raise ValueError("Need to pass either shape or resolution!")
+#     else:
+#         lat_size, lon_size = shape
 
-    # Get original shape and extent
-    o_lat_size = dataset.sizes['lat']
-    o_lon_size = dataset.sizes['lon']
-    o_extent = (dataset.lon.values.min(), dataset.lat.values.min(),
-                dataset.lon.values.max(), dataset.lat.values.max())
+#     # Get original shape and extent
+#     o_lat_size = dataset.sizes['lat']
+#     o_lon_size = dataset.sizes['lon']
+#     o_extent = (dataset.lon.values.min(), dataset.lat.values.min(),
+#                 dataset.lon.values.max(), dataset.lat.values.max())
 
-    new_coords = dict(dataset.coords)
-    new_coords['lat'] = np.linspace(lat_max, lat_min, lat_size)
-    new_coords['lon'] = np.linspace(lon_min, lon_max, lon_size)
+#     new_coords = dict(dataset.coords)
+#     new_coords['lat'] = np.linspace(lat_max, lat_min, lat_size)
+#     new_coords['lon'] = np.linspace(lon_min, lon_max, lon_size)
 
-    # Calculate coordinate grid based on original/new shape/extent
-    print(o_extent, tuple((o_lat_size, o_lon_size)),
-          tuple(extent), tuple((lat_size, lon_size)))
-    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
-    print('calculate coord grid')
-    coord_grid = c_grid(o_extent, tuple((o_lat_size, o_lon_size)),
-                        tuple(extent), tuple((lat_size, lon_size)))
-    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+#     print('Initiating dataset')
+#     result = xr.Dataset(coords=new_coords, attrs=dataset.attrs)
+#     print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
 
-    print('Initiating dataset')
-    result = xr.Dataset(coords=new_coords, attrs=dataset.attrs)
-    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+#     # Calculate coordinate grid based on original/new shape/extent
+#     print(o_extent, tuple((o_lat_size, o_lon_size)),
+#           tuple(extent), tuple((lat_size, lon_size)))
+#     print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+#     print('calculate coord grid')
+#     coord_grid = c_grid(o_extent,
+#                         tuple((o_lat_size, o_lon_size)),
+#                         tuple(extent),
+#                         tuple((lat_size, lon_size)),
+#                         valid=True)
+#     print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
 
-    # Exclude all coordinates that extend beyond the coordinate
-    # range of the original data.
-    print('calculate valid coords')
-    out_of_range, valid_coords = c_valid(coord_grid,
-                                         shape=(o_lat_size, o_lon_size))
-    print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+#     # Exclude all coordinates that extend beyond the coordinate
+#     # range of the original data.
+#     # print('calculate valid coords')
+#     # out_of_range, valid_coords = c_valid(coord_grid,
+#     #                                      shape=(o_lat_size, o_lon_size))
+#     # print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
 
-    def _resample(values):
-        resampled = np.full((lat_size, lon_size), np.nan, dtype=values.dtype)
-        resampled[~out_of_range] = map_coordinates_with_nan(
-            values, valid_coords, order=2, cval=np.nan)
-        return resampled
+#     def _resample(values):
+#         resampled = np.full((lat_size, lon_size), np.nan, dtype=values.dtype)
+#         # resampled[~out_of_range] = map_coordinates_with_nan(
+#         #      values, valid_coords, order=2, cval=np.nan)
+#         resampled = map_coordinates_with_nan(
+#             values, coord_grid, order=2, cval=np.nan)
+#         return resampled
 
-    for var in dataset.data_vars:
-        if 'lat' not in dataset[var].coords or \
-                'lon' not in dataset[var].coords:
-            result[var] = dataset[var]
-        else:
-            print('resampling {}'.format(var))
-            result[var] = (('lat', 'lon'),
-                           _resample(dataset[var].values))
-            print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
+#     for var in dataset.data_vars:
+#         if 'lat' not in dataset[var].coords or \
+#                 'lon' not in dataset[var].coords:
+#             result[var] = dataset[var]
+#         else:
+#             print('resampling {}'.format(var))
+#             result[var] = (('lat', 'lon'),
+#                            _resample(dataset[var].values))
+#             print('--- {:.1f}s'.format(time.time() - t)); t = time.time()
 
-    return result
+#     return result
 
 
 def resample(data, new_coords, coords=None, order=3):
@@ -560,7 +567,7 @@ def resample(data, new_coords, coords=None, order=3):
     longitude, but may be in arbitrary units as long as they share the same
     coordinate system.
 
-    NOTE: This is a lower-level function used by warp_dataset().
+    NOTE: This is a lower-level function used by warp().
 
     Parameters
     ----------
@@ -603,28 +610,17 @@ def resample(data, new_coords, coords=None, order=3):
     for channel in range(L):
         # warp data onto the new image coordinates
         cdata = channels[:, :, channel]
-        if np.iscomplexobj(cdata):
-            # interpolate magnitude and phase separately
-            out_dtype = np.float32 if cdata.dtype is np.complex64 \
-                        else np.float64
-            mapped_mag = map_coordinates(np.abs(cdata), im_coords,
-                                         output=out_dtype, order=order,
-                                         cval=np.nan)
-            mapped_phase = map_coordinates(np.angle(cdata), im_coords,
-                                           output=out_dtype, order=order,
-                                           cval=np.nan)
-            mapped[:, :, channel] = mapped_mag * np.exp(1j * mapped_phase)
-        else:
-            mapped[:, :, channel] = \
-                map_coordinates(cdata, im_coords, output=np.float32,
-                                order=order, cval=np.nan)
+        mapped[:, :, channel] = \
+            map_coordinates_with_nan(cdata, im_coords, order=order,
+                                     cval=np.nan)
+
     if data.ndim == 2:
         mapped = mapped[:, :, 0]
 
     return mapped
 
 
-def warp_dataset(ds, extent=None, shape=None):
+def warp(ds, extent=None, shape=None, resolution=None):
     """Warp a dataset onto equirectangular coordinates. The resulting dataset
     will contain 'lat' and 'lon' as 1-dimensional coordinate variables, i.e.
     dimensions.
@@ -643,8 +639,11 @@ def warp_dataset(ds, extent=None, shape=None):
         take the maximum extent spanned my the original dataset.
     shape : tuple, optional
         The desired shape of the output dataset. This will determine the
-        resolution. If None (default), the output shape will be equal to the
-        input shape, which may not be desirable.
+        resolution. Ignored if `resolution` is also passed.
+    resolution : tuple, optional
+        The resolution of the output dataset. If both the shape and resolution
+        are `None`, the output shape will be equal to the input shape,
+        which may not be desirable.
 
     Returns
     -------
@@ -654,20 +653,65 @@ def warp_dataset(ds, extent=None, shape=None):
     if not isinstance(ds, xr.Dataset):
         raise ValueError("`ds` must be a valid xarray Dataset (got: {})."
                          .format(type(ds)))
-    gcps = _tie_points_to_gcps(ds)
-    ll2xy = _fit_latlon(gcps, inverse=True)
-    if extent is None:
-        # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
-        extent = [gcps['GCPX'].min(), gcps['GCPY'].min(),
-                  gcps['GCPX'].max(), gcps['GCPY'].max()]
-    if shape is None:
-        shape = ds.lat.shape
-    N_lat, N_lon = shape
-    new_lons = np.linspace(extent[0], extent[2], N_lon)
-    new_lats = np.linspace(extent[1], extent[3], N_lat)
-    new_ll_coords = np.stack(np.meshgrid(new_lons, new_lats, copy=False),
-                             axis=-1)
-    new_image_coords = ll2xy(new_ll_coords)
+
+    #
+    # Use lat/lon coordinate arrays
+    #
+    if 'lat' in ds.dims and 'lon' in ds.dims:
+        if extent is None:
+            # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
+            extent = (ds.lon.min(), ds.lat.min(),
+                      ds.lon.max(), ds.lat.max())
+        lon_min, lat_min, lon_max, lat_max = extent
+        if resolution is not None:
+            # Compute shape (a passed shape will be ignored).
+            lon_res, lat_res = resolution
+            lon_size = int((lon_max - lon_min) / lon_res)
+            lat_size = int((lat_max - lat_min) / lat_res)
+            shape = (lat_size, lon_size)
+        elif shape is not None:
+            lat_size, lon_size = shape
+        else:
+            lat_size = ds.sizes['lat']
+            lon_size = ds.sizes['lon']
+            shape = (lat_size, lon_size)
+
+        # New coordinates (needed to generate the dataset)
+        new_lats = np.linspace(lat_max, lat_min, lat_size)
+        new_lons = np.linspace(lon_min, lon_max, lon_size)
+
+        # Get original shape and extent
+        o_lat_size = ds.sizes['lat']
+        o_lon_size = ds.sizes['lon']
+        o_shape = (o_lat_size, o_lon_size)
+        o_extent = (ds.lon.values.min(), ds.lat.values.min(),
+                    ds.lon.values.max(), ds.lat.values.max())
+
+        # Generate coordinate grid
+        new_image_coords = c_grid(o_extent, o_shape, extent, shape)
+
+    #
+    # USE GCPs
+    #
+    elif 'lat' in ds.coords and 'lon' in ds.coords:
+        gcps = _tie_points_to_gcps(ds)
+        ll2xy = _fit_latlon(gcps, inverse=True)
+        if extent is None:
+            # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
+            extent = [gcps['GCPX'].min(), gcps['GCPY'].min(),
+                      gcps['GCPX'].max(), gcps['GCPY'].max()]
+        if shape is None:
+            shape = ds.lat.shape
+        lat_size, lon_size = shape
+        new_lons = np.linspace(extent[0], extent[2], lon_size)
+        new_lats = np.linspace(extent[1], extent[3], lat_size)
+        new_ll_coords = np.stack(np.meshgrid(new_lons, new_lats, copy=False),
+                                 axis=-1)
+        new_image_coords = ll2xy(new_ll_coords)
+
+    else:
+        raise ValueError("Could not determine the lat and lon coordinates "
+                         "for the dataset.")
 
     #
     # Create new dataset
@@ -676,10 +720,15 @@ def warp_dataset(ds, extent=None, shape=None):
     if 'time' in ds.coords:
         coords['time'] = ds.time
     ds_warped = xr.Dataset(coords=coords, attrs=ds.attrs)
+
     # Warp the data variables
-    for name, var in ds.data_vars.items():
-        new_data = resample(var.values, new_image_coords)
-        ds_warped[name] = (('lat', 'lon'), new_data)
+    for var in ds.data_vars:
+        if 'lat' not in ds[var].coords or \
+                'lon' not in ds[var].coords:
+            ds_warped[var] = ds[var]
+        else:
+            new_data = resample(ds[var].values, new_image_coords)
+            ds_warped[var] = (('lat', 'lon'), new_data)
 
     return ds_warped
 
