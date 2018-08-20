@@ -7,7 +7,7 @@ TODO: remove clutter in main()
 
 """
 # somehow need to import gdal first ...
-from . import satio
+from geo import satio
 from osgeo import gdal, osr
 import numpy as np
 import pandas as pd
@@ -16,8 +16,8 @@ from dask import delayed
 import os
 import glob
 from scipy.ndimage.interpolation import map_coordinates
-from .utils import array_chunks
-from ._warp import c_grid, c_valid
+from geo.utils import array_chunks
+from geo._warp import c_grid
 
 import time
 
@@ -198,6 +198,7 @@ def gdal_warp(src):
     return warped_ds
 
 
+@profile
 def map_coordinates_with_nan(input, coords, *args, **kwargs):
     """
     An extension of map_coordinates that can handle np.nan values in the
@@ -212,10 +213,11 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
         # spline_filter (in older versions?)
         nanmask_mapped = map_coordinates(nanmask.astype(np.float32), coords,
                                          cval=1) > 0.9
+        data = input.copy()
+        data[nanmask] = 0
     else:
         nanmask_mapped = np.zeros_like(coords).astype(bool)
-    data = input.copy()
-    data[nanmask] = 0
+        data = input
 
     #
     # Deal with complex data
@@ -226,11 +228,16 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
                     else np.float64
         cplx_kwargs = kwargs.copy()
         cplx_kwargs['output'] = out_dtype
-        mapped_mag = map_coordinates(np.abs(data), coords,
-                                     *args, **cplx_kwargs)
-        mapped_phase = map_coordinates(np.angle(data), coords,
-                                       *args, **cplx_kwargs)
-        result = mapped_mag * np.exp(1j * mapped_phase)
+        mapped_real = map_coordinates(np.real(data), coords,
+                                      *args, **cplx_kwargs)
+        mapped_imag = map_coordinates(np.imag(data), coords,
+                                      *args, **cplx_kwargs)
+        result = mapped_real + 1j * mapped_imag
+        # mapped_mag = map_coordinates(np.abs(data), coords,
+        #                              *args, **cplx_kwargs)
+        # mapped_phase = map_coordinates(np.angle(data), coords,
+        #                                *args, **cplx_kwargs)
+        # result = mapped_mag * np.exp(1j * mapped_phase)
     else:
         result = map_coordinates(data, coords, *args, **kwargs)
 
@@ -240,6 +247,7 @@ def map_coordinates_with_nan(input, coords, *args, **kwargs):
     return result
 
 
+@profile
 def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
     """Fit a polynomial to the input coordinates.
 
@@ -357,6 +365,7 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
         return fn
 
 
+@profile
 def _coord_transform(coords, new_coords, cdim=2):
     """Generate an array of image space coordinates that will transform
     from `coords` to `new_coords`.
@@ -414,6 +423,7 @@ def _common_extent_and_resolution(datasets):
     return common_extent, common_resolution
 
 
+@profile
 def align(datasets, path, parallel=False, compute=True):
     """
     Resample datasets to common extent and resolution.
@@ -563,6 +573,7 @@ def align(datasets, path, parallel=False, compute=True):
 #     return result
 
 
+@profile
 def resample(data, new_coords, coords=None, order=3):
     """Resample data at new coordinates.
 
@@ -622,6 +633,7 @@ def resample(data, new_coords, coords=None, order=3):
     return mapped
 
 
+@profile
 def warp(ds, extent=None, shape=None, resolution=None):
     """Warp a dataset onto equirectangular coordinates. The resulting dataset
     will contain 'lat' and 'lon' as 1-dimensional coordinate variables, i.e.
@@ -768,9 +780,21 @@ def _tie_points_to_gcps(ds):
     return gcps
 
 
-# def add_gcps_to_dataset(ds, gcps):
-#     pass
+@profile
+def main():
+    path = '/Users/jhansen/data/alignment_test/'
+    # align(path+'*.nc', path+'aligned/', parallel=False)
+
+    # Just do one.
+    datasets = glob.glob(path+'*.nc')
+    datasets = [satio.from_netcdf(p) for p in datasets]
+    extent, resolution = _common_extent_and_resolution(datasets)
+    ds = datasets[0]
+    del ds['C11']
+    del ds['C22']
+    resampled = warp(datasets[0], extent=extent, resolution=resolution)
+    satio.to_netcdf(resampled, os.path.join(path, 'aligned', 'test.nc'))
 
 
 if __name__ == '__main__':
-    pass
+    main()
