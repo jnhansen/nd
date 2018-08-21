@@ -214,8 +214,19 @@ def auto_merge(datasets, buffer='auto', chunks={}):
 
         # Group along the remaining dimensions and concatenate within each
         # group.
-        sorted_ds = sorted(datasets, key=lambda ds: tuple(ds[d].values[0]
-                                                          for d in split_dims))
+        def sort_key(ds, dims):
+            keys = []
+            for d in dims:
+                vals = ds[d].values
+                if vals[-1] > vals[0]:
+                    # ascending order
+                    keys.append(vals[0])
+                else:
+                    # descending order
+                    keys.append(-vals[0])
+            return tuple(keys)
+
+        sorted_ds = sorted(datasets, key=lambda ds: sort_key(ds, split_dims))
         for _, group in itertools.groupby(
                 sorted_ds,
                 key=lambda ds: tuple(ds[d].values[0] for d in split_dims[:-1])
@@ -228,8 +239,9 @@ def auto_merge(datasets, buffer='auto', chunks={}):
                     _buf = buf_cache[concat_dim]
                 else:
                     # Determine overlap along concat_dim
-                    diff = group[1][concat_dim].values - \
-                        group[0][concat_dim].values[-1]
+                    values0 = group[0][concat_dim].values
+                    values1 = group[1][concat_dim].values
+                    diff = values1 - values0[-1]
                     _buf = int((np.argmin(np.abs(diff)) + 1) / 2)
                     buf_cache[concat_dim] = _buf
 
