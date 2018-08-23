@@ -15,9 +15,12 @@ import xarray as xr
 from dask import delayed
 import os
 import glob
-from scipy.ndimage.interpolation import map_coordinates
-from geo.utils import array_chunks
-from geo._warp import c_grid
+from scipy.ndimage import interpolation
+from scipy.ndimage._ni_support import _extend_mode_to_code
+# import (_extend_mode_to_code, map_coordinates , geometric_transform)
+from scipy.ndimage import _nd_image
+from geo import utils
+from geo._warp import c_grid, CoordTransform
 
 import time
 
@@ -34,6 +37,13 @@ NO_DATA_VALUE = np.nan
 #     lat = gcp_df['GCPY']
 #     return [lon.min(), lat.min(), lon.max(), lat.max()]
 
+
+def _get_extent(ds):
+    if 'lon' not in ds.coords or 'lat' not in ds.coords:
+        raise ValueError("Dataset must contain 'lat' and 'lon' coordinates.")
+    # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
+    return (ds.lon.values.min(), ds.lat.values.min(),
+            ds.lon.values.max(), ds.lat.values.max())
 
 # @profile
 # def _get_warp_coords(src, shape=None, extent=None):
@@ -199,52 +209,120 @@ def gdal_warp(src):
 
 
 @profile
-def map_coordinates_with_nan(input, coords, *args, **kwargs):
+def map_coordinates_with_nan(input, coords=None, mapping=None, output=None,
+                             order=3, mode='constant', cval=np.nan, copy=True,
+                             **kwargs):
     """
     An extension of map_coordinates that can handle np.nan values in the
     input array.
+
+    NOTE: do spline filtering?
+
+    Parameters
+    ----------
+    copy : bool, optional
+        If True, create copy of input data (default).
+        Otherwise, fill NaN values inplace (more memory efficient).
     """
+    extra_arguments = None if mapping is None else ()
+    extra_keywords = None if mapping is None else {}
+    mode = _extend_mode_to_code(mode)
+    const_mode = _extend_mode_to_code('constant')
+    return_output = (output is None)
+
+    # _nd_image.geometric_transform(filtered, mapping, coords, None, None,
+    #                               output, order, mode, cval,
+    #                               extra_arguments, extra_keywords)
+
+    #
+    # Prepare output array, which will be filled inplace.
+    #
+    if output is None:
+        if coords is not None:
+            shape = coords.shape
+        else:
+            shape = input.shape
+        output = np.zeros(shape, dtype=input.dtype)
+    else:
+        shape = output.shape
+
+    if np.iscomplexobj(output):
+        out_dtype = np.float32 if output.dtype.itemsize == 8 \
+                    else np.float64
+        output = output[:, :, np.newaxis].view(out_dtype)
+
     #
     # Deal with NaN values
     #
-    nanmask = np.isnan(input)
-    if nanmask.any():
-        # NOTE: Apparently float32 dtype sometimes causes a crash in scipy's
-        # spline_filter (in older versions?)
-        nanmask_mapped = map_coordinates(nanmask.astype(np.float32), coords,
-                                         cval=1) > 0.9
-        data = input.copy()
+    if np.issubdtype(input.dtype, np.floating):
+        nanmask = np.isnan(input)
+    else:
+        nanmask = None
+
+    if nanmask is not None and nanmask.any():
+        nanmask_mapped = np.zeros(shape, dtype=bool)
+        nan_order = 0
+        _nd_image.geometric_transform(nanmask.astype(np.float32),
+                                      mapping, coords, None, None,
+                                      nanmask_mapped, nan_order, const_mode, 1,
+                                      extra_arguments, extra_keywords)
+        # nanmask_mapped = interpolation.map_coordinates(nanmask.astype(np.float32), coords,
+        #                                  cval=1) > 0.9
+        if copy:
+            data = input.copy()
+        else:
+            data = input
         data[nanmask] = 0
     else:
-        nanmask_mapped = np.zeros_like(coords).astype(bool)
+        nanmask_mapped = None
         data = input
 
     #
     # Deal with complex data
     #
     if np.iscomplexobj(data):
+        #
+        # Fill output[:, :, 0] with the real part,
+        # and output[:, :, 1] with the imaginary part
+        #
+
         # interpolate magnitude and phase separately
-        out_dtype = np.float32 if data.dtype is np.complex64 \
-                    else np.float64
-        cplx_kwargs = kwargs.copy()
-        cplx_kwargs['output'] = out_dtype
-        mapped_real = map_coordinates(np.real(data), coords,
-                                      *args, **cplx_kwargs)
-        mapped_imag = map_coordinates(np.imag(data), coords,
-                                      *args, **cplx_kwargs)
-        result = mapped_real + 1j * mapped_imag
-        # mapped_mag = map_coordinates(np.abs(data), coords,
+        # out_dtype = np.float32 if data.dtype is np.complex64 \
+        #             else np.float64
+        # cplx_kwargs = kwargs.copy()
+        # cplx_kwargs['output'] = out_dtype
+        floatview = data[:, :, np.newaxis].view(out_dtype)
+        for i in range(2):
+            _nd_image.geometric_transform(floatview[:, :, i],
+                                          mapping, coords, None, None,
+                                          output[:, :, i], order, mode, cval,
+                                          extra_arguments, extra_keywords)
+        output = output.view(input.dtype)[:, :, 0]
+        # mapped_real = interpolation.map_coordinates(np.real(data), coords,
+        #                               **cplx_kwargs)
+        # mapped_imag = interpolation.map_coordinates(np.imag(data), coords,
+        #                               **cplx_kwargs)
+        # result = mapped_real + 1j * mapped_imag
+        # mapped_mag = interpolation.map_coordinates(np.abs(data), coords,
         #                              *args, **cplx_kwargs)
-        # mapped_phase = map_coordinates(np.angle(data), coords,
+        # mapped_phase = interpolation.map_coordinates(np.angle(data), coords,
         #                                *args, **cplx_kwargs)
         # result = mapped_mag * np.exp(1j * mapped_phase)
     else:
-        result = map_coordinates(data, coords, *args, **kwargs)
+        # result = interpolation.map_coordinates(data, coords, *args, **kwargs)
+        _nd_image.geometric_transform(data,
+                                      mapping, coords, None, None,
+                                      output, order, mode, cval,
+                                      extra_arguments, extra_keywords)
 
     # Reapply NaN values
-    result[nanmask_mapped] = np.nan
+    if nanmask_mapped is not None:
+        output[nanmask_mapped] = np.nan
 
-    return result
+    if return_output:
+        return output
+    else:
+        return None
 
 
 @profile
@@ -351,7 +429,7 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
             # 8000       | 1e8    | 3
             # 8000       | 1e8    | 2
             res = np.empty_like(X)
-            for index, chunk in array_chunks(X, 8000, axis=0,
+            for index, chunk in utils.array_chunks(X, 8000, axis=0,
                                              return_indices=True):
                 p = poly.transform(chunk)
                 res[index] = clf.predict(p)
@@ -522,8 +600,7 @@ def align(datasets, path, parallel=False, compute=True):
 #     # Get original shape and extent
 #     o_lat_size = dataset.sizes['lat']
 #     o_lon_size = dataset.sizes['lon']
-#     o_extent = (dataset.lon.values.min(), dataset.lat.values.min(),
-#                 dataset.lon.values.max(), dataset.lat.values.max())
+#     o_extent = _get_extent(dataset)
 
 #     new_coords = dict(dataset.coords)
 #     new_coords['lat'] = np.linspace(lat_max, lat_min, lat_size)
@@ -582,6 +659,7 @@ def resample(data, new_coords, coords=None, order=3):
     coordinate system.
 
     NOTE: This is a lower-level function used by warp().
+    NOTE: DEPRECATE
 
     Parameters
     ----------
@@ -634,17 +712,19 @@ def resample(data, new_coords, coords=None, order=3):
 
 
 @profile
-def warp(ds, extent=None, shape=None, resolution=None):
+def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
+         precompute_coords=True):
     """Warp a dataset onto equirectangular coordinates. The resulting dataset
     will contain 'lat' and 'lon' as 1-dimensional coordinate variables, i.e.
     dimensions.
 
+    TODO: need to make this consume less memory (!)
     TODO: parallelize
-    TODO: make work with already orthorectified datasets
+    TODO: make work with already orthorectified datasets √
 
     Parameters
     ----------
-    ds : xarray.Dataset
+    ds : xarray.Dataset or xarray.DataArray
         A dataset that must contain coordinate variables 'lat' and 'lon',
         which may be NaN in most places (tie point grid).
     extent : list, optional
@@ -658,15 +738,17 @@ def warp(ds, extent=None, shape=None, resolution=None):
         The resolution of the output dataset. If both the shape and resolution
         are `None`, the output shape will be equal to the input shape,
         which may not be desirable.
+    precompute_coords : bool, optional
+        Faster, but uses more memory (default: True).
 
     Returns
     -------
     xarray.Dataset
         A warped dataset of shape `shape`.
     """
-    if not isinstance(ds, xr.Dataset):
-        raise ValueError("`ds` must be a valid xarray Dataset (got: {})."
-                         .format(type(ds)))
+    if not isinstance(ds, xr.Dataset) and not isinstance(ds, xr.DataArray):
+        raise ValueError("`ds` must be a valid xarray Dataset or DataArray "
+                         "(got: {}).".format(type(ds)))
 
     #
     # Use lat/lon coordinate arrays
@@ -675,8 +757,7 @@ def warp(ds, extent=None, shape=None, resolution=None):
         print(f'Computing new image coordinates ...'); t = time.time()
         if extent is None:
             # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
-            extent = (ds.lon.min(), ds.lat.min(),
-                      ds.lon.max(), ds.lat.max())
+            extent = _get_extent(ds)
         else:
             extent = tuple(extent)
         lon_min, lat_min, lon_max, lat_max = extent
@@ -701,16 +782,23 @@ def warp(ds, extent=None, shape=None, resolution=None):
         o_lat_size = ds.sizes['lat']
         o_lon_size = ds.sizes['lon']
         o_shape = (o_lat_size, o_lon_size)
-        o_extent = (ds.lon.values.min(), ds.lat.values.min(),
-                    ds.lon.values.max(), ds.lat.values.max())
+        o_extent = _get_extent(ds)
 
-        # Generate coordinate grid
-        new_image_coords = c_grid(o_extent, o_shape, extent, shape)
+        if precompute_coords:
+            # Generate coordinate grid
+            coords = c_grid(o_extent, o_shape, extent, shape)
+            mapping = None
+        else:
+            # Generate coordinate transform
+            coords = None
+            mapping = CoordTransform(o_extent, o_shape, extent, shape).apply
+
         print('--- {:.1f}s'.format(time.time() - t))
 
     #
     # USE GCPs
     #
+    # TODO: Make work with new mechanism
     elif 'lat' in ds.coords and 'lon' in ds.coords:
         gcps = _tie_points_to_gcps(ds)
         ll2xy = _fit_latlon(gcps, inverse=True)
@@ -725,7 +813,7 @@ def warp(ds, extent=None, shape=None, resolution=None):
         new_lats = np.linspace(extent[1], extent[3], lat_size)
         new_ll_coords = np.stack(np.meshgrid(new_lons, new_lats, copy=False),
                                  axis=-1)
-        new_image_coords = ll2xy(new_ll_coords)
+        coords = ll2xy(new_ll_coords)
 
     else:
         raise ValueError("Could not determine the lat and lon coordinates "
@@ -734,23 +822,71 @@ def warp(ds, extent=None, shape=None, resolution=None):
     #
     # Create new dataset
     #
-    coords = {'lat': new_lats, 'lon': new_lons}
+    ds_coords = {'lat': new_lats, 'lon': new_lons}
     if 'time' in ds.coords:
-        coords['time'] = ds.time
-    ds_warped = xr.Dataset(coords=coords, attrs=ds.attrs)
+        ds_coords['time'] = ds.time
 
-    # Warp the data variables
-    for var in ds.data_vars:
-        print(f'Warping {var} ...'); t = time.time()
-        if 'lat' not in ds[var].coords or \
-                'lon' not in ds[var].coords:
-            ds_warped[var] = ds[var]
+    # Warp a single DataArray
+    def _warp_dataarray(da):
+        var = da.name
+        if 'lat' not in da.coords or \
+                'lon' not in da.coords:
+            return da
         else:
-            new_data = resample(ds[var].values, new_image_coords)
-            ds_warped[var] = (('lat', 'lon'), new_data)
-        print('--- {:.1f}s'.format(time.time() - t))
+            print(f'Warping {var} ...'); t = time.time()
+            kwargs = {}
+            # If the dtype is integer, treat as categorical
+            if np.issubdtype(da.dtype, np.integer):
+                kwargs['order'] = 0
+            # new_data = resample(da.values, coords, **kwargs)
+            new_data = np.zeros(shape, dtype=da.dtype)
+            map_coordinates_with_nan(da.values, coords=coords, mapping=mapping,
+                                     output=new_data, copy=False, **kwargs)
+            # geometric_transform(da.values, coord_transform, output=new_data,
+            #                     **kwargs)
+            da_warped = xr.DataArray(new_data, dims=ds_coords.keys(),
+                                     coords=ds_coords, attrs=da.attrs)
+            print('--- {:.1f}s'.format(time.time() - t))
+            return da_warped
 
-    return ds_warped
+    # If requested, split into small chunks for memory reasons.
+    if chunks is not None:
+        parts = utils.xr_split(ds, dim='lat', chunks=chunks)
+    else:
+        parts = [ds]
+
+    result = None
+    for part in parts:
+        if isinstance(part, xr.Dataset):
+            if result is None:
+                # First part only
+                result = xr.Dataset(coords=ds_coords, attrs=ds.attrs)
+            for var in part.data_vars:
+                warped = _warp_dataarray(part[var])
+                if var not in result:
+                    result[var] = warped
+                else:
+                    result[var] = result[var].fillna(warped)
+
+        elif isinstance(part, xr.DataArray):
+            warped = _warp_dataarray(part)
+            if result is None:
+                # First part only
+                result = warped
+            else:
+                result = result.fillna(warped)
+
+    return result
+
+
+def warp_like(ds, template):
+    """
+    Warp `ds` to match the coordinates of `template`.
+    """
+    extent = _get_extent(template)
+    shape = (template.sizes['lat'],
+             template.sizes['lon'])
+    return warp(ds, extent=extent, shape=shape)
 
 
 def _tie_points_to_gcps(ds):
@@ -790,10 +926,16 @@ def main():
     datasets = [satio.from_netcdf(p) for p in datasets]
     extent, resolution = _common_extent_and_resolution(datasets)
     ds = datasets[0]
-    del ds['C11']
-    del ds['C22']
-    resampled = warp(datasets[0], extent=extent, resolution=resolution)
-    satio.to_netcdf(resampled, os.path.join(path, 'aligned', 'test.nc'))
+    # del ds['C11']
+    # del ds['C22']
+
+    # Standard
+    # resampled = warp(ds, extent=extent, resolution=resolution)
+    # satio.to_netcdf(resampled, os.path.join(path, 'aligned', 'test.nc'))
+    resampled = warp(ds, extent=extent, resolution=resolution, chunks=None,
+                     precompute_coords=True)
+    satio.to_netcdf(resampled,
+                    os.path.join(path, 'aligned', 'test_chunked.nc'))
 
 
 if __name__ == '__main__':
