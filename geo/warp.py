@@ -368,16 +368,15 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
                              " ['GCPLine', 'GCPPixel', 'GCPX', 'GCPY'].")
         ll = coords[['GCPX', 'GCPY']]
         xy = coords[['GCPLine', 'GCPPixel']]
+    elif not isinstance(coords, np.ndarray):
+        raise ValueError("`coords` is not a valid numpy array.")
+    elif coords.ndim != 3 or coords.shape[2] != 2:
+        raise ValueError("`coords` must have shape (rows, cols, 2)."
+                         " Found shape %s instead." % repr(coords.shape))
     else:
         #
         # Lat-Lon grid
         #
-        if not isinstance(coords, np.ndarray):
-            raise ValueError("`coords` is not a valid numpy array.")
-        if coords.ndim != 3 or coords.shape[2] != 2:
-            raise ValueError("`coords` must have shape (rows, cols, 2)."
-                             " Found shape %s instead." % repr(coords.shape))
-
         y, x = np.meshgrid(np.arange(coords.shape[1]),
                            np.arange(coords.shape[0]),
                            copy=False)
@@ -531,7 +530,7 @@ def align(datasets, path, parallel=False, compute=True):
 
     os.makedirs(path, exist_ok=True)
 
-    def _align(ds, path):
+    def _align(ds, outfile):
         if isinstance(ds, str):
             ds = satio.from_netcdf(ds)
         resampled = warp(ds, extent=extent, resolution=resolution)
