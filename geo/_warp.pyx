@@ -22,14 +22,62 @@ ctypedef fused coord_type:
     float
 
 
+cdef class CoordTransform:
+    cdef:
+        double o_lon_ll, o_lat_ll, o_lon_ur, o_lat_ur
+        Py_ssize_t o_lat_size, o_lon_size
+        double lon_ll, lat_ll, lon_ur, lat_ur
+        Py_ssize_t lat_size, lon_size
+        double o_lat_range, o_lon_range
+        double lat_range, lon_range
+        double o_lat_density, o_lon_density
+        double lat_density, lon_density
+
+    def __cinit__(self,
+                  tuple o_extent,
+                  tuple o_shape,
+                  tuple extent,
+                  tuple shape):
+        self.o_lon_ll, self.o_lat_ll, self.o_lon_ur, self.o_lat_ur = o_extent
+        self.o_lat_size, self.o_lon_size = o_shape
+        self.lon_ll, self.lat_ll, self.lon_ur, self.lat_ur = extent
+        self.lat_size, self.lon_size = shape
+
+        self.o_lat_range = self.o_lat_ur - self.o_lat_ll
+        self.o_lon_range = self.o_lon_ur - self.o_lon_ll
+
+        self.lat_range = self.lat_ur - self.lat_ll
+        self.lon_range = self.lon_ur - self.lon_ll
+
+        self.o_lat_density = float(self.o_lat_size) / self.o_lat_range
+        self.o_lon_density = float(self.o_lon_size) / self.o_lon_range
+
+        self.lat_density = float(self.lat_size) / self.lat_range
+        self.lon_density = float(self.lon_size) / self.lon_range
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.cdivision(True)
+    cpdef tuple apply(self, tuple c):
+        cdef:
+            double lat, lon
+            double y, x
+            Py_ssize_t i_lat, i_lon
+        i_lat, i_lon = c
+        lat = self.lat_ur + i_lat * self.lat_density
+        lon = self.lon_ll + i_lon * self.lon_density
+        y = (self.o_lat_ur - lat) * self.o_lat_density
+        x = (lon - self.o_lon_ll) * self.o_lon_density
+        return (y, x)
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-cpdef double[:, :, :] c_grid(tuple o_extent,
-                             tuple o_shape,
-                             tuple extent,
-                             tuple shape):
+cpdef float[:, :, :] c_grid(tuple o_extent,
+                            tuple o_shape,
+                            tuple extent,
+                            tuple shape):
     """
     Generate a grid of image coordinates based on original and new extent,
     as well as original and new shape or resolution.
@@ -60,9 +108,9 @@ cpdef double[:, :, :] c_grid(tuple o_extent,
         double o_lat_range, o_lon_range
         double o_lat_density, o_lon_density
         SIZE_TYPE i_lat, i_lon
-        double [:, :, :] coord_grid
+        float [:, :, :] coord_grid
         double [:] new_coords_lat, new_coords_lon
-        double [:] new_coords_y, new_coords_x
+        float [:] new_coords_y, new_coords_x
 
     lon_ll = extent[0]
     lat_ll = extent[1]
@@ -86,8 +134,8 @@ cpdef double[:, :, :] c_grid(tuple o_extent,
     new_coords_lat = np.linspace(lat_ur, lat_ll, lat_size)
     new_coords_lon = np.linspace(lon_ll, lon_ur, lon_size)
 
-    new_coords_y = np.empty(lat_size)
-    new_coords_x = np.empty(lon_size)
+    new_coords_y = np.empty(lat_size, dtype=np.float32)
+    new_coords_x = np.empty(lon_size, dtype=np.float32)
     for i_lat in range(lat_size):
         new_coords_y[i_lat] = \
             (o_lat_ur - new_coords_lat[i_lat]) * o_lat_density
@@ -97,7 +145,7 @@ cpdef double[:, :, :] c_grid(tuple o_extent,
             (new_coords_lon[i_lon] - o_lon_ll) * o_lon_density
 
     # Generate coordinate grid
-    coord_grid = np.empty((2, lat_size, lon_size))
+    coord_grid = np.empty((2, lat_size, lon_size), dtype=np.float32)
 
     for i_lat in range(lat_size):
         for i_lon in range(lon_size):
