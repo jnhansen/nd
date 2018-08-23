@@ -527,6 +527,7 @@ def align(datasets, path, parallel=False, compute=True):
                          for ds in datasets]
 
     extent, resolution = _common_extent_and_resolution(datasets)
+    print(extent, resolution)
 
     os.makedirs(path, exist_ok=True)
 
@@ -547,6 +548,7 @@ def align(datasets, path, parallel=False, compute=True):
                 delayed(_align)(ds, outfile)
             )
         else:
+            print('Aligning {}'.format(name))
             _align(ds, outfile)
 
     if parallel:
