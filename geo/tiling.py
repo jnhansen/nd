@@ -218,7 +218,7 @@ def auto_merge(datasets, buffer='auto', chunks={}):
             keys = []
             for d in dims:
                 vals = ds[d].values
-                if vals[-1] > vals[0]:
+                if len(vals) < 2 or vals[-1] >= vals[0]:
                     # ascending order
                     keys.append(vals[0])
                 else:
