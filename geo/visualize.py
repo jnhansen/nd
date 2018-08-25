@@ -4,12 +4,92 @@ Quickly visualize datasets.
 TODO: Update to work with xarray Dataset rather than GDAL.
 
 """
+import cv2
+import xarray as xr
 import numpy as np
 import skimage.transform
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 
-from .transform import latlon_extent
+
+def colorize(labels, N=10, nan_vals=[]):
+    """
+    Apply a color map to a map of integer labels.
+
+    Parameters
+    ----------
+    labels : np.array, shape (M,N)
+        The labeled image.
+    N : int, optional
+        The number of colors to use (default: 10)
+
+    Returns
+    -------
+    np.array, shape (M,N,3)
+        A colored image in BGR space, ready to be handled by OpenCV.
+    """
+    data = (labels % N) * (255/(N-1))
+    data_gray = cv2.cvtColor(data.astype(np.uint8), cv2.COLOR_GRAY2RGB)
+    data_color = cv2.applyColorMap(data_gray, cv2.COLORMAP_JET)
+    for nv in nan_vals:
+        data_color[labels == nv] = 0
+    # data_color[labels == MASK_VAL] = 255
+    return data_color
+
+
+def to_rgb(data, output, vrange=None, stretch=(2, 98), categorical=False,
+           mask=None):
+    """
+    data : list of DataArray
+    output : str
+        file path
+    vrange : list of tuple, optional
+        min/max values
+    stretch : tuple
+        percentiles to stretch color map
+    """
+    if isinstance(data, list):
+        n_channels = len(data)
+    elif isinstance(data, xr.DataArray) or isinstance(data, np.ndarray):
+        n_channels = 1
+        data = [data]
+    else:
+        raise ValueError("`data` must be a DataArray or list of DataArrays")
+
+    if isinstance(data[0], xr.DataArray):
+        shape = (data[0].sizes['lat'], data[0].sizes['lon'], n_channels)
+        values = [d.values for d in data]
+    else:
+        shape = data[0].shape + (n_channels,)
+        values = data
+
+    if categorical:
+        colored = colorize(values[0], nan_vals=[0])
+
+    else:
+        im = np.empty(shape)
+
+        for i in range(n_channels):
+            channel = values[i]
+            # Stretch
+            if vrange:
+                minval = vrange[0]
+                maxval = vrange[1]
+            else:
+                minval = np.percentile(channel, stretch[0])
+                maxval = np.percentile(channel, stretch[1])
+            channel = (channel - minval) / (maxval - minval) * 255
+            im[:, :, i] = channel
+        im = np.clip(im, 0, 255).astype(np.uint8)
+        if n_channels == 1:
+            colored = cv2.cvtColor(im[:, :, 0], cv2.COLOR_GRAY2BGR)
+        else:
+            colored = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+
+    if mask is not None:
+        colored[~mask] = 0
+
+    cv2.imwrite(output, colored)
 
 
 def plot_image(src, name, N=1):
@@ -134,7 +214,6 @@ def plot_basemap(src, name, *args, **kwargs):
     alpha = ~np.isnan(color_tuple).all(axis=1) * 1.0
     color_tuple = np.insert(color_tuple, 3, alpha, 1)
 
-
     # # colors = np.array([data_[0,:,:].flatten(),data_[1,:,:].flatten(),
     # data_[0,:,:].flatten(), np.zeros(data_.shape[1:]).flatten()]) / 255
     # colors = np.stack([data_[1,:,:],data_[1,:,:],data_[1,:,:],255*np.ones(
@@ -154,7 +233,7 @@ def plot_basemap(src, name, *args, **kwargs):
     im = m.pcolormesh(lon_grid, lat_grid, data_[1, :, :], color=color_tuple,
                       latlon=True, **kwargs)
     # im = m.pcolormesh(x,y, data_[1,:,:], vmin=0, vmax=255, cmap=plt.cm.jet)
-    # im = m.pcolormesh(x,y, _data, cmap=cmap, 
+    # im = m.pcolormesh(x,y, _data, cmap=cmap,
     #                   vmin=_data.min(), vmax=_data.max())
     # im = m.pcolormesh(x,y, data_small.T, cmap=cmap, vmin=0, vmax=255)
     cb = plt.colorbar(orientation='vertical', fraction=0.10, shrink=0.7)
