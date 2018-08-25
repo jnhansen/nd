@@ -273,7 +273,7 @@ def xr_merge(ds_list, dim, buffer=0):
     return xr.concat(parts, dim=dim)
 
 
-def parallel(fn, dim=None, chunks=None, chunksize=None, buffer=0,
+def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
              compute=True):
     """
     Parallelize a function that takes an xarray dataset as first argument.
@@ -328,7 +328,11 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, buffer=0,
         # Split into parts
         parts = [delayed(fn)(part, *args, **kwargs) for part in
                  xr_split(prechunked, dim=dim, chunks=chunks, buffer=buffer)]
-        result = delayed(xr_merge)(parts, dim=dim, buffer=buffer)
+        if merge:
+            result = delayed(xr_merge)(parts, dim=dim, buffer=buffer)
+        else:
+            result = delayed(parts)
+
         if compute:
             return result.compute()
         else:
