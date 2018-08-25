@@ -449,7 +449,10 @@ def from_gdal_dataset(gdal_ds):
                              "path to one.")
     ncols, nrows = gdal_ds.RasterXSize, gdal_ds.RasterYSize
     meta = gdal_ds.GetMetadata()
-    times = [utils.str2date(meta['ACQUISITION_START_TIME'])]
+    if 'ACQUISITION_START_TIME' in meta:
+        times = [utils.str2date(meta['ACQUISITION_START_TIME'])]
+    else:
+        times = None
 
     #
     # Determine whether the dataset uses GCPs or GeoTransform.
@@ -485,7 +488,11 @@ def from_gdal_dataset(gdal_ds):
     for i in range(gdal_ds.RasterCount):
         band = gdal_ds.GetRasterBand(i+1)
         ndv = band.GetNoDataValue()
-        name = band.GetMetadata()['POLARISATION']
+        bandmeta = band.GetMetadata()
+        if 'POLARISATION' in bandmeta:
+            name = bandmeta['POLARISATION']
+        else:
+            name = '{}'.format(i)
         data = band.ReadAsArray()
         data[data == ndv] = np.nan
         result[name] = (data_coords, data)
