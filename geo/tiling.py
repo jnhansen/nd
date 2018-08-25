@@ -84,7 +84,9 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
         # Skip existing files.
         tile_path = os.path.join(path, tile_name)
         if not os.path.isfile(tile_path):
-            satio.to_netcdf(subset, tile_path)
+            temp_tile_path = tile_path + '.part'
+            satio.to_netcdf(subset, temp_tile_path)
+            os.rename(temp_tile_path, tile_path)
 
     # 2. Then apply itertools to the slices.
     for slice_dict in utils.dict_product(slices):
