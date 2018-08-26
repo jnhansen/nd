@@ -37,7 +37,7 @@ def colorize(labels, N=10, nan_vals=[]):
     return data_color
 
 
-def to_rgb(data, output, vrange=None, stretch=(2, 98), categorical=False,
+def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
            mask=None):
     """
     data : list of DataArray
@@ -89,7 +89,10 @@ def to_rgb(data, output, vrange=None, stretch=(2, 98), categorical=False,
     if mask is not None:
         colored[~mask] = 0
 
-    cv2.imwrite(output, colored)
+    if output is None:
+        return colored
+    else:
+        cv2.imwrite(output, colored)
 
 
 def plot_image(src, name, N=1):
