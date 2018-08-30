@@ -4,11 +4,28 @@ cimport numpy as np
 from scipy.stats import chi2
 from libc.math cimport abs, log, isnan
 from cython cimport floating
+from cython_gsl cimport gsl_ran_chisq_pdf, gsl_cdf_chisq_P, gsl_cdf_chisq_Q
+
 
 ctypedef np.float64_t DOUBLE
 ctypedef np.float32_t FLOAT
+ctypedef Py_ssize_t SIZE_TYPE
+ctypedef unsigned char BOOL
+# ctypedef np.uint8_t BOOL
 
 # =================================================================
+
+# cpdef double chisq_pdf(double x, double nu):
+#     return gsl_ran_chisq_pdf(x, nu)
+
+
+# cpdef double chisq_cdf_P(double x, double nu):
+#     return gsl_cdf_chisq_P(x, nu)
+
+
+# cpdef double chisq_cdf_Q(double x, double nu):
+#     return gsl_cdf_chisq_Q(x, nu)
+
 
 @cython.cdivision(True)
 cdef double _f(double p, double k, double n):
@@ -38,6 +55,9 @@ cdef double _omega2(double p, double k, double n, double rho):
 @cython.cdivision(True)
 # cpdef floating _z(np.ndarray[floating, ndim=2] ts, unsigned int n):
 cpdef floating _z(floating [:, :] ts, unsigned int n):
+    """
+    The 4 columns in ts are [C11, C12.real, C21.imag, C22]
+    """
     if floating is float:
         dtype = np.float32
     else:
@@ -77,7 +97,6 @@ cpdef floating _z(floating [:, :] ts, unsigned int n):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-# cpdef np.ndarray[floating, ndim=2] array_omnibus(np.ndarray[floating, ndim=4] ts, unsigned int n):
 cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts, unsigned int n):
     if floating is float:
         dtype = np.float32
@@ -123,7 +142,6 @@ cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts, unsig
 @cython.wraparound(False)
 @cython.cdivision(True)
 @cython.boundscheck(False)
-# cpdef floating single_pixel_omnibus(np.ndarray[floating, ndim=2] ts, unsigned int n):
 cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n):
     if floating is float:
         dtype = np.float32
@@ -143,14 +161,12 @@ cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n):
     rho = _rho(p, k, n)
     omega2 = _omega2(p, k, n, rho)
     z = _z(ts, n)
-    _P1 = chi2.cdf(z, f).astype(dtype)
-    _P2 = chi2.cdf(z, f+4).astype(dtype)
+    _P1 = gsl_cdf_chisq_P(z, f)
+    _P2 = gsl_cdf_chisq_P(z, f+4)
 
     result = _P1 + omega2 * (_P2 - _P1)
     return result
 
-
-ctypedef unsigned char BOOL
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -217,3 +233,70 @@ cpdef np.ndarray[BOOL, ndim=3] change_array_to_bool(np.ndarray[floating, ndim=3]
                     last_change = idx
 
     return res
+
+
+@cython.wraparound(False)
+@cython.cdivision(True)
+@cython.boundscheck(False)
+cpdef BOOL [:] single_pixel_change_detection(floating [:, :] ts,
+                                             double alpha,
+                                             unsigned int n):
+    cdef:
+        floating [:, :] subset
+        SIZE_TYPE k = ts.shape[0]
+        SIZE_TYPE l, j, r
+        floating p_H0_l, p_H0_lj
+        BOOL [:] result = np.zeros(k, dtype=np.uint8)
+        BOOL _change
+
+    l = 0
+    while True:
+        # Test global hypotheses H0_l
+        subset = ts[l:, :]
+        p_H0_l = single_pixel_omnibus(subset, n=n)
+        _change = (p_H0_l > alpha)
+        if not _change:
+            break
+        else:
+            # Test marginal hypotheses
+            # j is the number of time points to consider in the omnibus tests
+            for j in range(2, k - l):
+                subset = ts[l:l+j, :]
+                p_H0_lj = single_pixel_omnibus(subset, n=n)
+                _change = (p_H0_lj > alpha)
+                # Break on first significant change
+                if _change:
+                    r = j - 1
+                    result[l + r] = 1
+                    break
+        l = l + r
+        if l >= k - 2:
+            break
+
+    return result
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cpdef BOOL [:, :, :] change_detection(floating [:, :, :, :] values,
+                                      double alpha, unsigned int n=1):
+    """
+    `ds` is already multilooked (with `n` looks).
+    """
+    cdef:
+        SIZE_TYPE nrows = values.shape[0]
+        SIZE_TYPE ncols = values.shape[1]
+        SIZE_TYPE k = values.shape[2]
+        SIZE_TYPE i_lat, i_lon
+        floating [:, :] ts
+        BOOL [:, :, :] result = np.empty((nrows, ncols, k), dtype=np.uint8)
+
+    # Do change detection completely independently for each pixel.
+    for i_lat in range(nrows):
+        for i_lon in range(ncols):
+            ts = values[i_lat, i_lon, :, :]
+            result[i_lat, i_lon, :] = \
+                single_pixel_change_detection(ts, alpha=alpha, n=n)
+
+    return result

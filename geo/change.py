@@ -5,12 +5,13 @@ Conradsen et al. (2015).
 TODO: Make all functions work with xarray Datasets
 
 """
+from . import satio
+from . import _omnibus
 import numpy as np
 import xarray as xr
 from scipy import ndimage
 from scipy.stats import chi2
 import dask.array as da
-from ._omnibus import array_omnibus, change_array_to_bool
 
 
 try:
@@ -268,10 +269,10 @@ def omnibus(ds, n=1):
     values = np.stack([
         ds.C11, ds.C12.real, ds.C12.imag, ds.C22
     ], axis=-1)
-    return array_omnibus(values, n=n)
+    return _omnibus.array_omnibus(values, n=n)
 
 
-def change_detection(ds, alpha=0.01, ml=None, n=1):
+def change_detection_legacy(ds, alpha=0.01, ml=None, n=1):
     """
     Implement the change detection algorithm proposed by Conradsen et al.
     (2015).
@@ -318,6 +319,9 @@ def change_detection(ds, alpha=0.01, ml=None, n=1):
     # no_changes = (p_H0 < alpha)
 
     def first_change_after(ds, t0, alpha, n):
+        """
+        Compute the index of the first change
+        """
         k = ds.sizes['time']
         nrows = ds_m.sizes['lat']
         ncols = ds_m.sizes['lon']
@@ -350,7 +354,7 @@ def change_detection(ds, alpha=0.01, ml=None, n=1):
         changes[t0, :, :] = first_change
 
     # Determine the changes
-    changes_bool = change_array_to_bool(changes).astype(bool)
+    changes_bool = _omnibus.change_array_to_bool(changes).astype(bool)
 
     # return changes_bool
 
@@ -362,6 +366,51 @@ def change_detection(ds, alpha=0.01, ml=None, n=1):
     change_ds['changes'] = (('time', 'lat', 'lon'), changes_bool)
 
     return change_ds
+
+
+def change_detection(ds, alpha=0.01, ml=None, n=1):
+    """
+    Implement the change detection algorithm proposed by Conradsen et al.
+    (2015).
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        A (multilooked) dataset in covariance matrix format.
+    alpha : float (0. ... 1.), optional
+        The significance level (default: 0.01).
+    ml : int, optional
+        Multilooking window size. If `None`, no multilooking is performed and
+        the dataset is assumed to already be multilooked (default: None)
+    n : int, optional
+        The number of looks in `ds`. If `ml` is specified this parameter is
+        ignored (default: 1).
+
+    Returns
+    -------
+    xarray.Dataset
+        The index of first detected change
+    """
+    ds.persist()
+
+    ds_m = satio._disassemble_complex(ds)
+
+    # Multilooking
+    if ml is not None:
+        ds_m = multilook(ds_m, w=ml)
+        n = ml ** 2
+
+    values = ds_m[['C11', 'C12__re', 'C12__im', 'C22']].to_array() \
+        .transpose('lat', 'lon', 'time', 'variable').values
+
+    change = _omnibus.change_detection(values, alpha=alpha, n=n)
+
+    coords = ds.transpose('lat', 'lon', 'time').coords
+    change_arr = xr.DataArray(np.asarray(change, dtype=bool),
+                              dims=coords.keys(), coords=coords,
+                              attrs=ds.attrs)
+
+    return change_arr
 
 
 if __name__ == '__main__':
