@@ -12,7 +12,22 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 
 
-def colorize(labels, N=10, nan_vals=[]):
+CMAPS = {
+    'jet': cv2.COLORMAP_JET,
+    'hsv': cv2.COLORMAP_HSV,
+    'hot': cv2.COLORMAP_HOT,
+    'cool': cv2.COLORMAP_COOL
+}
+
+
+def _cmap_from_str(cmap):
+    if cmap in CMAPS:
+        return CMAPS[cmap]
+    else:
+        return cmap
+
+
+def colorize(labels, N=None, nan_vals=[], cmap='jet'):
     """
     Apply a color map to a map of integer labels.
 
@@ -28,9 +43,11 @@ def colorize(labels, N=10, nan_vals=[]):
     np.array, shape (M,N,3)
         A colored image in BGR space, ready to be handled by OpenCV.
     """
+    if N is None:
+        N = min(10, len(np.unique(labels)))
     data = (labels % N) * (255/(N-1))
     data_gray = cv2.cvtColor(data.astype(np.uint8), cv2.COLOR_GRAY2RGB)
-    data_color = cv2.applyColorMap(data_gray, cv2.COLORMAP_JET)
+    data_color = cv2.applyColorMap(data_gray, _cmap_from_str(cmap))
     for nv in nan_vals:
         data_color[labels == nv] = 0
     # data_color[labels == MASK_VAL] = 255
@@ -38,7 +55,7 @@ def colorize(labels, N=10, nan_vals=[]):
 
 
 def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
-           mask=None):
+           mask=None, size=None, cmap=None):
     """
     data : list of DataArray
     output : str
@@ -56,12 +73,12 @@ def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
     else:
         raise ValueError("`data` must be a DataArray or list of DataArrays")
 
-    if isinstance(data[0], xr.DataArray):
-        shape = (data[0].sizes['lat'], data[0].sizes['lon'], n_channels)
-        values = [d.values for d in data]
-    else:
-        shape = data[0].shape + (n_channels,)
-        values = data
+    values = [np.asarray(d) for d in data]
+    shape = data[0].shape + (n_channels,)
+
+    if vrange is not None:
+        if isinstance(vrange[0], (int, float)):
+            vrange = [vrange] * n_channels
 
     if categorical:
         colored = colorize(values[0], nan_vals=[0])
@@ -72,9 +89,9 @@ def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
         for i in range(n_channels):
             channel = values[i]
             # Stretch
-            if vrange:
-                minval = vrange[0]
-                maxval = vrange[1]
+            if vrange is not None:
+                minval = vrange[i][0]
+                maxval = vrange[i][1]
             else:
                 minval = np.percentile(channel, stretch[0])
                 maxval = np.percentile(channel, stretch[1])
@@ -83,14 +100,29 @@ def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
         im = np.clip(im, 0, 255).astype(np.uint8)
         if n_channels == 1:
             colored = cv2.cvtColor(im[:, :, 0], cv2.COLOR_GRAY2BGR)
+            if cmap is not None:
+                # colored is now in BGR
+                colored = cv2.applyColorMap(colored, _cmap_from_str(cmap))
         else:
+            # im is in RGB
             colored = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+        # if output is not None:
+        #     colored = cv2.cvtColor(colored, cv2.COLOR_RGB2BGR)
 
     if mask is not None:
         colored[~mask] = 0
 
+    if size is not None:
+        if size[0] is None:
+            size = (int(colored.shape[0] * size[1] / colored.shape[1]),
+                    size[1])
+        elif size[1] is None:
+            size = (size[0],
+                    int(colored.shape[1] * size[0] / colored.shape[0]))
+        colored = cv2.resize(colored, (size[1], size[0]))
+
     if output is None:
-        return colored
+        return cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
     else:
         cv2.imwrite(output, colored)
 
