@@ -38,6 +38,7 @@ setup(
         "python-dateutil",
         "scikit-image",
         "matplotlib",
-        "affine"
+        "affine",
+        "cython_gsl"
     ]
 )
