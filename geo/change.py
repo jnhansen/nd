@@ -405,8 +405,9 @@ def change_detection(ds, alpha=0.01, ml=None, n=1):
 
     Returns
     -------
-    xarray.Dataset
-        The index of first detected change
+    xarray.DataArray
+        A boolean DataArray indicating whether a change occurred at each
+        (lat, lon, time) coordinate.
     """
     ds.persist()
 
