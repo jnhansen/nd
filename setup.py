@@ -39,6 +39,7 @@ setup(
         "scikit-image",
         "matplotlib",
         "affine",
-        "cython_gsl"
+        "cython_gsl",
+        "opencv"
     ]
 )
