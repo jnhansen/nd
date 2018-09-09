@@ -10,6 +10,7 @@ from . import _omnibus
 import numpy as np
 import xarray as xr
 from scipy import ndimage
+import cv2
 from scipy.stats import chi2
 import dask.array as da
 
@@ -134,6 +135,17 @@ def compact_to_complex(arr):
     return result
 
 
+def ndfilter(arr, kernel):
+    """
+    Low level function for image convolution.
+    Use either openCV or scipy.ndimage
+    """
+    filtered = cv2.filter2D(arr, ddepth=-1, kernel=kernel, anchor=(-1, -1),
+                            delta=0, borderType=cv2.BORDER_REFLECT)
+    # filtered = ndimage.convolve(arr, kernel, mode='reflect')
+    return filtered
+
+
 @profile
 def _multilook_array(im, w=3, axes=(0, 1)):
     """Return a multilooked image (equivalent to boxcar filter) with given
@@ -157,13 +169,14 @@ def _multilook_array(im, w=3, axes=(0, 1)):
     for a in axes:
         kernel_shape[a] = w
     n = w ** len(axes)
-    kernel = np.ones(kernel_shape, np.float32) / n
-    if np.iscomplexobj(im):
-        im_conv = ndimage.convolve(np.real(im), kernel, mode='nearest')
-        re_conv = ndimage.convolve(np.imag(im), kernel, mode='nearest')
+    values = np.asarray(im)
+    kernel = np.ones(kernel_shape, np.float64) / n
+    if np.iscomplexobj(values):
+        im_conv = ndfilter(np.real(values), kernel)
+        re_conv = ndfilter(np.imag(values), kernel)
         return re_conv + 1j * im_conv
     else:
-        return ndimage.convolve(im, kernel, mode='nearest')
+        return ndfilter(values, kernel)
 
 
 @profile
@@ -187,12 +200,16 @@ def multilook(ds, w=3):
     xarray.Dataset
         The multilooked image.
     """
-    ds_m = ds.copy()
-    for vn, v in ds_m.data_vars.items():
-        if 'lat' not in v.dims or 'lon' not in v.dims:
+    # Make sure lat and lon are first dimensions
+    ll = set(('lat', 'lon'))
+    dims = tuple(ll) + tuple(set(ds.dims) - ll)
+    ds_m = ds.copy().transpose(*dims)
+    for v in ds_m.data_vars:
+        if 'lat' not in ds_m[v].dims or 'lon' not in ds_m[v].dims:
             continue
-        axes = tuple(v.dims.index(_) for _ in ('lat', 'lon'))
-        ds_m[vn] = (v.dims, _multilook_array(v, w=w, axes=axes))
+        axes = tuple(ds_m[v].dims.index(_) for _ in ('lat', 'lon'))
+        ds_m[v] = (ds_m[v].dims,
+                   _multilook_array(ds_m[v], w=w, axes=axes))
     return ds_m
 
 
