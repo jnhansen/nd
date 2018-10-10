@@ -471,8 +471,8 @@ def from_gdal_dataset(gdal_ds):
                              "match the GCPs (%s)." % e)
         lat = llgrid[:, :, 0]
         lon = llgrid[:, :, 1]
-        result = xr.Dataset(coords={'lat': (['x', 'y'], lat),
-                                    'lon': (['x', 'y'], lon),
+        result = xr.Dataset(coords={'lat': (['y', 'x'], lat),
+                                    'lon': (['y', 'x'], lon),
                                     'time': times})
         data_coords = ('y', 'x')
     else:
@@ -494,7 +494,10 @@ def from_gdal_dataset(gdal_ds):
         else:
             name = '{}'.format(i)
         data = band.ReadAsArray()
-        data[data == ndv] = np.nan
+        nanmask = (data == ndv)
+        if nanmask.any():
+            data = data.astype(float)
+            data[nanmask] = np.nan
         result[name] = (data_coords, data)
 
     return result
