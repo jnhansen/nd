@@ -22,6 +22,7 @@ ext_modules = [
 
 gdal_version = subprocess.check_output(
     ['gdal-config', '--version']).decode('utf-8').strip('\n')
+gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
 
 setup(
     name='geotools',
@@ -40,7 +41,7 @@ setup(
         "dask",
         "cython",
         "lxml",
-        "pygdal=={}".format(gdal_version),
+        "pygdal>={},<={}".format(*gdal_version_range),
         "pandas",
         "python-dateutil",
         "scikit-image",
