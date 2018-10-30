@@ -5,3 +5,7 @@
 .ipynb_checkpoints
 **/*.nc
 **/*.so
+*.pdf
+*.dat
+*.json
+*.ipynb
