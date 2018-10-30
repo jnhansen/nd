@@ -1,9 +1,12 @@
 import xarray as xr
-from sklearn.cluster import MiniBatchKMeans
-from sklearn import preprocessing
-# import pandas as pd
+try:
+    from sklearn.cluster import MiniBatchKMeans
+    from sklearn import preprocessing
+except (ImportError, ModuleNotFoundError):
+    raise ImportError('scikit-learn is required for this module.')
+
 import numpy as np
-from ..change import multilook
+from ..filter import boxcar
 
 
 __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
@@ -18,7 +21,7 @@ def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
     if ml == 0 or ml is None:
         values = df.values
     else:
-        df_ml = multilook(ds[variables], w=ml).to_dataframe()[variables]
+        df_ml = boxcar(ds[variables], w=ml).to_dataframe()[variables]
         values = np.concatenate([df.values, df_ml.values], axis=1)
     if scale:
         values = preprocessing.scale(values)
@@ -31,11 +34,11 @@ def _cluster_smooth(ds, ml=5, scale=True, **kwargs):
     datavars = [v for v in ds.data_vars
                 if 'lat' in ds[v].coords and 'lon' in ds[v].coords]
     # The redundant [datavars] is necessary to remove the `time` coordinate
-    multilooked = multilook(ds[datavars], w=ml)
+    multilooked = boxcar(ds[datavars], w=ml)
     # Calculate variance:
     diff = (ds - multilooked)
     diff_sq = diff * diff
-    ds_var = multilook(diff_sq[datavars], w=ml) * ml**2
+    ds_var = boxcar(diff_sq[datavars], w=ml) * ml**2
     df_ml = multilooked.to_dataframe()[datavars]
     df_var = ds_var.to_dataframe()[datavars]
     values = np.concatenate([df_ml.values, df_var.values], axis=1)
