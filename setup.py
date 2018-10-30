@@ -36,7 +36,7 @@ setup(
         "dask",
         "cython",
         "lxml",
-        "gdal",
+        "pygdal",
         "pandas",
         "python-dateutil",
         "scikit-image",
