@@ -8,7 +8,7 @@ addons:
       - libhdf5-serial-dev
       - netcdf-bin
       - libnetcdf-dev
-      - libgsl-dev
+      - gsl-bin
 matrix:
   include:
   - python: 3.5
