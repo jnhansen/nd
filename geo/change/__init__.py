@@ -1,3 +1,3 @@
-from .omnibus_ import OmnibusTest, multilook
+from .omnibus_ import OmnibusTest
 
-__all__ = ['OmnibusTest', 'multilook']
+__all__ = ['OmnibusTest']

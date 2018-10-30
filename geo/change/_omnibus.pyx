@@ -293,7 +293,7 @@ cpdef BOOL [:, :, :] change_detection(floating [:, :, :, :] values,
                         num_threads=num_threads):
         for i_lon in range(ncols):
             single_pixel_change_detection(values[i_lat, i_lon, :, ::1],
-                                            result[i_lat, i_lon, :],
-                                            alpha=alpha, n=n)
+                                          result[i_lat, i_lon, :],
+                                          alpha=alpha, n=n)
 
     return result

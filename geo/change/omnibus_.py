@@ -6,11 +6,11 @@ TODO: Make all functions work with xarray Datasets
 
 """
 from ..io import disassemble_complex
+from ..filter import boxcar
 from . import _omnibus
 from .change_ import ChangeDetection
 import numpy as np
 import xarray as xr
-import cv2
 from scipy.stats import chi2
 import dask.array as da
 
@@ -135,84 +135,6 @@ def compact_to_complex(arr):
     return result
 
 
-def ndfilter(arr, kernel):
-    """
-    Low level function for image convolution.
-    Use either openCV or scipy.ndimage
-    """
-    filtered = cv2.filter2D(arr, ddepth=-1, kernel=kernel, anchor=(-1, -1),
-                            delta=0, borderType=cv2.BORDER_REFLECT)
-    # filtered = ndimage.convolve(arr, kernel, mode='reflect')
-    return filtered
-
-
-@profile
-def _multilook_array(im, w=3, axes=(0, 1)):
-    """Return a multilooked image (equivalent to boxcar filter) with given
-    window size.
-
-    Parameters
-    ----------
-    im : numpy.array, shape (M, N)
-        The original image.
-    w : int, optional
-        The window size (default: 3).
-    axes : tuple, optional
-        The axes along which to convolve.
-
-    Returns
-    -------
-    numpy.array, shape (M, N)
-        The multilooked (filtered) image.
-    """
-    kernel_shape = [1] * im.ndim
-    for a in axes:
-        kernel_shape[a] = w
-    n = w ** len(axes)
-    values = np.asarray(im)
-    kernel = np.ones(kernel_shape, np.float64) / n
-    if np.iscomplexobj(values):
-        im_conv = ndfilter(np.real(values), kernel)
-        re_conv = ndfilter(np.imag(values), kernel)
-        return re_conv + 1j * im_conv
-    else:
-        return ndfilter(values, kernel)
-
-
-@profile
-def multilook(ds, w=3):
-    """Multilook an image in covariance matrix representation.
-
-    Each matrix entry is multilooked separately.
-
-    TODO: take as argument the dimensions along which to convolve?
-    TODO: cythonize?
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        The original image in covariance matrix representation.
-    w : int, optional
-        The window size (default: 3).
-
-    Returns
-    -------
-    xarray.Dataset
-        The multilooked image.
-    """
-    # Make sure lat and lon are first dimensions
-    ll = set(('lat', 'lon'))
-    dims = tuple(ll) + tuple(set(ds.dims) - ll)
-    ds_m = ds.copy().transpose(*dims)
-    for v in ds_m.data_vars:
-        if 'lat' not in ds_m[v].dims or 'lon' not in ds_m[v].dims:
-            continue
-        axes = tuple(ds_m[v].dims.index(_) for _ in ('lat', 'lon'))
-        ds_m[v] = (ds_m[v].dims,
-                   _multilook_array(ds_m[v], w=w, axes=axes))
-    return ds_m
-
-
 @profile
 def omnibus_test(ds, n=1, axis=0):
     """Compute the test statistic to determine whether a change has occurred.
@@ -314,7 +236,7 @@ def change_detection_legacy(ds, alpha=0.01, ml=None, n=1):
     """
     # Multilooking
     if ml is not None:
-        ds_m = multilook(ds, w=ml)
+        ds_m = boxcar(ds, w=ml)
         n = ml ** 2
     else:
         ds_m = ds
@@ -415,7 +337,7 @@ def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
 
     # Multilooking
     if ml is not None:
-        ds_m = multilook(ds_m, w=ml)
+        ds_m = boxcar(ds_m, w=ml)
         n = ml ** 2
 
     values = ds_m[['C11', 'C12__re', 'C12__im', 'C22']].to_array() \
