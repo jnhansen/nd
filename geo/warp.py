@@ -493,7 +493,7 @@ def warp(ds, extent=None, shape=None, resolution=None, order=3, chunks=None,
     # Use lat/lon coordinate arrays
     #
     if 'lat' in ds.dims and 'lon' in ds.dims:
-        print(f'Computing new image coordinates ...'); t = time.time()
+        print('Computing new image coordinates ...'); t = time.time()
         if extent is None:
             # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
             extent = _get_extent(ds)
@@ -597,7 +597,7 @@ def warp(ds, extent=None, shape=None, resolution=None, order=3, chunks=None,
                 'lon' not in da.coords:
             return da
         else:
-            print(f'Warping {var} ...'); t = time.time()
+            print('Warping {} ...').format(var); t = time.time()
             kwargs = {'order': order}
             # If the dtype is integer, treat as categorical
             # TODO: Make this optional?
