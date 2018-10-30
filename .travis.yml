@@ -34,5 +34,5 @@ install:
 - pip install cython CythonGSL numpy
 - pip install .
 - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
-# script:
-# - python setup.py test
+script:
+- python setup.py test
