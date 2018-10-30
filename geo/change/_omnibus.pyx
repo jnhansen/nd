@@ -255,7 +255,7 @@ cpdef void single_pixel_change_detection(floating [:, :] ts,
         else:
             # Test marginal hypotheses
             # j is the number of time points to consider in the omnibus tests
-            for j in range(2, k - l):
+            for j in range(2, k - l + 1):
                 subset = ts[l:l+j, :]
                 p_H0_lj = single_pixel_omnibus(subset, n=n)
                 _change = (p_H0_lj > alpha)
@@ -265,7 +265,7 @@ cpdef void single_pixel_change_detection(floating [:, :] ts,
                     result[l + r] = 1
                     break
         l = l + r
-        if l >= k - 2:
+        if l >= k - 1:
             break
 
 
@@ -284,7 +284,7 @@ cpdef BOOL [:, :, :] change_detection(floating [:, :, :, :] values,
         SIZE_TYPE k = values.shape[2]
         SIZE_TYPE i_lat, i_lon
         floating [:, :] ts
-        BOOL [:, :, :] result = np.empty((nrows, ncols, k), dtype=np.uint8,
+        BOOL [:, :, :] result = np.zeros((nrows, ncols, k), dtype=np.uint8,
                                          order='C')
         unsigned int num_threads = njobs
 
