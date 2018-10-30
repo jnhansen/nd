@@ -79,9 +79,9 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
         # Slice the dataset and write to disk.
         subset = ds.isel(slice_dict)
         suffix = '.'.join(
-            [f'{dim}_{s.start}' for dim, s in slice_dict.items()]
+            ['{}_{}'.format(dim, s.start) for dim, s in slice_dict.items()]
         )
-        tile_name = f'{prefix}.{suffix}.nc'
+        tile_name = '{}.{}.nc'.format(prefix, suffix)
         # Skip existing files.
         tile_path = os.path.join(path, tile_name)
         if not os.path.isfile(tile_path):
@@ -142,7 +142,7 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
         # 3. Write result to file
         root, name = os.path.split(f)
         stem, ext = os.path.splitext(name)
-        out_name = f'{stem}{suffix}{ext}'
+        out_name = '{}{}{}'.format(stem, suffix, ext)
         out_path = root if path is None else path
         out_file = os.path.join(out_path, out_name)
         if not overwrite and os.path.exists(out_file):
