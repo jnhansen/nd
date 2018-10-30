@@ -7,7 +7,7 @@ TODO: remove clutter in main()
 
 """
 # somehow need to import gdal first ...
-from geo import satio
+from .io import from_netcdf, to_netcdf
 from osgeo import gdal, osr
 import numpy as np
 import pandas as pd
@@ -15,13 +15,15 @@ import xarray as xr
 from dask import delayed
 import os
 import glob
-from scipy.ndimage import interpolation
+# from scipy.ndimage import interpolation
+from scipy import interpolate
 from scipy.ndimage._ni_support import _extend_mode_to_code
 # import (_extend_mode_to_code, map_coordinates , geometric_transform)
 from scipy.ndimage import _nd_image
-from geo import utils
-from geo._warp import c_grid, CoordTransform
+from . import utils
+from ._warp import c_grid, CoordTransform
 import time
+import warnings
 
 try:
     type(profile)
@@ -77,7 +79,8 @@ def _tie_points_to_gcps(ds):
 
 
 @profile
-def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
+def _fit_latlon(coords, degree=3, inverse=False, method='spline',
+                return_coef=False):
     """Fit a polynomial to the input coordinates.
 
     TODO: Make work with shape (2, M, N)
@@ -93,6 +96,8 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
         The polynomial degree to be fitted (default: 3)
     inverse : bool, optional
         If True, fit x,y as function of lon,lat (default: False).
+    method : str, optional
+        One of 'spline' or 'ls' (least squares) (default: 'spline').
     return_coef : bool, optional
         If True, return the coefficients of the fitted polynomial.
         Otherwise, return a function that converts between (x,y) and (lat,lon).
@@ -105,10 +110,6 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
         (lon,lat). Otherwise, the function returns (lon,lat) for an input of
         (y,x).
     """
-    from sklearn.preprocessing import PolynomialFeatures
-    from sklearn import linear_model
-    poly = PolynomialFeatures(degree=degree)
-
     if isinstance(coords, pd.DataFrame):
         #
         # GCPs
@@ -117,8 +118,8 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
         if not coords.columns.isin(must_contain).all():
             raise ValueError("The DataFrame `coords` must contain the columns"
                              " ['GCPLine', 'GCPPixel', 'GCPX', 'GCPY'].")
-        ll = coords[['GCPX', 'GCPY']]
-        xy = coords[['GCPLine', 'GCPPixel']]
+        ll = coords[['GCPX', 'GCPY']].values
+        xy = coords[['GCPLine', 'GCPPixel']].values
     elif not isinstance(coords, np.ndarray):
         raise ValueError("`coords` is not a valid numpy array.")
     elif coords.ndim != 3 or coords.shape[2] != 2:
@@ -141,56 +142,102 @@ def _fit_latlon(coords, degree=3, inverse=False, return_coef=False):
         ll = ll[~mask]
         xy = xy[~mask]
 
-    if inverse:
-        regressor = poly.fit_transform(ll)
-        regressand = xy
-    else:
-        regressor = poly.fit_transform(xy)
-        regressand = ll
+    if method == 'ls':
+        from sklearn.preprocessing import PolynomialFeatures
+        from sklearn import linear_model
+        poly = PolynomialFeatures(degree=degree)
 
-    clf = linear_model.LinearRegression()
-    clf.fit(regressor, regressand)
+        if inverse:
+            regressor = poly.fit_transform(ll)
+            regressand = xy
+        else:
+            regressor = poly.fit_transform(xy)
+            regressand = ll
 
-    if return_coef:
-        return clf.coef_
+        clf = linear_model.LinearRegression()
+        clf.fit(regressor, regressand)
 
-    else:
+        if return_coef:
+            return clf.coef_
+
         def fn(X):
-            """
-            This function maps from (x,y) to (lon,lat) (or the reverse).
-            """
-            if not isinstance(X, np.ndarray):
-                X = np.array(X)
-            orig_shape = X.shape
+            p = poly.transform(X)
+            return clf.predict(p)
 
-            if len(orig_shape) == 1:
-                # single coordinate pair was passed
-                X = np.array([X])
-            elif len(orig_shape) == 3:
-                # flatten X temporarily
-                X = X.reshape(-1, 2)
+    elif method == 'spline':
+        regressor = ll if inverse else xy.astype(np.float)
+        regressand = xy.astype(np.float) if inverse else ll
 
-            #
-            # If X is very large, split into chunks.
-            #
-            # Empirical optimal chunk sizes (approximately):
-            # chunk size | len(X) | degree
-            # -----------|--------|--------
-            # 8000       | 1e8    | 3
-            # 8000       | 1e8    | 2
-            res = np.empty_like(X)
-            for index, chunk in utils.array_chunks(X, 8000, axis=0,
-                                             return_indices=True):
-                p = poly.transform(chunk)
-                res[index] = clf.predict(p)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            if degree == 1:
+                kind = 'linear'
+            elif degree == 3:
+                kind = 'cubic'
+            elif degree == 5:
+                kind = 'quintic'
+            else:
+                kind = None
+            spline0 = interpolate.interp2d(regressor[:, 0], regressor[:, 1],
+                                           regressand[:, 0], kind=kind)
+            spline1 = interpolate.interp2d(regressor[:, 0], regressor[:, 1],
+                                           regressand[:, 1], kind=kind)
 
-            # reshape back to original shape:
-            if len(orig_shape) != 2:
-                res = res.reshape(orig_shape)
-
-            return res
+        def fn(x, y):
+            # Xf = X.astype(np.float)
+            return np.stack([
+                spline0(x, y), spline1(x, y)
+            ], axis=-1)
 
         return fn
+
+        # def fn(X):
+        #     # Xf = X.astype(np.float)
+        #     return np.stack([
+        #         spline0.ev(X[:, 0], X[:, 1]),
+        #         spline1.ev(X[:, 0], X[:, 1])
+        #     ], axis=1)
+
+    else:
+        raise ValueError("'%s' is not a supported method." % method)
+
+    def wrapper(X):
+        """
+        This function maps from (y,x) to (lat,lon) (or the reverse).
+        """
+        if not isinstance(X, np.ndarray):
+            X = np.array(X)
+        orig_shape = X.shape
+
+        if len(orig_shape) == 1:
+            # single coordinate pair was passed
+            X = np.array([X])
+        elif len(orig_shape) == 3:
+            # flatten X temporarily
+            X = X.reshape(-1, 2)
+
+        #
+        # If X is very large, split into chunks.
+        #
+        # Empirical optimal chunk sizes (approximately):
+        # chunk size | len(X) | degree
+        # -----------|--------|--------
+        # 8000       | 1e8    | 3
+        # 8000       | 1e8    | 2
+        res = np.empty_like(X, dtype=np.float)
+        for index, chunk in utils.array_chunks(X, 8000, axis=0,
+                                               return_indices=True):
+            # Apply fn(X) to each chunk.
+            # This is either a polynomial evaluation or a spline interpolation
+            res[index] = fn(chunk)
+
+        # reshape back to original shape:
+        if len(orig_shape) != 2:
+            res = res.reshape(orig_shape)
+
+        return res
+
+    return wrapper
 
 
 @profile
@@ -335,7 +382,7 @@ def resample(input, coords=None, mapping=None, output=None, order=3,
     #
     if output is None:
         if coords is not None:
-            shape = coords.shape
+            shape = coords.shape[1:]
         else:
             shape = input.shape
         output = np.zeros(shape, dtype=input.dtype)
@@ -402,7 +449,7 @@ def resample(input, coords=None, mapping=None, output=None, order=3,
 
 
 @profile
-def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
+def warp(ds, extent=None, shape=None, resolution=None, order=3, chunks=None,
          precompute_coords=True):
     """Warp a dataset onto equirectangular coordinates. The resulting dataset
     will contain 'lat' and 'lon' as 1-dimensional coordinate variables, i.e.
@@ -428,6 +475,8 @@ def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
         The resolution of the output dataset. If both the shape and resolution
         are `None`, the output shape will be equal to the input shape,
         which may not be desirable.
+    order : int, optional
+        Order of spline interpolation (default: 3).
     precompute_coords : bool, optional
         Faster, but uses more memory (default: True).
 
@@ -491,7 +540,7 @@ def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
     # TODO: Make work with new mechanism
     elif 'lat' in ds.coords and 'lon' in ds.coords:
         gcps = _tie_points_to_gcps(ds)
-        ll2xy = _fit_latlon(gcps, inverse=True)
+
         if extent is None:
             # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
             extent = [gcps['GCPX'].min(), gcps['GCPY'].min(),
@@ -501,20 +550,45 @@ def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
         lat_size, lon_size = shape
         new_lons = np.linspace(extent[0], extent[2], lon_size)
         new_lats = np.linspace(extent[1], extent[3], lat_size)
-        new_ll_coords = np.stack(np.meshgrid(new_lons, new_lats, copy=False),
-                                 axis=-1)
-        coords = ll2xy(new_ll_coords)
+
+        # Generate new image coordinates
+        points = gcps[['GCPX', 'GCPY']]
+        ll_grid = np.stack(
+            np.meshgrid(new_lons, new_lats), axis=-1
+        )
+        if order == 0:
+            method = 'nearest'
+        elif order == 1:
+            method = 'linear'
+        elif order == 3:
+            method = 'cubic'
+        elif order == 5:
+            method = 'quintic'
+        else:
+            method = 'cubic'
+        coords = np.stack([
+            interpolate.griddata(
+                points, gcps['GCPLine'], ll_grid, method=method),
+            interpolate.griddata(
+                points, gcps['GCPPixel'], ll_grid, method=method)
+        ], axis=0)
+        # ll2xy = _fit_latlon(gcps, inverse=True, method='spline', degree=order)
+        # spline_x = interp2d(gcps['GCPX'], gcps['GCPY'], gcps['GCPPixel'],
+        #                     kind='cubic')
+        # spline_y = interp2d(gcps['GCPX'], gcps['GCPY'], gcps['GCPLine'],
+        #                     kind='cubic')
+        # new_ll_coords = np.stack(
+        #     np.meshgrid(new_lons, new_lats, copy=False), axis=-1)
+        # coords = ll2xy(new_lons, new_lats).transpose((2, 0, 1))
+        # coords = np.stack([
+        #     spline_y(new_lons, new_lats),
+        #     spline_x(new_lons, new_lats)
+        # ], axis=0)
+        mapping = None
 
     else:
         raise ValueError("Could not determine the lat and lon coordinates "
                          "for the dataset.")
-
-    #
-    # Create new dataset
-    #
-    ds_coords = {'lat': new_lats, 'lon': new_lons}
-    if 'time' in ds.coords:
-        ds_coords['time'] = ds.time
 
     # Warp a single DataArray
     def _warp_dataarray(da):
@@ -524,7 +598,7 @@ def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
             return da
         else:
             print(f'Warping {var} ...'); t = time.time()
-            kwargs = {}
+            kwargs = {'order': order}
             # If the dtype is integer, treat as categorical
             # TODO: Make this optional?
             if np.issubdtype(da.dtype, np.integer):
@@ -532,8 +606,11 @@ def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
             new_data = np.zeros(shape, dtype=da.dtype)
             resample(da.values, coords=coords, mapping=mapping,
                      output=new_data, copy=False, **kwargs)
-            da_warped = xr.DataArray(new_data, dims=ds_coords.keys(),
-                                     coords=ds_coords, attrs=da.attrs)
+            da_coords = {'lat': new_lats, 'lon': new_lons}
+            if len(new_data.shape) == 3 and 'time' in ds.coords:
+                da_coords['time'] = ds.time.values
+            da_warped = xr.DataArray(new_data, dims=da_coords.keys(),
+                                     coords=da_coords, attrs=da.attrs)
             print('--- {:.1f}s'.format(time.time() - t))
             return da_warped
 
@@ -542,6 +619,13 @@ def warp(ds, extent=None, shape=None, resolution=None, chunks=None,
         parts = utils.xr_split(ds, dim='lat', chunks=chunks)
     else:
         parts = [ds]
+
+    #
+    # Create new dataset
+    #
+    ds_coords = {'lat': new_lats, 'lon': new_lons}
+    if 'time' in ds.coords:
+        ds_coords['time'] = ds.time.values
 
     result = None
     for part in parts:
@@ -600,7 +684,7 @@ def align(datasets, path, parallel=False, compute=True,
         # Pass chunks={} to ensure the dataset is read as a dask array
         product_names = [os.path.splitext(os.path.split(_)[1])[0]
                          for _ in products]
-        datasets = [satio.from_netcdf(path) for path in datasets]
+        datasets = [from_netcdf(path) for path in datasets]
     else:
         product_names = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
                          for ds in datasets]
@@ -612,10 +696,10 @@ def align(datasets, path, parallel=False, compute=True,
 
     def _align(ds, outfile):
         if isinstance(ds, str):
-            ds = satio.from_netcdf(ds)
+            ds = from_netcdf(ds)
         resampled = warp(ds, extent=extent, resolution=resolution,
                          precompute_coords=precompute_coords)
-        satio.to_netcdf(resampled, outfile)
+        to_netcdf(resampled, outfile)
         # Explicitly close datasets
         del resampled
         ds.close()
@@ -646,7 +730,7 @@ def main():
 
     # Just do one.
     datasets = glob.glob(path+'*.nc')
-    datasets = [satio.from_netcdf(p) for p in datasets]
+    datasets = [from_netcdf(p) for p in datasets]
     extent, resolution = _common_extent_and_resolution(datasets)
     ds = datasets[0]
     # del ds['C11']
@@ -654,11 +738,10 @@ def main():
 
     # Standard
     # resampled = warp(ds, extent=extent, resolution=resolution)
-    # satio.to_netcdf(resampled, os.path.join(path, 'aligned', 'test.nc'))
+    # to_netcdf(resampled, os.path.join(path, 'aligned', 'test.nc'))
     resampled = warp(ds, extent=extent, resolution=resolution, chunks=None,
                      precompute_coords=True)
-    satio.to_netcdf(resampled,
-                    os.path.join(path, 'aligned', 'test_chunked.nc'))
+    to_netcdf(resampled, os.path.join(path, 'aligned', 'test_chunked.nc'))
 
 
 if __name__ == '__main__':

@@ -323,7 +323,6 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
         n = ds.sizes[dim]
         chunksize = int(np.ceil(n / chunks))
         prechunked = ds.chunk({dim: chunksize})
-        print(prechunked)
 
         # Split into parts
         parts = [delayed(fn)(part, *args, **kwargs) for part in

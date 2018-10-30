@@ -1,8 +1,10 @@
 cimport cython
+from cython.parallel import prange
 import numpy as np
 cimport numpy as np
 from scipy.stats import chi2
 from libc.math cimport abs, log, isnan
+# from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from cython cimport floating
 from cython_gsl cimport gsl_ran_chisq_pdf, gsl_cdf_chisq_P, gsl_cdf_chisq_Q
 
@@ -28,21 +30,21 @@ ctypedef unsigned char BOOL
 
 
 @cython.cdivision(True)
-cdef double _f(double p, double k, double n):
+cdef double _f(double p, double k, double n) nogil:
     cdef double f
     f = (k - 1) * p**2
     return f
 
 
 @cython.cdivision(True)
-cdef double _rho(double p, double k, double n):
+cdef double _rho(double p, double k, double n) nogil:
     cdef double rho
     rho = 1 - (2 * p**2 - 1) / (6 * (k - 1) * p) * (k/n - 1/(n*k))
     return rho
 
 
 @cython.cdivision(True)
-cdef double _omega2(double p, double k, double n, double rho):
+cdef double _omega2(double p, double k, double n, double rho) nogil:
     cdef double omega2
     omega2 = p**2 * (p**2 - 1) / (24 * rho**2) \
         * (k/(n**2) - 1/((n*k)**2)) \
@@ -54,15 +56,10 @@ cdef double _omega2(double p, double k, double n, double rho):
 @cython.wraparound(False)
 @cython.cdivision(True)
 # cpdef floating _z(np.ndarray[floating, ndim=2] ts, unsigned int n):
-cpdef floating _z(floating [:, :] ts, unsigned int n):
+cpdef floating _z(floating [:, :] ts, unsigned int n) nogil:
     """
     The 4 columns in ts are [C11, C12.real, C21.imag, C22]
     """
-    if floating is float:
-        dtype = np.float32
-    else:
-        dtype = np.float64
-
     cdef:
         floating p = 2,             # dual pol: p=2, full pol: p=3
         size_t k = ts.shape[0],     # number of matrices (time steps)
@@ -94,6 +91,9 @@ cpdef floating _z(floating [:, :] ts, unsigned int n):
 
 
 
+#
+# This function is deprecated and should not be used.
+#
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -142,12 +142,7 @@ cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts, unsig
 @cython.wraparound(False)
 @cython.cdivision(True)
 @cython.boundscheck(False)
-cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n):
-    if floating is float:
-        dtype = np.float32
-    else:
-        dtype = np.float64
-
+cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n) nogil:
     cdef:
         double p = 2
         size_t k = ts.shape[0]
@@ -238,15 +233,15 @@ cpdef np.ndarray[BOOL, ndim=3] change_array_to_bool(np.ndarray[floating, ndim=3]
 @cython.wraparound(False)
 @cython.cdivision(True)
 @cython.boundscheck(False)
-cpdef BOOL [:] single_pixel_change_detection(floating [:, :] ts,
-                                             double alpha,
-                                             unsigned int n):
+cpdef void single_pixel_change_detection(floating [:, :] ts,
+                                         BOOL [:] result,
+                                         double alpha,
+                                         unsigned int n) nogil:
     cdef:
         floating [:, :] subset
         SIZE_TYPE k = ts.shape[0]
         SIZE_TYPE l, j, r
         floating p_H0_l, p_H0_lj
-        BOOL [:] result = np.zeros(k, dtype=np.uint8)
         BOOL _change
 
     l = 0
@@ -273,14 +268,13 @@ cpdef BOOL [:] single_pixel_change_detection(floating [:, :] ts,
         if l >= k - 2:
             break
 
-    return result
-
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
 cpdef BOOL [:, :, :] change_detection(floating [:, :, :, :] values,
-                                      double alpha, unsigned int n=1):
+                                      double alpha, unsigned int n=1,
+                                      unsigned int njobs=1):
     """
     `ds` is already multilooked (with `n` looks).
     """
@@ -290,13 +284,16 @@ cpdef BOOL [:, :, :] change_detection(floating [:, :, :, :] values,
         SIZE_TYPE k = values.shape[2]
         SIZE_TYPE i_lat, i_lon
         floating [:, :] ts
-        BOOL [:, :, :] result = np.empty((nrows, ncols, k), dtype=np.uint8)
+        BOOL [:, :, :] result = np.empty((nrows, ncols, k), dtype=np.uint8,
+                                         order='C')
+        unsigned int num_threads = njobs
 
     # Do change detection completely independently for each pixel.
-    for i_lat in range(nrows):
+    for i_lat in prange(nrows, nogil=True, schedule='dynamic', chunksize=100,
+                        num_threads=num_threads):
         for i_lon in range(ncols):
-            ts = values[i_lat, i_lon, :, :]
-            result[i_lat, i_lon, :] = \
-                single_pixel_change_detection(ts, alpha=alpha, n=n)
+            single_pixel_change_detection(values[i_lat, i_lon, :, ::1],
+                                            result[i_lat, i_lon, :],
+                                            alpha=alpha, n=n)
 
     return result

@@ -54,16 +54,20 @@ def colorize(labels, N=None, nan_vals=[], cmap='jet'):
     return data_color
 
 
-def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
-           mask=None, size=None, cmap=None):
+def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
+           categorical=False, mask=None, size=None, cmap=None):
     """
     data : list of DataArray
     output : str
         file path
-    vrange : list of tuple, optional
-        min/max values
-    stretch : tuple
-        percentiles to stretch color map
+    vmin : float or list of float
+        minimum value, or list of values per channel (default: None).
+    vmax : float or list of float
+        maximum value, or list of values per channel (default: None).
+    pmin : float
+        lowest percentile to plot (default: 2). Ignored if vmin is passed.
+    pmax : float
+        highest percentile to plot (default: 2). Ignored if vmax is passed.
     """
     if isinstance(data, list):
         n_channels = len(data)
@@ -76,9 +80,12 @@ def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
     values = [np.asarray(d) for d in data]
     shape = data[0].shape + (n_channels,)
 
-    if vrange is not None:
-        if isinstance(vrange[0], (int, float)):
-            vrange = [vrange] * n_channels
+    if vmin is not None:
+        if isinstance(vmin, (int, float)):
+            vmin = [vmin] * n_channels
+    if vmax is not None:
+        if isinstance(vmax, (int, float)):
+            vmax = [vmax] * n_channels
 
     if categorical:
         colored = colorize(values[0], nan_vals=[0])
@@ -89,12 +96,14 @@ def to_rgb(data, output=None, vrange=None, stretch=(2, 98), categorical=False,
         for i in range(n_channels):
             channel = values[i]
             # Stretch
-            if vrange is not None:
-                minval = vrange[i][0]
-                maxval = vrange[i][1]
+            if vmin is not None:
+                minval = vmin[i]
             else:
-                minval = np.percentile(channel, stretch[0])
-                maxval = np.percentile(channel, stretch[1])
+                minval = np.percentile(channel, pmin)
+            if vmax is not None:
+                maxval = vmax[i]
+            else:
+                maxval = np.percentile(channel, pmax)
             channel = (channel - minval) / (maxval - minval) * 255
             im[:, :, i] = channel
         im = np.clip(im, 0, 255).astype(np.uint8)

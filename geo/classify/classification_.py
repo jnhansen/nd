@@ -3,7 +3,7 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn import preprocessing
 # import pandas as pd
 import numpy as np
-from geo.change import multilook
+from ..change import multilook
 
 
 __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']

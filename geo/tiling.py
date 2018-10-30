@@ -4,7 +4,8 @@ This module may be used to mosaic and tile multiple satellite image products.
 TODO: Contain buffer information in NetCDF metadata?
 
 """
-from . import satio, utils
+from .io import from_netcdf, to_netcdf, add_time
+from . import utils
 import os
 import glob
 import itertools
@@ -85,7 +86,7 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
         tile_path = os.path.join(path, tile_name)
         if not os.path.isfile(tile_path):
             temp_tile_path = tile_path + '.part'
-            satio.to_netcdf(subset, temp_tile_path)
+            to_netcdf(subset, temp_tile_path)
             os.rename(temp_tile_path, tile_path)
 
     # 2. Then apply itertools to the slices.
@@ -135,7 +136,7 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
 
     def _wrapper(f):
         # 1. Open dataset
-        data = satio.from_netcdf(f)
+        data = from_netcdf(f)
         # 2. Apply function
         result = fn(data, *args, **kwargs)
         # 3. Write result to file
@@ -146,7 +147,7 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
         out_file = os.path.join(out_path, out_name)
         if not overwrite and os.path.exists(out_file):
             out_file = '{}_new{}'.format(*os.path.splitext(out_file))
-        satio.to_netcdf(result, out_file)
+        to_netcdf(result, out_file)
         # Garbage collect open datasets
         data.close()
         result.close()
@@ -201,7 +202,7 @@ def auto_merge(datasets, buffer='auto', chunks={}):
     # Treat `datasets` as a list of file paths
     if isinstance(datasets[0], str):
         # Pass chunks={} to ensure the dataset is read as a dask array
-        datasets = [satio._add_time(xr.open_dataset(path, chunks=chunks))
+        datasets = [add_time(xr.open_dataset(path, chunks=chunks))
                     for path in datasets]
 
     if buffer == 'auto':
