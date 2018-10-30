@@ -9,6 +9,7 @@ addons:
       - netcdf-bin
       - libnetcdf-dev
       - gsl-bin
+      - libgsl0-dev
 matrix:
   include:
   - python: 3.5
