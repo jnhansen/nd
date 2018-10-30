@@ -9,11 +9,13 @@ import cython_gsl
 # directive_defaults['binding'] = True
 
 ext_modules = [
-    Extension("geo._omnibus", ["geo/_omnibus.pyx"],
+    Extension("geo.change._omnibus", ["geo/change/_omnibus.pyx"],
               libraries=cython_gsl.get_libraries(),
               library_dirs=[cython_gsl.get_library_dir()],
-              include_dirs=[cython_gsl.get_cython_include_dir()]),
-            #   define_macros=[('CYTHON_TRACE', '1')]),
+              include_dirs=['.', cython_gsl.get_cython_include_dir()],
+              extra_compile_args=['-O3', '-fopenmp'],
+              extra_link_args=['-fopenmp'],
+              ),
     Extension("geo._warp", ["geo/_warp.pyx"])
 ]
 
@@ -27,6 +29,7 @@ setup(
         cython_gsl.get_include()
     ],
     install_requires=[
+        # "gcc",
         "numpy",
         "scipy",
         "xarray",
@@ -39,7 +42,7 @@ setup(
         "scikit-image",
         "matplotlib",
         "affine",
-        "cython_gsl",
-        "opencv"
+        "CythonGSL",
+        "opencv-python"
     ]
 )
