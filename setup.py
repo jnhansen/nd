@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages, Extension
+import subprocess
 from Cython.Distutils import build_ext
 import numpy
 import cython_gsl
@@ -19,6 +20,9 @@ ext_modules = [
     Extension("geo._warp", ["geo/_warp.pyx"])
 ]
 
+gdal_version = subprocess.check_output(
+    ['gdal-config', '--version']).decode('utf-8').strip('\n')
+
 setup(
     name='geotools',
     packages=find_packages(),
@@ -36,7 +40,7 @@ setup(
         "dask",
         "cython",
         "lxml",
-        "pygdal",
+        "pygdal=={}".format(gdal_version),
         "pandas",
         "python-dateutil",
         "scikit-image",
