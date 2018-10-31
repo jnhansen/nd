@@ -384,3 +384,22 @@ def select(objects, fn, unlist=True, first=False):
         return filtered[0]
     else:
         return filtered
+
+
+def get_vars_for_dims(ds, dims):
+    """
+    Return a list of all variables in `ds` which have dimensions `dims`.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+    dims : list of str
+        The dimensions that each variable must contain
+
+    Returns
+    -------
+    list of str
+        A list of all variable names that have dimensions `dims`.
+    """
+    return [v for v in ds.data_vars
+            if set(ds[v].dims).issuperset(set(dims))]
