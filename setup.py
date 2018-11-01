@@ -17,7 +17,11 @@ ext_modules = [
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("geo._warp", ["geo/_warp.pyx"])
+    Extension("geo.filter._nlmeans", ["geo/filter/_nlmeans.pyx"],
+              extra_compile_args=['-O3', '-fopenmp'],
+              extra_link_args=['-fopenmp'],
+              ),
+    Extension("geo._warp", ["geo/_warp.pyx"]),
 ]
 
 gdal_version = subprocess.check_output(

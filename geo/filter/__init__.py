@@ -1,8 +1,9 @@
 import numpy as np
 import cv2
+from ._nlmeans import _pixelwise_nlmeans_3d
+from ..utils import get_vars_for_dims, expand_variables
 
-
-__all__ = ['convolve', 'boxcar']
+__all__ = ['convolve', 'boxcar', 'nlmeans']
 
 
 def _convolve(arr, kernel, out=None):
@@ -49,6 +50,48 @@ def boxcar(ds, w, dims=('lat', 'lon'), **kwargs):
     N = len(dims)
     kernel = np.ones((w,) * N, dtype=np.float64) / w**N
     return convolve(ds, kernel=kernel, dims=dims, **kwargs)
+
+
+def nlmeans(ds, r, sigma, h, f=1, **kwargs):
+    """
+    Non-Local Means (Buades2011).
+
+    Buades, A., Coll, B., & Morel, J.-M. (2011). Non-Local Means Denoising.
+    Image Processing On Line, 1, 208–212.
+    https://doi.org/10.5201/ipol.2011.bcm_nlm
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+    r : dict
+        e.g. {'lat': 3, 'lon': 3, 'time': 1}
+    sigma : float
+    h : float
+    dims : tuple
+    f : int
+
+    """
+    dims = tuple(r.keys())
+    r_ = np.array(list(r.values()), dtype=np.uint32)
+
+    variables = get_vars_for_dims(ds, dims)
+    other_variables = get_vars_for_dims(ds, dims, invert=True)
+    ordered_dims = dims + ('variable',) + tuple(set(ds.dims) - set(dims))
+
+    # convert to DataArray
+    da_ordered = ds[variables].to_array().transpose(*ordered_dims)
+    da_filtered = da_ordered.copy()
+
+    arr = da_ordered.values
+    output = da_filtered.values
+
+    _pixelwise_nlmeans_3d(arr, output, r_, f, sigma, h)
+
+    result = expand_variables(da_filtered)
+    for v in other_variables:
+        result[v] = ds[v]
+
+    return result
 
 
 # def multilook(ds, w=3):
