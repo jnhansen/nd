@@ -71,6 +71,9 @@ def nlmeans(ds, r, sigma, h, f=1, **kwargs):
     f : int
 
     """
+    for k in ['lat', 'lon', 'time']:
+        if k not in r:
+            r[k] = 0
     dims = tuple(r.keys())
     r_ = np.array(list(r.values()), dtype=np.uint32)
 
