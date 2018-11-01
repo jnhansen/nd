@@ -25,7 +25,9 @@ __all__ = ['str2date',
            'xr_merge',
            'parallel',
            'select',
-           'get_vars_for_dims']
+           'get_vars_for_dims',
+           'expand_variables',
+           ]
 
 
 def str2date(string, fmt=None):
@@ -417,3 +419,29 @@ def get_vars_for_dims(ds, dims):
     """
     return [v for v in ds.data_vars
             if set(ds[v].dims).issuperset(set(dims))]
+
+
+def expand_variables(da, dim='variable'):
+    """
+    This is the inverse of xarray.Dataset.to_array().
+
+    Parameters
+    ----------
+    da : xarray.DataArray
+        A DataArray that contains the variable names as dimension.
+    dim : str
+        The dimension name (default: 'variable').
+
+    Returns
+    -------
+    xarray.Dataset
+        A dataset with the variable dimension in `da` exploded to variables.
+    """
+    _vars = []
+    for v in da[dim]:
+        _var = da.sel(**{dim: v})
+        _var.name = str(_var[dim].values)
+        del _var[dim]
+        _vars.append(_var)
+
+    return xr.merge(_vars)
