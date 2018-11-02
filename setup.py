@@ -29,8 +29,8 @@ gdal_version = subprocess.check_output(
 gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
 
 setup(
-    name='geotools',
-    packages=find_packages(),
+    # name='geo',
+    # packages=find_packages(),
     cmdclass={'build_ext': build_ext},
     ext_modules=ext_modules,
     include_dirs=[
@@ -48,7 +48,6 @@ setup(
         "pygdal>={},<={}".format(*gdal_version_range),
         "pandas",
         "python-dateutil",
-        "scikit-image",
         "matplotlib",
         "affine",
         "CythonGSL",
