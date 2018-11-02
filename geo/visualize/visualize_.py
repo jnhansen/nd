@@ -165,6 +165,62 @@ def plot_image(src, name, N=1):
     plt.savefig(name)
 
 
+def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
+                rgb=lambda da: [da.C11, da.C22, da.C11/da.C22]):
+    """
+    Create a video from an xarray.Dataset.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The dataset must have dimensions 'lat', 'lon', and 'time'.
+    path : str
+        The output file path of the video.
+    timestamp : bool, optional
+        Whether to print the timestamp in the upper left corner
+        (default: True).
+    width : int, optional
+        The width of the video (default: ds.dim['lon'])
+    height : int, optional
+        The height of the video (default: ds.dim['lat'])
+    fps : int, optional
+        Frames per second (default: 1).
+    rgb : callable, optional
+        A callable that takes a DataArray as input and returns a list of
+        R, G, B channels. By default will compute the C11, C22, C11/C22
+        representation.
+    """
+    # Font properties for timestamp
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    bottomLeftCornerOfText = (20, 40)
+    fontScale = 1
+    fontColor = (0, 0, 0)
+    lineType = 2
+
+    if height is None:
+        height = ds.dims['lat']
+    if width is None:
+        width = ds.dims['lon']
+
+    video = cv2.VideoWriter(path, -1, fps, (width, height))
+
+    for t in ds.time.values:
+        da = ds.sel(time=t)
+        frame = to_rgb(rgb(da))
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if timestamp:
+            cv2.putText(frame, str(t)[:10],
+                        bottomLeftCornerOfText,
+                        font,
+                        fontScale,
+                        fontColor,
+                        lineType)
+        video.write(frame)
+
+    cv2.destroyAllWindows()
+    video.release()
+
+
 # def plot_basemap(src, name, *args, **kwargs):
 #     """
 #     A simple function to plot a (warped) gdal Dataset on a map.

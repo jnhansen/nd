@@ -1,4 +1,5 @@
-from .visualize_ import colorize, to_rgb
+from .visualize_ import colorize, to_rgb, write_video
 
 __all__ = ['colorize',
-           'to_rgb']
+           'to_rgb',
+           'write_video']
