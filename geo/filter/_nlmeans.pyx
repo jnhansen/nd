@@ -8,6 +8,9 @@ from libc.math cimport abs, log, isnan, exp
 
 ctypedef Py_ssize_t SIZE_TYPE
 
+cdef short EDGE_MODE_REFLECT = 0
+cdef short EDGE_MODE_REPEAT = 1
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -30,17 +33,32 @@ cdef double _dsquare(floating [:, :, :] Bp, floating [:, :, :] Bq):
     return dsquare
 
 
-cdef Py_ssize_t _idx(Py_ssize_t i, Py_ssize_t shape):
+cdef Py_ssize_t _idx(Py_ssize_t i, Py_ssize_t shape,
+                     short mode=EDGE_MODE_REFLECT):
     """
     Sanitize index i given the shape of its dimension
     by reflecting at the boundary.
+
+    Parameters
+    ----------
+    mode : short
+        one of EDGE_MODE_REPEAT or EDGE_MODE_REFLECT
     """
-    if i < 0:
-        return -i
-    elif i >= shape:
-        return 2*shape - 2 - i
-    else:
-        return i
+    if mode == EDGE_MODE_REPEAT:
+        if i < 0:
+            return 0
+        elif i >= shape:
+            return shape - 1
+        else:
+            return i
+
+    elif mode == EDGE_MODE_REFLECT:
+        if i < 0:
+            return -i
+        elif i >= shape:
+            return 2*shape - 2 - i
+        else:
+            return i
 
 
 # @cython.boundscheck(False)
@@ -60,6 +78,7 @@ cpdef void _patchwise_nlmeans(np.ndarray[floating, ndim=3] arr,
         int di, dj
         double total_weight, max_weight, weight, dsquare
         np.ndarray[floating, ndim=3] weighted_sum
+        short m = EDGE_MODE_REFLECT
 
     # Make sure output is zero before we start.
     for i in range(nrows):
@@ -93,8 +112,10 @@ cpdef void _patchwise_nlmeans(np.ndarray[floating, ndim=3] arr,
                         for dj in range(-f, f+1):
                             for v in range(nvars):
                                 dsquare += (
-                                    arr[_idx(ip + di, nrows), _idx(jp + dj, ncols), v] -
-                                    arr[_idx(iq + di, nrows), _idx(jq + dj, ncols), v]
+                                    arr[_idx(ip + di, nrows, m),
+                                        _idx(jp + dj, ncols, m), v] -
+                                    arr[_idx(iq + di, nrows, m),
+                                        _idx(jq + dj, ncols, m), v]
                                 ) ** 2
 
 
@@ -110,7 +131,8 @@ cpdef void _patchwise_nlmeans(np.ndarray[floating, ndim=3] arr,
                         for j in range(jq - f, jq + f + 1):
                             for v in range(nvars):
                                 weighted_sum[i - iq + f, j - jq + f, v] += \
-                                    weight * arr[_idx(i, nrows), _idx(j, ncols), v]
+                                    weight * arr[_idx(i, nrows, m),
+                                                 _idx(j, ncols, m), v]
 
             # Now we have the weighted sum w(Bp, Bq)
 
@@ -124,10 +146,10 @@ cpdef void _patchwise_nlmeans(np.ndarray[floating, ndim=3] arr,
                         # weighted_sum[i-iP_min, j-jP_min, v] += \
                         #     max_weight * arr[i, j, v]
                         # output[i, j, v] = weighted_sum[i, j, v] / total_weight
-                        output[_idx(i, nrows), _idx(j, ncols), v] += (
+                        output[_idx(i, nrows, m), _idx(j, ncols, m), v] += (
                             weighted_sum[i - ip + r, j - jp + r, v] + \
                             max_weight * \
-                            arr[_idx(i, nrows), _idx(j, ncols), v]
+                            arr[_idx(i, nrows, m), _idx(j, ncols, m), v]
                         ) / total_weight
                         # output[i, j, v] = \
                         #     (weighted_sum[i-iP_min, j-jP_min, v] + \
@@ -158,6 +180,7 @@ cpdef void _pixelwise_nlmeans(floating [:, :, :] arr,
         double total_weight, max_weight, weight, dsquare
         floating [:] weighted_sum = np.zeros(nvars)
         SIZE_TYPE ndims = 2
+        short m = EDGE_MODE_REFLECT
 
     # Make sure output is zero before we start.
     for i in range(nrows):
@@ -190,8 +213,10 @@ cpdef void _pixelwise_nlmeans(floating [:, :, :] arr,
                         for dj in range(-f, f + 1):
                             for v in range(nvars):
                                 dsquare += (
-                                    arr[_idx(ip + di, nrows), _idx(jp + dj, ncols), v] -
-                                    arr[_idx(iq + di, nrows), _idx(jq + dj, ncols), v]
+                                    arr[_idx(ip + di, nrows, m),
+                                        _idx(jp + dj, ncols, m), v] -
+                                    arr[_idx(iq + di, nrows, m),
+                                        _idx(jq + dj, ncols, m), v]
                                 ) ** 2
 
                     dsquare /= nvars * (2*f + 1)**ndims
@@ -204,7 +229,8 @@ cpdef void _pixelwise_nlmeans(floating [:, :, :] arr,
                         max_weight = weight
 
                     for v in range(nvars):
-                        weighted_sum[v] += weight * arr[_idx(iq, nrows), _idx(jq, ncols), v]
+                        weighted_sum[v] += weight * arr[_idx(iq, nrows, m),
+                                                        _idx(jq, ncols, m), v]
 
             # Include pixel itself
             # And assign to output pixel
@@ -231,6 +257,7 @@ cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
         floating total_weight, max_weight, weight, dsquare
         floating [:] weighted_sum
         floating dsq_norm = nvars * (2*f[0] + 1) * (2*f[1] + 1) * (2*f[2] + 1)
+        short m = EDGE_MODE_REFLECT
 
     dtype = np.float32 if floating is float else np.float64
     weighted_sum = np.zeros(nvars, dtype=dtype)
@@ -269,13 +296,13 @@ cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
                                     for d[2] in range(-f[2], f[2] + 1):
                                         for v in range(nvars):
                                             dsquare += (
-                                                arr[_idx(p[0] + d[0], N[0]),
-                                                    _idx(p[1] + d[1], N[1]),
-                                                    _idx(p[2] + d[2], N[2]),
+                                                arr[_idx(p[0] + d[0], N[0], m),
+                                                    _idx(p[1] + d[1], N[1], m),
+                                                    _idx(p[2] + d[2], N[2], m),
                                                     v] -
-                                                arr[_idx(q[0] + d[0], N[0]),
-                                                    _idx(q[1] + d[1], N[1]),
-                                                    _idx(q[2] + d[2], N[2]),
+                                                arr[_idx(q[0] + d[0], N[0], m),
+                                                    _idx(q[1] + d[1], N[1], m),
+                                                    _idx(q[2] + d[2], N[2], m),
                                                     v]
                                             ) ** 2
 
@@ -290,9 +317,9 @@ cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
 
                             for v in range(nvars):
                                 weighted_sum[v] += weight * \
-                                    arr[_idx(q[0], N[0]),
-                                        _idx(q[1], N[1]),
-                                        _idx(q[2], N[2]), v]
+                                    arr[_idx(q[0], N[0], m),
+                                        _idx(q[1], N[1], m),
+                                        _idx(q[2], N[2], m), v]
 
                 # Include pixel itself
                 # And assign to output pixel
