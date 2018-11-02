@@ -166,7 +166,7 @@ def plot_image(src, name, N=1):
 
 
 def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
-                rgb=lambda da: [da.C11, da.C22, da.C11/da.C22]):
+                codec=None, rgb=lambda da: [da.C11, da.C22, da.C11/da.C22]):
     """
     Create a video from an xarray.Dataset.
 
@@ -185,6 +185,8 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         The height of the video (default: ds.dim['lat'])
     fps : int, optional
         Frames per second (default: 1).
+    codec : str, optional
+        fourcc codec (see http://www.fourcc.org/codecs.php)
     rgb : callable, optional
         A callable that takes a DataArray as input and returns a list of
         R, G, B channels. By default will compute the C11, C22, C11/C22
@@ -202,7 +204,11 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     if width is None:
         width = ds.dims['lon']
 
-    video = cv2.VideoWriter(path, -1, fps, (width, height))
+    if codec is None:
+        fourcc = -1
+    else:
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+    video = cv2.VideoWriter(path, fourcc, fps, (width, height))
 
     for t in ds.time.values:
         da = ds.sel(time=t)
