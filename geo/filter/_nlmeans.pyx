@@ -221,7 +221,7 @@ cpdef void _pixelwise_nlmeans(floating [:, :, :] arr,
 cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
                                  floating [:, :, :, :] output,
                                  unsigned int [:] r,
-                                 unsigned int f,
+                                 unsigned int [:] f,
                                  double sigma, double h):
     cdef:
         SIZE_TYPE ndims = 3
@@ -230,6 +230,7 @@ cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
         SIZE_TYPE [3] i, p, q, d
         floating total_weight, max_weight, weight, dsquare
         floating [:] weighted_sum
+        floating dsq_norm = nvars * (2*f[0] + 1) * (2*f[1] + 1) * (2*f[2] + 1)
 
     dtype = np.float32 if floating is float else np.float64
     weighted_sum = np.zeros(nvars, dtype=dtype)
@@ -263,9 +264,9 @@ cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
                                 continue
 
                             dsquare = 0
-                            for d[0] in range(-f, f + 1):
-                                for d[1] in range(-f, f + 1):
-                                    for d[2] in range(-f, f + 1):
+                            for d[0] in range(-f[0], f[0] + 1):
+                                for d[1] in range(-f[1], f[1] + 1):
+                                    for d[2] in range(-f[2], f[2] + 1):
                                         for v in range(nvars):
                                             dsquare += (
                                                 arr[_idx(p[0] + d[0], N[0]),
@@ -278,7 +279,7 @@ cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
                                                     v]
                                             ) ** 2
 
-                            dsquare /= nvars * (2*f + 1)**ndims
+                            dsquare /= dsq_norm
 
                             # Update weights
                             weight = exp( -max(dsquare - 2*sigma**2, 0) / h**2 )

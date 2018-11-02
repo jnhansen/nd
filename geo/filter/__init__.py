@@ -76,6 +76,7 @@ def nlmeans(ds, r, sigma, h, f=1, **kwargs):
             r[k] = 0
     dims = tuple(r.keys())
     r_ = np.array(list(r.values()), dtype=np.uint32)
+    f_ = np.array([f if _ > 0 else 0 for _ in r_], dtype=np.uint32)
 
     variables = get_vars_for_dims(ds, dims)
     other_variables = get_vars_for_dims(ds, dims, invert=True)
@@ -88,7 +89,7 @@ def nlmeans(ds, r, sigma, h, f=1, **kwargs):
     arr = da_ordered.values
     output = da_filtered.values
 
-    _pixelwise_nlmeans_3d(arr, output, r_, f, sigma, h)
+    _pixelwise_nlmeans_3d(arr, output, r_, f_, sigma, h)
 
     result = expand_variables(da_filtered)
     for v in other_variables:
