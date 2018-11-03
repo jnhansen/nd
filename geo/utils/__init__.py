@@ -447,4 +447,6 @@ def expand_variables(da, dim='variable'):
         del _var[dim]
         _vars.append(_var)
 
-    return xr.merge(_vars)
+    result = xr.merge(_vars)
+    result.attrs = da.attrs
+    return result
