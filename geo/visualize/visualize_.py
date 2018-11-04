@@ -10,7 +10,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 try:
     from mpl_toolkits.basemap import Basemap
-    import skimage.transform
 except ImportError:
     pass
 
