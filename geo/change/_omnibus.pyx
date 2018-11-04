@@ -140,8 +140,8 @@ cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts, unsig
 
 
 @cython.wraparound(False)
-@cython.cdivision(True)
 @cython.boundscheck(False)
+@cython.cdivision(True)
 cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n) nogil:
     cdef:
         double p = 2
@@ -260,8 +260,8 @@ cpdef void single_pixel_change_detection(floating [:, :] ts,
                 p_H0_lj = single_pixel_omnibus(subset, n=n)
                 _change = (p_H0_lj > alpha)
                 # Break on first significant change
+                r = j - 1
                 if _change:
-                    r = j - 1
                     result[l + r] = 1
                     break
         l = l + r
