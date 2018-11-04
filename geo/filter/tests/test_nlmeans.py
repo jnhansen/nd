@@ -1,5 +1,5 @@
-from .. import nlmeans
-from ...utils.testing import generate_test_dataset
+from geo.filter import nlmeans
+from geo.utils.testing import generate_test_dataset
 import numpy as np
 
 
