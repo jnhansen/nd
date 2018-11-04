@@ -321,6 +321,9 @@ cpdef void _pixelwise_nlmeans_3d(floating [:, :, :, :] arr,
                                         _idx(q[1], N[1], m),
                                         _idx(q[2], N[2], m), v]
 
+                if max_weight == 0:
+                    max_weight = 1
+
                 # Include pixel itself
                 # And assign to output pixel
                 total_weight += max_weight
