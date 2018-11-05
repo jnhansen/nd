@@ -1,0 +1,5 @@
+[run]
+source=geo
+include=*/geo/*
+omit=
+    */test_*.py
