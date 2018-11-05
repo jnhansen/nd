@@ -441,6 +441,8 @@ def expand_variables(da, dim='variable'):
         A dataset with the variable dimension in `da` exploded to variables.
     """
     _vars = []
+    attrs = da.attrs
+    da.attrs = {}
     for v in da[dim]:
         _var = da.sel(**{dim: v})
         _var.name = str(_var[dim].values)
@@ -448,5 +450,5 @@ def expand_variables(da, dim='variable'):
         _vars.append(_var)
 
     result = xr.merge(_vars)
-    result.attrs = da.attrs
+    result.attrs = attrs
     return result
