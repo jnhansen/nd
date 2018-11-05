@@ -51,6 +51,10 @@ def equal_list_of_dicts(obj1, obj2, exclude=[]):
     return set(serial1) == set(serial2)
 
 
+def assert_all_true(ds):
+    assert ds.to_array().values.all()
+
+
 # def generate_test_latlon_grid(shape):
 #     y, x = np.meshgrid(np.arange(shape[1]),
 #                        np.arange(shape[0]),

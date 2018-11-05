@@ -1,5 +1,5 @@
 from geo.filter import nlmeans
-from geo.utils.testing import generate_test_dataset
+from geo.utils.testing import generate_test_dataset, assert_all_true
 import numpy as np
 
 
@@ -19,14 +19,10 @@ def test_nlmeans_zero_radius():
     assert ds.equals(ds_nlm)
 
 
-# def test_reduce_noise():
-#     # Check that applying nlmeans reduces the standard deviation.
-#     ds_nlm = nlmeans(ds, r={'lat': 1, 'lon': 1, 'time': 0}, sigma=2, h=2)
-
-
-# def test_nlmeans_2d():
-#     t0 = ds.isel(time=0)
-#     t0_nlm = nlmeans(t0, r={}, f=1, sigma=1, h=1)
+def test_reduce_std():
+    # Check that applying nlmeans reduces the standard deviation.
+    ds_nlm = nlmeans(ds, r={'lat': 1, 'lon': 1, 'time': 0}, sigma=2, h=2)
+    assert_all_true(ds_nlm.std() < ds.std())
 
 
 def test_ignore_time_dimension():
