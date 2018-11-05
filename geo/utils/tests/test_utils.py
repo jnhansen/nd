@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.testing import assert_equal
 from geo import utils
+from geo.utils import testing
 
 
 def test_str2date():
@@ -15,7 +16,7 @@ def test_dict_product():
               {'a': 2, 'b': 6},
               {'a': 3, 'b': 5},
               {'a': 3, 'b': 6}]
-    assert_equal(list(utils.dict_product(d)), result)
+    assert testing.equal_list_of_dicts(list(utils.dict_product(d)), result)
 
 
 def test_chunks():
