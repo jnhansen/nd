@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.com/jnhansen/geo.svg?branch=master)](https://travis-ci.com/jnhansen/geo)
+
+
 # geo [*work in progress*]
 
 This package contains a selection of tools to handle and analyze satellite data.
