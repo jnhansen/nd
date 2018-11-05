@@ -37,4 +37,5 @@ install:
 - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
 script:
 - pytest --cov
+after_success:
 - codecov
