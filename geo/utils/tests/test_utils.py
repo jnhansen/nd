@@ -48,3 +48,39 @@ def test_parallel():
     xr_assert_identical(result_serial, result_parallel)
     # Assert that the parallel execution was more than three times faster
     assert serial_time > parallel_time
+
+
+def test_select():
+    complete = [{'a': 1, 'b': 2}, {'a': 2, 'b': 2}, {'a': 1, 'b': 1}]
+    expected = [{'a': 1, 'b': 2}, {'a': 1, 'b': 1}]
+    selected = utils.select(complete, lambda o: o['a'] == 1)
+    assert_equal(expected, selected)
+
+
+def test_get_vars_for_dims():
+    ds = generate_test_dataset(var=['var1', 'var2'])
+    ds['other'] = 1
+    ds['spatial'] = (('lat', 'lon'),
+                     np.ones((ds.dims['lat'], ds.dims['lon'])))
+    all_vars = {'var1', 'var2', 'other', 'spatial'}
+
+    for dims, variables in [
+        ([], all_vars),
+        (['lat', 'lon'], {'var1', 'var2', 'spatial'}),
+        (['lat', 'lon', 'time'], {'var1', 'var2'})
+    ]:
+        assert_equal(
+            set(utils.get_vars_for_dims(ds, dims)),
+            variables
+        )
+        assert_equal(
+            set(utils.get_vars_for_dims(ds, dims, invert=True)),
+            all_vars - variables
+        )
+
+
+def test_expand_variables():
+    ds = generate_test_dataset()
+    da = ds.to_array(dim='new_dim')
+    ds_new = utils.expand_variables(da, dim='new_dim')
+    xr_assert_identical(ds, ds_new)
