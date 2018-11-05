@@ -165,13 +165,13 @@ def plot_image(src, name, N=1):
 
 
 def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
-                codec=None, rgb=lambda da: [da.C11, da.C22, da.C11/da.C22]):
+                codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22]):
     """
     Create a video from an xarray.Dataset.
 
     Parameters
     ----------
-    ds : xarray.Dataset
+    ds : xarray.Dataset or xarray.DataArray
         The dataset must have dimensions 'lat', 'lon', and 'time'.
     path : str
         The output file path of the video.
@@ -187,9 +187,10 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     codec : str, optional
         fourcc codec (see http://www.fourcc.org/codecs.php)
     rgb : callable, optional
-        A callable that takes a DataArray as input and returns a list of
+        A callable that takes a Dataset as input and returns a list of
         R, G, B channels. By default will compute the C11, C22, C11/C22
         representation.
+        For a DataArray, the video will be grayscale.
     """
     # Font properties for timestamp
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -198,10 +199,16 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     fontColor = (0, 0, 0)
     lineType = 2
 
+    # For a DataArray, the video is grayscale.
+    if isinstance(ds, xr.DataArray):
+        def rgb(d):
+            return d
+
+    # Use coords rather than dims so it also works for DataArray
     if height is None:
-        height = ds.dims['lat']
+        height = ds.coords['lat'].size
     if width is None:
-        width = ds.dims['lon']
+        width = ds.coords['lon'].size
 
     if codec is None:
         fourcc = -1
@@ -210,8 +217,8 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     video = cv2.VideoWriter(path, fourcc, fps, (width, height))
 
     for t in ds.time.values:
-        da = ds.sel(time=t)
-        frame = to_rgb(rgb(da))
+        d = ds.sel(time=t)
+        frame = to_rgb(rgb(d))
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         if timestamp:
             cv2.putText(frame, str(t)[:10],
