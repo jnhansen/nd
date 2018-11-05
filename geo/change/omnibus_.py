@@ -348,7 +348,7 @@ def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
     coords = ds.transpose('lat', 'lon', 'time').coords
     change_arr = xr.DataArray(np.asarray(change, dtype=bool),
                               dims=coords.keys(), coords=coords,
-                              attrs=ds.attrs)
+                              attrs=ds.attrs, name='change')
 
     return change_arr
 
