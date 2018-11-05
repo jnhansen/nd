@@ -33,6 +33,8 @@ install:
 - export C_INCLUDE_PATH=/usr/include/gdal
 - pip install cython CythonGSL numpy
 - pip install scikit-learn
+- pip install pytest pytest-cov
+- pip install coverage codecov
 - pip install -e .
 - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
 script:
