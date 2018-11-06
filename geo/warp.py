@@ -597,7 +597,7 @@ def warp(ds, extent=None, shape=None, resolution=None, order=3, chunks=None,
                 'lon' not in da.coords:
             return da
         else:
-            print('Warping {} ...').format(var); t = time.time()
+            print('Warping {} ...'.format(var)); t = time.time()
             kwargs = {'order': order}
             # If the dtype is integer, treat as categorical
             # TODO: Make this optional?
