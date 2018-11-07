@@ -78,8 +78,8 @@ def test_select_dict_first():
     complete = {'x': {'a': 1, 'b': 2},
                 'y': {'a': 2, 'b': 2},
                 'z': {'a': 1, 'b': 1}}
-    assert_equal(utils.select(complete, lambda o: o['a'] == 1, first=True),
-                 {'a': 1, 'b': 2})
+    assert utils.select(complete, lambda o: o['a'] == 1, first=True) \
+        in [{'a': 1, 'b': 2}, {'a': 1, 'b': 1}]
 
 
 def test_get_vars_for_dims():
