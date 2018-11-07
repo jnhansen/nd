@@ -106,7 +106,9 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
                 maxval = vmax[i]
             else:
                 maxval = np.percentile(channel, pmax)
-            channel = (channel - minval) / (maxval - minval) * 255
+            if maxval > minval:
+                channel = (channel - minval) / (maxval - minval) * 255
+
             im[:, :, i] = channel
         im = np.clip(im, 0, 255).astype(np.uint8)
         if n_channels == 1:
