@@ -1,7 +1,8 @@
 from geo.visualize import to_rgb
 from numpy.testing import assert_equal
-from geo.utils.testing import generate_test_dataset
+from geo.testing import generate_test_dataset
 import numpy as np
+import pytest
 
 
 def test_to_rgb_gray():
@@ -27,3 +28,8 @@ def test_to_rgb_color():
     assert_equal(
         to_rgb(values, pmin=0, pmax=100), rgb
     )
+
+
+def test_to_rgb_invalid_datatype():
+    with pytest.raises(ValueError):
+        to_rgb('string')

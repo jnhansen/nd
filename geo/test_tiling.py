@@ -1,4 +1,4 @@
-from geo.utils.testing import generate_test_dataset
+from geo.testing import generate_test_dataset
 from geo.utils import dict_product
 from geo import tiling
 from xarray.testing import assert_equal

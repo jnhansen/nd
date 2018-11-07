@@ -1,5 +1,5 @@
 from geo.filter import nlmeans
-from geo.utils.testing import generate_test_dataset, assert_all_true
+from geo.testing import generate_test_dataset, assert_all_true
 import numpy as np
 
 

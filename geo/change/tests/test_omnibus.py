@@ -1,5 +1,5 @@
 import xarray as xr
-from geo.utils import testing
+from geo import testing
 from geo.change import OmnibusTest
 
 

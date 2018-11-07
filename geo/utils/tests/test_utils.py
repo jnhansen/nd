@@ -3,7 +3,7 @@ from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
 from geo import utils
-from geo.utils.testing import equal_list_of_dicts, generate_test_dataset
+from geo.testing import equal_list_of_dicts, generate_test_dataset
 import time
 
 
