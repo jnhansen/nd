@@ -6,11 +6,13 @@ import json
 
 def generate_test_dataset(nlat=20, nlon=20, ntime=10,
                           var=['C11', 'C12__im', 'C12__re', 'C22'],
-                          mean=0, sigma=1):
+                          mean=0, sigma=1,
+                          extent=(-10.0, 50.0, 0.0, 60.0),
+                          random_seed=42):
 
-    np.random.seed(42)
-    lats = np.linspace(50.0, 60.0, nlat)
-    lons = np.linspace(-10.0, 0.0, nlon)
+    np.random.seed(random_seed)
+    lats = np.linspace(extent[1], extent[3], nlat)
+    lons = np.linspace(extent[0], extent[2], nlon)
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
     times = pd.date_range('2017-01-01', '2018-01-01', periods=ntime)
     ds = xr.Dataset(coords={'lat': lats, 'lon': lons, 'time': times},
