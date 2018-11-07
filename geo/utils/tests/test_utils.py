@@ -50,11 +50,36 @@ def test_parallel():
     assert serial_time > parallel_time
 
 
-def test_select():
+def test_select_list():
     complete = [{'a': 1, 'b': 2}, {'a': 2, 'b': 2}, {'a': 1, 'b': 1}]
     expected = [{'a': 1, 'b': 2}, {'a': 1, 'b': 1}]
     selected = utils.select(complete, lambda o: o['a'] == 1)
     assert_equal(expected, selected)
+
+
+def test_select_dict():
+    complete = {'x': {'a': 1, 'b': 2},
+                'y': {'a': 2, 'b': 2},
+                'z': {'a': 1, 'b': 1}}
+    expected = {'x': {'a': 1, 'b': 2}, 'z': {'a': 1, 'b': 1}}
+    selected = utils.select(complete, lambda o: o['a'] == 1)
+    assert_equal(expected, selected)
+
+
+def test_select_list_first():
+    complete = [{'a': 1, 'b': 2}, {'a': 2, 'b': 2}, {'a': 1, 'b': 1}]
+    assert_equal(utils.select(complete, lambda o: o['a'] == 1, first=True),
+                 {'a': 1, 'b': 2})
+    assert_equal(utils.select(complete, lambda o: 'c' in o, first=True),
+                 None)
+
+
+def test_select_dict_first():
+    complete = {'x': {'a': 1, 'b': 2},
+                'y': {'a': 2, 'b': 2},
+                'z': {'a': 1, 'b': 1}}
+    assert_equal(utils.select(complete, lambda o: o['a'] == 1, first=True),
+                 {'a': 1, 'b': 2})
 
 
 def test_get_vars_for_dims():
