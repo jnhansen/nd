@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.com/jnhansen/geo.svg?branch=master)](https://travis-ci.com/jnhansen/geo)
+[![codecov](https://codecov.io/gh/jnhansen/geo/branch/master/graph/badge.svg)](https://codecov.io/gh/jnhansen/geo)
 
 
 # geo [*work in progress*]
