@@ -31,12 +31,12 @@ install:
 - source activate test-environment
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal
 - export C_INCLUDE_PATH=/usr/include/gdal
+- export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
 - pip install cython CythonGSL numpy
 - pip install scikit-learn
 - pip install pytest pytest-cov
 - pip install coverage codecov
 - pip install -e .
-- export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
 script:
 - pytest --cov
 after_success:
