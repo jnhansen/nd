@@ -34,8 +34,8 @@ def convolve(ds, kernel, dims=('lat', 'lon')):
         values = ds_conv[v].values
 
         if np.iscomplexobj(values):
-            im_conv = _convolve(np.real(values), kernel)
-            re_conv = _convolve(np.imag(values), kernel)
+            re_conv = _convolve(np.real(values), kernel)
+            im_conv = _convolve(np.imag(values), kernel)
             v_convolved = re_conv + 1j * im_conv
         else:
             v_convolved = _convolve(values, kernel)
