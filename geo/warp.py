@@ -687,7 +687,8 @@ def align(datasets, path, parallel=False, compute=True,
         datasets = [from_netcdf(path) for path in datasets]
     else:
         product_names = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
-                         for ds in datasets]
+                         if 'metadata' in ds else 'data{}'.format(i)
+                         for i, ds in enumerate(datasets)]
 
     extent, resolution = _common_extent_and_resolution(datasets)
     print(extent, resolution)
