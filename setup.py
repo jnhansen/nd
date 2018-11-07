@@ -62,6 +62,7 @@ setup(
         "python-dateutil",
         "matplotlib",
         "affine",
-        "opencv-python"
+        "opencv-python",
+        "NetCDF4"
     ]
 )
