@@ -1,8 +1,10 @@
-name: nd
+name: ndtest
+channels:
+  - conda-forge
 dependencies:
   - python=3.6
   - gsl
   - numpy
   - sphinx
   - sphinxcontrib-apidoc
-  - CythonGSL
+  - cythongsl
