@@ -19,18 +19,18 @@ ext = '.pyx' if use_cython else '.c'
 # directive_defaults['binding'] = True
 
 extensions = [
-    Extension("geo.change._omnibus", ["geo/change/_omnibus" + ext],
+    Extension("nd.change._omnibus", ["nd/change/_omnibus" + ext],
               libraries=cython_gsl.get_libraries(),
               library_dirs=[cython_gsl.get_library_dir()],
               include_dirs=['.', cython_gsl.get_cython_include_dir()],
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("geo.filter._nlmeans", ["geo/filter/_nlmeans" + ext],
+    Extension("nd.filter._nlmeans", ["nd/filter/_nlmeans" + ext],
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("geo._warp", ["geo/_warp" + ext]),
+    Extension("nd._warp", ["nd/_warp" + ext]),
 ]
 
 if use_cython:
