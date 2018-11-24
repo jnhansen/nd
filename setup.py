@@ -70,16 +70,9 @@ else:
     gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
 
 include_dirs = []
+install_requires = []
 if not mock_install:
-    include_dirs.append(numpy.get_include())
-    if use_cython:
-        include_dirs.append(cython_gsl.get_include())
-
-setup(
-    cmdclass=cmdclass,
-    ext_modules=extensions,
-    include_dirs=include_dirs,
-    install_requires=[
+    install_requires.extend([
         "numpy",
         "scipy",
         "xarray",
@@ -92,5 +85,14 @@ setup(
         "affine",
         "opencv-python",
         "NetCDF4"
-    ]
+    ])
+    include_dirs.append(numpy.get_include())
+    if use_cython:
+        include_dirs.append(cython_gsl.get_include())
+
+setup(
+    cmdclass=cmdclass,
+    ext_modules=extensions,
+    include_dirs=include_dirs,
+    install_requires=install_requires
 )
