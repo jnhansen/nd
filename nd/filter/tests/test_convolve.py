@@ -12,6 +12,16 @@ identity_kernel = np.zeros((3, 3))
 identity_kernel[1, 1] = 1
 
 
+def test_expand_kernel():
+    kernel = np.ones((2, 3))
+    dims = ('x', 'y')
+    new_dims = ('x', 'a', 'y', 's')
+    new_kernel = _expand_kernel(kernel, dims, new_dims)
+    assert_equal(
+        new_kernel.shape, (2, 1, 3, 1)
+    )
+
+
 def test_convolve_ndarray():
     np.random.seed(42)
     arr = np.random.rand(20, 20)
