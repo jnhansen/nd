@@ -4,25 +4,13 @@
 API Reference
 =============
 
-:Release: |version|
-:Date: |today|
-
 .. module:: nd
 
-This reference ...
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
-   reference/io
-   reference/change
-   reference/classify
-   reference/utils
-   reference/visualize
-   reference/testing
-   reference/warp
-   reference/tiling
-   reference/filter
+   reference/nd
 
 
 .. _io_ref:
