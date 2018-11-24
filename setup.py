@@ -2,18 +2,13 @@ from setuptools import setup, Extension
 import subprocess
 import os
 import numpy
+import cython_gsl
 
 mock_install = os.environ.get('READTHEDOCS') == 'True'
 
 try:
-    import cython_gsl
     from Cython.Distutils import build_ext
     from Cython.Build import cythonize
-    cython_gsl.get_library_dir()
-except IndexError:
-    # IndexError is raised if the gsl library is not installed.
-    # For building the documentation this is not required.
-    use_cython = False
 except ImportError:
     use_cython = False
 else:
@@ -81,8 +76,7 @@ if not mock_install:
     ])
 
 include_dirs.append(numpy.get_include())
-if use_cython:
-    include_dirs.append(cython_gsl.get_include())
+include_dirs.append(cython_gsl.get_include())
 
 setup(
     cmdclass=cmdclass,
