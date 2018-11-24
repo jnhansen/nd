@@ -51,7 +51,7 @@ extensions = [
 # apidoc configuration
 apidoc_module_dir = '../nd'
 apidoc_output_dir = 'reference'
-apidoc_excluded_paths = ['tests']
+apidoc_excluded_paths = ['**/tests', 'test_*']
 apidoc_separate_modules = True
 
 
