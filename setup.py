@@ -1,11 +1,11 @@
 from setuptools import setup, Extension
 import subprocess
 import os
+import numpy
 
 mock_install = os.environ.get('READTHEDOCS') == 'True'
 
 try:
-    import numpy
     import cython_gsl
     from Cython.Distutils import build_ext
     from Cython.Build import cythonize
@@ -80,8 +80,8 @@ if not mock_install:
         "NetCDF4"
     ])
 
+include_dirs.append(numpy.get_include())
 if use_cython:
-    include_dirs.append(numpy.get_include())
     include_dirs.append(cython_gsl.get_include())
 
 setup(
