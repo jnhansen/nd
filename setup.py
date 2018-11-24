@@ -1,9 +1,9 @@
 from setuptools import setup, Extension
 import subprocess
-import numpy
-import cython_gsl
 
 try:
+    import numpy
+    import cython_gsl
     from Cython.Distutils import build_ext
     from Cython.Build import cythonize
 except ImportError:
@@ -18,11 +18,20 @@ ext = '.pyx' if use_cython else '.c'
 # directive_defaults['linetrace'] = True
 # directive_defaults['binding'] = True
 
+omnibus_libraries = []
+omnibus_library_dirs = []
+omnibus_include_dirs = ['.']
+
+if use_cython:
+    omnibus_libraries.extend(cython_gsl.get_libraries())
+    omnibus_library_dirs.append(cython_gsl.get_library_dir())
+    omnibus_include_dirs.append(cython_gsl.get_cython_include_dir())
+
 extensions = [
     Extension("nd.change._omnibus", ["nd/change/_omnibus" + ext],
-              libraries=cython_gsl.get_libraries(),
-              library_dirs=[cython_gsl.get_library_dir()],
-              include_dirs=['.', cython_gsl.get_cython_include_dir()],
+              libraries=omnibus_libraries,
+              library_dirs=omnibus_library_dirs,
+              include_dirs=omnibus_include_dirs,
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
@@ -44,13 +53,14 @@ gdal_version = subprocess.check_output(
     ['gdal-config', '--version']).decode('utf-8').strip('\n')
 gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
 
+include_dirs = []
+if use_cython:
+    include_dirs.append(numpy.get_include())
+    include_dirs.append(cython_gsl.get_include())
 setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
-    include_dirs=[
-        numpy.get_include(),
-        cython_gsl.get_include()
-    ],
+    include_dirs=include_dirs,
     install_requires=[
         "numpy",
         "scipy",
