@@ -1,13 +1,15 @@
 .. _setup:
 
-==============
-Installing geo
-==============
+=============
+Installing nd
+=============
 
-Installing geo from source::
+Installing nd from source
 
-    git clone https://github.com/jnhansen/geo
-    cd geo
+::
+
+    git clone https://github.com/jnhansen/nd
+    cd nd
     python setup.py build_ext
     pip install .
 

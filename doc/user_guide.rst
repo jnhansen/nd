@@ -9,6 +9,7 @@ User Guide
 .. toctree::
    :numbered:
 
-   setup.rst
-   getting_started.rst
-
+   setup
+   getting_started
+   change/index
+   filters/index

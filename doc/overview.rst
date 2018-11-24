@@ -6,11 +6,11 @@
 Overview
 ========
 
-The geo library is composed of a variety of submodules that bundle similar features.
+The library is composed of a variety of submodules that bundle similar features.
 
 
-geo.io
-------
+nd.io
+-----
 Several functions to read and write satellite data.
 
 - to/from NetCDF
@@ -20,8 +20,8 @@ Several functions to read and write satellite data.
 - deal with complex-valued data (not supported by NetCDF) by disassembling into two reals when writing to NetCDF, and vice versa when reading.
 
 
-geo.change
-----------
+nd.change
+---------
 A module implementing change detection algorithms.
 
 - convert dual polarization data into the complex covariance matrix representation
@@ -29,15 +29,15 @@ A module implementing change detection algorithms.
 - OmnibusTest (change detection algorithm by Conradsen et al. (2015))
 
 
-geo.classify
-------------
+nd.classify
+-----------
 A collection of classification and clustering methods.
 
 ... *work in progress* ...
 
 
-geo.filter
-----------
+nd.filter
+---------
 Implements several filters, currently:
 
 - kernel convolutions
@@ -45,8 +45,8 @@ Implements several filters, currently:
 - non-local means
 
 
-geo.utils
----------
+nd.utils
+--------
 Several utility functions.
 
 - split/merge numpy arrays, xarray datasets, ...
@@ -54,8 +54,8 @@ Several utility functions.
 - parallelize operations acting on xarray datasets
 
 
-geo.warp
---------
+nd.warp
+-------
 Given a dataset with Ground Control Points (GCPs), usually in the form of a tie point grid,
 warp the dataset onto an equirectangular projection (WGS84), such that lat/lon directly correspond to the
 y and x coordinates, respectively.
@@ -64,8 +64,8 @@ This makes concatenating datasets easier and reduces storage size, because lat/l
 do not need to be stored for each pixel.
 
 
-geo.visualize
--------------
+nd.visualize
+------------
 Several functions to quickly visualize data.
 
 - create RGB images from data
@@ -73,8 +73,8 @@ Several functions to quickly visualize data.
 - create video from a spatiotemporal dataset
 
 
-geo.tiling
-----------
+nd.tiling
+---------
 
 - Split a dataset into tiles.
 

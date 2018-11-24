@@ -7,7 +7,7 @@ API Reference
 :Release: |version|
 :Date: |today|
 
-.. module:: geo
+.. module:: nd
 
 This reference ...
 
@@ -27,9 +27,9 @@ This reference ...
 
 .. _io_ref:
 
-:mod:`geo.io`: Geospatial I/O
-==================================
+:mod:`nd.io`: Geospatial I/O
+=============================
 
-.. automodule:: geo.io
+.. automodule:: nd.io
    :members:
    :no-inherited-members:
