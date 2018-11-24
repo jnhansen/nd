@@ -1,8 +1,11 @@
 build:
   image: latest
 
+conda:
+  file: docs/environment.yml
+
 python:
   version: 3.6
   setup_py_install: yes
 
-requirements_file: doc/requirements.txt
+# requirements_file: doc/requirements.txt
