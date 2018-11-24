@@ -53,10 +53,14 @@ if use_cython:
 else:
     cmdclass = {}
 
-
-gdal_version = subprocess.check_output(
-    ['gdal-config', '--version']).decode('utf-8').strip('\n')
-gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
+try:
+    gdal_version = subprocess.check_output(
+        ['gdal-config', '--version']).decode('utf-8').strip('\n')
+    gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
+except FileNotFoundError:
+    # gdal is not installed.
+    # Assume this is a mock install.
+    gdal_version_range = [0, 99]
 
 include_dirs = []
 if use_cython:
