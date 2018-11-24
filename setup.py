@@ -6,9 +6,12 @@ try:
     import cython_gsl
     from Cython.Distutils import build_ext
     from Cython.Build import cythonize
-except (ImportError, IndexError):
+    cython_gsl.get_libraries()
+except IndexError:
     # IndexError is raised if the gsl library is not installed.
     # For building the documentation this is not required.
+    use_cython = False
+except ImportError:
     use_cython = False
 else:
     use_cython = True
