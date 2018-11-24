@@ -1,5 +1,6 @@
-[![Build Status](https://travis-ci.com/jnhansen/geo.svg?branch=master)](https://travis-ci.com/jnhansen/geo)
-[![codecov](https://codecov.io/gh/jnhansen/geo/branch/master/graph/badge.svg)](https://codecov.io/gh/jnhansen/geo)
+[![Build Status](https://travis-ci.com/jnhansen/nd.svg?branch=master)](https://travis-ci.com/jnhansen/nd)
+[![codecov](https://codecov.io/gh/jnhansen/nd/branch/master/graph/badge.svg)](https://codecov.io/gh/jnhansen/nd)
+[![Documentation](https://readthedocs.org/projects/nd/badge/?version=latest)](https://nd.readthedocs.io/en/latest/?badge=latest)
 
 
 # nd
