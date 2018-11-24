@@ -28,6 +28,7 @@ def generate_test_dataset(nlat=20, nlon=20, ntime=10,
 def equal_list_of_dicts(obj1, obj2, exclude=[]):
     """Check whether two lists of dictionaries are equal, independent of the
     order within the list.
+
     Parameters
     ----------
     obj1 : list of dict
@@ -37,11 +38,13 @@ def equal_list_of_dicts(obj1, obj2, exclude=[]):
     exclude : list of str, optional
         A list of keys that are to be excluded when deciding whether the lists
         of dictionaries are equal (default: []).
+
     Returns
     -------
     bool
         True if the two lists contain the same dictionaries, False otherwise.
     """
+
     for key in exclude:
         for i in obj1:
             del i[key]

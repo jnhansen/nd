@@ -12,9 +12,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
 # from github_links import make_linkcode_resolve
 
 # -- Project information -----------------------------------------------------
@@ -42,6 +42,7 @@ extensions = [
     'sphinxcontrib.apidoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
@@ -51,9 +52,14 @@ extensions = [
 # apidoc configuration
 apidoc_module_dir = '../nd'
 apidoc_output_dir = 'reference'
-apidoc_excluded_paths = ['**/tests', 'test_*']
+apidoc_excluded_paths = ['**/tests', 'test_*', '**/test_*',
+                         '**/*.pyx', '**/*.pxd']
 apidoc_separate_modules = True
 
+# Mock imports for autodoc
+autodoc_mock_imports = ['cython_gsl', 'numpy', 'matplotlib', 'cv2', 'dask',
+                        'xarray', 'scipy', 'affine', 'sklearn', 'osgeo',
+                        'dateutil', 'pandas', 'lxml']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

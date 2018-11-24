@@ -61,6 +61,9 @@ def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
 
 
 class OmnibusTest(ChangeDetection):
+    """
+    OmnibusTest
+    """
 
     def __init__(self, ml=None, n=1, *args, **kwargs):
         self.ml = ml

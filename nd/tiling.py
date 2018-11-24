@@ -195,6 +195,7 @@ def auto_merge(datasets, buffer='auto', chunks={}):
     xarray.Dataset
         The merged dataset.
     """
+
     # Treat `datasets` as a glob expression
     if isinstance(datasets, str):
         datasets = glob.glob(datasets)

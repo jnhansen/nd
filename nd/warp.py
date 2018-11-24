@@ -371,6 +371,7 @@ def resample(input, coords=None, mapping=None, output=None, order=3,
         If `output` is None, returns the resampled array. Otherwise, returns
         None.
     """
+
     extra_arguments = None if mapping is None else ()
     extra_keywords = None if mapping is None else {}
     mode = _extend_mode_to_code(mode)
