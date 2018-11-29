@@ -1,3 +1,8 @@
+"""
+.. document private functions
+.. autofunction:: _expand_kernel
+"""
+
 import numpy as np
 import scipy.ndimage.filters
 import cv2
@@ -20,7 +25,39 @@ def _expand_kernel(kernel, kernel_dims, new_dims):
     """
     Reshape a kernel spanning some dimensions to cover a superset of
     dimensions.
+
+    Parameters
+    ----------
+    kernel : ndarray
+        An n-dimensional kernel.
+    kernel_dims : tuple
+        The dimensions corresponding to the kernel axes.
+    new_dims : tuple
+        The dimensions of the dataset to which the kernel needs to be applied.
+        Must be a superset of `kernel_dims`.
+
+    Returns
+    -------
+    ndarray
+        The reshaped kernel.
+
+    Raises
+    ------
+    ValueError
+        Will raise a ValueError if the dimensions of the kernel don't match
+        `kernel_dims`.
+    ValueError
+        Will raise a ValueError if `new_dims` is not a superset of
+        `kernel_dims`.
     """
+
+    if not set(new_dims).issuperset(set(kernel_dims)):
+        raise ValueError('`new_dims` must be a superset of `kernel_dims`.')
+
+    if kernel.ndim == len(kernel_dims):
+        raise ValueError('The length of `kernel_dims` must match the '
+                         'dimension of `kernel`.')
+
     new_kernel_shape = np.ones(len(new_dims), dtype=int)
     new_kernel_shape[[new_dims.index(_) for _ in kernel_dims]] = kernel.shape
     return kernel.reshape(new_kernel_shape)
@@ -29,7 +66,25 @@ def _expand_kernel(kernel, kernel_dims, new_dims):
 # TODO: offer `inplace=True` option?
 def convolve(ds, kernel, dims=('lat', 'lon')):
     """
+    Kernel-convolution of an xarray.Dataset.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset.
+    kernel : ndarray
+        The convolution kernel.
+    dims : tuple, optional
+        The dataset dimensions corresponding to the kernel axes
+        (default: ('lat', 'lon')). The length of the tuple must match the
+        number of dimensions of the kernel.
+
+    Returns
+    -------
+    xarray.Dataset
+        The convolved dataset.
     """
+
     # Make sure the dimensions we want to filter are first.
     # dims = ('lat', 'lon')
     ordered_dims = dims + tuple(set(ds.dims) - set(dims))

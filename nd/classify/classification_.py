@@ -1,3 +1,8 @@
+"""
+.. document private functions
+.. autofunction:: _cluster
+"""
+
 import xarray as xr
 try:
     from sklearn.cluster import MiniBatchKMeans
@@ -13,6 +18,30 @@ __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
 
 
 def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
+    """
+    Cluster a dataset using MiniBatchKMeans.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset.
+    ml : int, optional
+        Boxcar window size for smoothing before clustering (default: 5).
+    scale : bool, optional
+        If True, scale the input data before clustering to zero mean and unit
+        variance (default: True).
+    variables : list of str, optional
+        A list of variables to be used for clustering (default: all variables).
+    kwargs : dict
+        Extra keyword arguments passed on to MiniBatchKMeans.
+
+    Returns
+    -------
+    clustered, labels : (MiniBatchKMeans, xarray.DataArray)
+        Returns the fitted MiniBatchKMeans instance and an xarray.DataArray
+        with the cluster labels.
+    """
+
     if variables is None:
         variables = [v for v in ds.data_vars
                      if 'lat' in ds[v].coords and 'lon' in ds[v].coords]
@@ -54,6 +83,13 @@ def cluster(ds, **kwargs):
     At each time step, cluster the pixels according to their C2 matrix elements
     into `k` different clusters, using the previously found clusters as initial
     cluster centers for the next time step.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset.
+    kwargs : dict
+        Extra keyword arguments to be passed on to _cluster().
     """
     ls = []
     km_args = kwargs.copy()
@@ -71,6 +107,18 @@ def cluster(ds, **kwargs):
 # Use the initial clustering result to normalize values.
 #
 def norm_by_cluster(ds, labels=None, n_clusters=10):
+    """
+    Norm each pixel by the average per cluster.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset.
+    labels : str, optional
+        If None, cluster first (default: None).
+    n_clusters : int, optional
+        Only used if labels is None. Passed on to _cluster() (default: 10).
+    """
     if labels is None:
         # Cluster the pixels at time 0.
         clust, labels = _cluster(ds.isel(time=0), n_clusters=n_clusters)

@@ -14,9 +14,11 @@ def nlmeans(ds, r, sigma, h, f=1, **kwargs):
     Parameters
     ----------
     ds : xarray.Dataset
+        The input dataset.
     r : dict
         e.g. {'lat': 3, 'lon': 3, 'time': 1}
     sigma : float
+        The standard deviation of the noise present in the data.
     h : float
     dims : tuple
     f : int
