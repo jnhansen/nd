@@ -4,7 +4,7 @@
 """
 
 import numpy as np
-import scipy.ndimage.filters
+import scipy.ndimage.filters as snf
 import cv2
 from .nlmeans_ import nlmeans
 
@@ -16,7 +16,7 @@ def _convolve(arr, kernel, out=None):
     Low-level convolution function.
     """
     print(arr.shape, kernel.shape)
-    return scipy.ndimage.filters.convolve(arr, kernel)
+    return snf.convolve(arr, kernel)
     # return cv2.filter2D(arr, ddepth=-1, kernel=kernel, anchor=(-1, -1),
     #                     delta=0, borderType=cv2.BORDER_REFLECT)
 
@@ -87,7 +87,7 @@ def convolve(ds, kernel, dims=('lat', 'lon')):
 
     # Make sure the dimensions we want to filter are first.
     # dims = ('lat', 'lon')
-    ordered_dims = dims + tuple(set(ds.dims) - set(dims))
+    ordered_dims = tuple(dims) + tuple(set(ds.dims) - set(dims))
 
     # Create new dataset (allocate memory).
     ds_ordered = ds.transpose(*ordered_dims)
@@ -122,6 +122,68 @@ def boxcar(ds, w, dims=('lat', 'lon'), **kwargs):
     N = len(dims)
     kernel = np.ones((w,) * N, dtype=np.float64) / w**N
     return convolve(ds, kernel=kernel, dims=dims, **kwargs)
+
+
+def gaussian(ds, sigma, dims=('lat', 'lon'), **kwargs):
+    """
+    A Gaussian filter.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset
+    sigma : float or sequence of float
+        The standard deviation for the Gaussian kernel. If sequence, this is
+        set individually for each dimension.
+    dims : tuple of str
+        The dimensions along which to apply the Gaussian filtering.
+    kwargs : dict
+        Extra keyword arguments passed on to
+        scipy.ndimage.filters.gaussian_filter.
+
+    Returns
+    -------
+    xarray.Dataset
+        The filtered dataset.
+    """
+    if isinstance(sigma, (int, float)):
+        sigma = [sigma] * len(dims)
+
+    # Make sure the dimensions we want to filter are first.
+    # dims = ('lat', 'lon')
+    ordered_dims = tuple(dims) + tuple(set(ds.dims) - set(dims))
+
+    # Create new dataset (allocate memory).
+    ds_ordered = ds.transpose(*ordered_dims)
+    ds_gauss = ds_ordered.copy()
+
+    # Apply filter to every variable that contains all dimensions
+    # given in `dim`.
+    for v in ds_gauss.data_vars:
+        # Skip variables that do not contain all specified dimensions.
+        vdims = ds_gauss[v].dims
+        if not set(vdims).issuperset(set(dims)):
+            continue
+
+        # Generate n-dimensional sigma
+        ndsigma = [0] * len(vdims)
+        for d, s in zip(dims, sigma):
+            ndsigma[vdims.index(d)] = s
+
+        values = ds_gauss[v].values
+
+        if np.iscomplexobj(values):
+            re_gauss = snf.gaussian_filter(np.real(values), sigma=ndsigma,
+                                           **kwargs)
+            im_gauss = snf.gaussian_filter(np.imag(values), sigma=ndsigma,
+                                           **kwargs)
+            v_gauss = re_gauss + 1j * im_gauss
+        else:
+            v_gauss = snf.gaussian_filter(values, sigma=ndsigma, **kwargs)
+
+        ds_gauss[v] = (ds_gauss[v].dims, v_gauss)
+
+    return ds_gauss
 
 
 # def multilook(ds, w=3):
