@@ -1,8 +1,16 @@
 from setuptools import setup, Extension
 import subprocess
 import os
-import numpy
-import cython_gsl
+try:
+    import numpy
+except (ImportError, ModuleNotFoundError):
+    raise ImportError('This package requires "numpy" to be installed. '
+                      'Install it first: "pip install numpy".')
+try:
+    import cython_gsl
+except (ImportError, ModuleNotFoundError):
+    raise ImportError('This package requires "cythongsl" to be installed. '
+                      'Install it first: "pip install cythongsl".')
 
 mock_install = os.environ.get('READTHEDOCS') == 'True'
 
@@ -41,7 +49,7 @@ extensions = [
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("nd.filter._nlmeans", ["nd/filter/_nlmeans" + ext],
+    Extension("nd.filters._nlmeans", ["nd/filters/_nlmeans" + ext],
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
@@ -82,5 +90,8 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     include_dirs=include_dirs,
-    install_requires=install_requires
+    install_requires=install_requires,
+    # extras_require={
+    #     'gdal': ["pygdal>={},<={}".format(*gdal_version_range)]
+    # }
 )

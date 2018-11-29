@@ -6,7 +6,7 @@ TODO: Make all functions work with xarray Datasets
 
 """
 from ..io import disassemble_complex
-from ..filter import boxcar
+from ..filters import boxcar
 from .change_ import ChangeDetection
 import numpy as np
 import xarray as xr

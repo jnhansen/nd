@@ -1,4 +1,4 @@
-from nd.filter import nlmeans
+from nd.filters import nlmeans
 from nd.testing import generate_test_dataset, assert_all_true
 import numpy as np
 

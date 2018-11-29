@@ -1,4 +1,4 @@
-from nd.filter import _convolve, convolve, boxcar, _expand_kernel
+from nd.filters import _convolve, convolve, boxcar, _expand_kernel
 from nd.testing import generate_test_dataset
 from nd.io import assemble_complex
 import numpy as np
