@@ -8,7 +8,7 @@ import scipy.ndimage.filters as snf
 import cv2
 from .nlmeans_ import nlmeans
 
-__all__ = ['convolve', 'boxcar', 'nlmeans']
+__all__ = ['convolve', 'boxcar', 'nlmeans', 'gaussian']
 
 
 def _convolve(arr, kernel, out=None):
