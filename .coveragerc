@@ -1,5 +1,5 @@
 [run]
-source=geo
-include=*/geo/*
+source=nd
+include=*/nd/*
 omit=
     */test_*.py
