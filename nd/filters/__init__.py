@@ -54,7 +54,7 @@ def _expand_kernel(kernel, kernel_dims, new_dims):
     if not set(new_dims).issuperset(set(kernel_dims)):
         raise ValueError('`new_dims` must be a superset of `kernel_dims`.')
 
-    if kernel.ndim == len(kernel_dims):
+    if kernel.ndim != len(kernel_dims):
         raise ValueError('The length of `kernel_dims` must match the '
                          'dimension of `kernel`.')
 
