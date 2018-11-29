@@ -7,10 +7,17 @@ TODO: Make all functions work with xarray Datasets
 """
 from ..io import disassemble_complex
 from ..filter import boxcar
-from . import _omnibus
 from .change_ import ChangeDetection
 import numpy as np
 import xarray as xr
+# Cannot install libgsl-dev on ReadTheDocs.
+# So if we are building the documentation ignore the error raised.
+try:
+    from . import _omnibus
+except:
+    import os
+    if os.environ.get('READTHEDOCS') != 'True':
+        raise
 
 
 def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
