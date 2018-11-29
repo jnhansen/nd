@@ -1,8 +1,2 @@
-matplotlib
-pandas
 numpy
-scipy
-xarray
-gdal
-netcdf4
-rasterio
+cythongsl
