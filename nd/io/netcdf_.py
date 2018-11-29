@@ -35,6 +35,7 @@ def from_netcdf(path, *args, **kwargs):
     Returns
     -------
     xarray.Dataset
+        The opened dataset.
     """
     # Make sure to load as lazy dask arrays:
     if 'chunks' not in kwargs:

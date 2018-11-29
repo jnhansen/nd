@@ -28,7 +28,7 @@ def _make_gdal_dataset(data, src, extent=None, outfile=None, driver='auto'):
 
     Parameters
     ----------
-    data :
+    data : ndarray
     src : gdal.Dataset
     driver : GDAL driver, optional
     outfile : optional
@@ -113,6 +113,7 @@ def from_gdal_dataset(gdal_ds):
     Returns
     -------
     xarray.Dataset
+        The same dataset converted to xarray.
     """
     if not isinstance(gdal_ds, gdal.Dataset):
         if isinstance(gdal_ds, str):

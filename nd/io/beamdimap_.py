@@ -24,6 +24,7 @@ def from_beam_dimap(path, read_data=True):
     Returns
     -------
     xarray.Dataset
+        The same dataset converted into xarray.
     """
     # -------------------------------------------------------------------------
     # Read metadata

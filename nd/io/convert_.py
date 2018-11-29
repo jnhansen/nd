@@ -10,7 +10,15 @@ def disassemble_complex(ds):
     Parameters
     ----------
     ds : xarray.Dataset
+        The input dataset with complex variables.
+
+    Returns
+    -------
+    xarray.Dataset
+        A dataset where all complex variables have been split into their real
+        and imaginary parts.
     """
+
     new_ds = ds.copy()
     #
     # Find all complex variables and disassemble into their real and
@@ -37,7 +45,16 @@ def assemble_complex(ds, inplace=False):
     Parameters
     ----------
     ds : xarray.Dataset
+        The input dataset with complex variables split into real and imaginary
+        parts.
+
+    Returns
+    -------
+    xarray.Dataset
+        A dataset where the real and imaginary parts have been combined into
+        the respective complex variables.
     """
+
     if inplace:
         new_ds = ds
     else:
@@ -72,6 +89,19 @@ def assemble_complex(ds, inplace=False):
 
 
 def add_time(ds, inplace=False):
+    """
+    Add a `time` dimension to the dataset.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        A dataset that is guaranteed to contain the dimension `time`.
+    """
     if not inplace:
         result = ds.copy()
     else:
@@ -91,12 +121,18 @@ def dualpol_to_complex(ds, inplace=False):
     Parameters
     ----------
     ds : xarray.Dataset
+        The input dataset in dual polarized format. Must contain the bands
+        'i_VV.img', 'q_VV.img', 'i_VH.img', 'q_VH.img'.
+    inplace : bool, optional
+        If False, create a copy of the dataset, otherwise alter the dataset
+        inplace (default: False).
 
     Returns
     -------
     xarray.Dataset
-        complex valued data
+        A dataset with complex-valued variables 'VV' and 'VH'.
     """
+
     if inplace:
         ds_c = ds
     else:
@@ -130,7 +166,9 @@ def generate_covariance_matrix(ds, compact=False):
     Returns
     -------
     numpy.array, shape (M, N, 2, 2)
+
     """
+
     if isinstance(ds, xr.Dataset):
         ds_cov = ds.copy()
         vh = ds['VH']
