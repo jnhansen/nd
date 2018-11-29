@@ -6,7 +6,7 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError('scikit-learn is required for this module.')
 
 import numpy as np
-from ..filter import boxcar
+from ..filters import boxcar
 
 
 __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
