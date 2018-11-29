@@ -14,6 +14,12 @@
 #
 import os
 import sys
+import glob
+from operator import attrgetter
+import inspect
+import subprocess
+
+
 try:
     import nd
 except ImportError:
@@ -23,8 +29,6 @@ else:
         os.path.join(os.path.dirname(nd.__file__), '..')
     )
 sys.path.insert(0, nd_path)
-
-# from github_links import make_linkcode_resolve
 
 # -- Project information -----------------------------------------------------
 
@@ -51,10 +55,11 @@ extensions = [
     'sphinxcontrib.apidoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.autodoc',
+    'sphinx.ext.linkcode',
     'sphinx.ext.napoleon',
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
+    # 'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
 ]
 
@@ -122,6 +127,54 @@ html_static_path = ['_static']
 
 html_favicon = 'logos/favicon.ico'
 html_logo = 'logos/nd_text.png'
+
+
+# Determine github source links:
+def linkcode_resolve(domain, info):
+    url = u'https://github.com/jnhansen/nd/tree/{revision}/'\
+          '{package}/{path}#L{lineno}'
+
+    # Determined git revision
+    try:
+        revision = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD']
+        ).strip()
+    except (subprocess.CalledProcessError, OSError):
+        return None
+
+    revision = revision.decode('utf-8')
+
+    package = 'nd'
+    if domain not in ('py', 'pyx'):
+        return
+    if not info.get('module') or not info.get('fullname'):
+        return
+
+    class_name = info['fullname'].split('.')[0]
+    module = __import__(info['module'], fromlist=[class_name])
+    obj = attrgetter(info['fullname'])(module)
+
+    try:
+        path = inspect.getsourcefile(obj)
+    except Exception:
+        path = None
+    if not path:
+        try:
+            path = inspect.getsourcefile(sys.modules[obj.__module__])
+        except Exception:
+            path = None
+    if not path:
+        return
+
+    path = os.path.relpath(path,
+                           start=os.path.dirname(__import__(package).__file__))
+    try:
+        lineno = inspect.getsourcelines(obj)[1]
+    except Exception:
+        lineno = ''
+    return url.format(revision=revision, package=package,
+                      path=path, lineno=lineno)
+
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -210,5 +263,4 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
-import glob
 autosummary_generate = glob.glob("reference/*.rst")
