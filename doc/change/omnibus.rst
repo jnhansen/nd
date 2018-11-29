@@ -60,6 +60,11 @@ The test statistic can be translated into a probability :math:`p(H_0)`.
 The hypothesis test is repeated iteratively over subsets of the time series in order to determine the actual time of change.
 
 
+.. topic:: See Also:
+
+ * :class:`nd.change.OmnibusTest`
+
+
 .. topic:: References:
 
  * Conradsen, K., Nielsen, A. A., & Skriver, H. (2016).
