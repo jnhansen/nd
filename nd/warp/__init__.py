@@ -7,7 +7,7 @@ TODO: remove clutter in main()
 
 """
 # somehow need to import gdal first ...
-from .io import from_netcdf, to_netcdf
+from ..io import from_netcdf, to_netcdf
 from osgeo import gdal, osr
 import numpy as np
 import pandas as pd
@@ -15,12 +15,10 @@ import xarray as xr
 from dask import delayed
 import os
 import glob
-# from scipy.ndimage import interpolation
 from scipy import interpolate
 from scipy.ndimage._ni_support import _extend_mode_to_code
-# import (_extend_mode_to_code, map_coordinates , geometric_transform)
 from scipy.ndimage import _nd_image
-from . import utils
+from .. import utils
 from ._warp import c_grid, CoordTransform
 import time
 import warnings
