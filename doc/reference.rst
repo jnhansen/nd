@@ -10,4 +10,4 @@ API Reference
 .. toctree::
    :maxdepth: 3
 
-   reference/nd
+   api/nd
