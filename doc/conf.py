@@ -52,7 +52,7 @@ release = ''
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinxcontrib.apidoc',
+    # 'sphinxcontrib.apidoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.autodoc',
     'sphinx.ext.linkcode',
@@ -64,12 +64,12 @@ extensions = [
 ]
 
 # apidoc configuration
-apidoc_module_dir = '../nd'
-apidoc_output_dir = 'reference'
-apidoc_excluded_paths = ['**/tests', 'test_*', '**/test_*',
-                         '**/*.pyx', '**/*.pxd']
-apidoc_separate_modules = False
-apidoc_toc_file = False
+# apidoc_module_dir = '../nd'
+# apidoc_output_dir = 'api'
+# apidoc_excluded_paths = ['**/tests', 'test_*', '**/test_*',
+#                          '**/*.pyx', '**/*.pxd']
+# apidoc_separate_modules = False
+# apidoc_toc_file = False
 
 # Mock imports for autodoc
 autodoc_mock_imports = ['matplotlib', 'cv2', 'dask', 'xarray', 'scipy',
@@ -263,4 +263,4 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
-autosummary_generate = glob.glob("reference/*.rst")
+autosummary_generate = glob.glob("api/*.rst")
