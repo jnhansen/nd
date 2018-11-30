@@ -7,7 +7,7 @@ TODO: Make all functions work with xarray Datasets
 """
 from ..io import disassemble_complex
 from ..filters import boxcar
-from .change_ import ChangeDetection
+from . import ChangeDetection
 import numpy as np
 import xarray as xr
 # Cannot install libgsl-dev on ReadTheDocs.
