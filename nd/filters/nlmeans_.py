@@ -1,9 +1,9 @@
 import numpy as np
-from ..utils import get_vars_for_dims, expand_variables
 from ._nlmeans import _pixelwise_nlmeans_3d
+from .filter_ import Filter
 
 
-def nlmeans(ds, r, sigma, h, f=1, **kwargs):
+class NLMeansFilter(Filter):
     """
     Non-Local Means (Buades2011).
 
@@ -13,45 +13,33 @@ def nlmeans(ds, r, sigma, h, f=1, **kwargs):
 
     Parameters
     ----------
-    ds : xarray.Dataset
-        The input dataset.
-    r : dict
-        e.g. {'lat': 3, 'lon': 3, 'time': 1}
+    dims : tuple of str
+        The dataset dimensions along which to filter.
+    r : {int, sequence}
+        The radius
     sigma : float
         The standard deviation of the noise present in the data.
     h : float
-    dims : tuple
     f : int
-
     """
-    orig_dims = tuple(ds.dims)
-    dims = tuple(r.keys())
 
-    r_ = np.array(list(r.values()), dtype=np.uint32)
-    f_ = np.array([f if _ > 0 else 0 for _ in r_], dtype=np.uint32)
+    per_variable = False
 
-    variables = get_vars_for_dims(ds, dims)
-    other_variables = get_vars_for_dims(ds, dims, invert=True)
+    def __init__(self, dims, r, sigma, h, f=1):
+        if isinstance(r, (int, float)):
+            r = [r] * len(dims)
+        self.dims = tuple(dims)
+        # Pad r and f to three dimensions
+        _r = np.array(r, dtype=np.uint32)
+        _f = np.array([f if _ > 0 else 0 for _ in _r], dtype=np.uint32)
+        pad = np.zeros(3 - len(_r), dtype=_r.dtype)
+        self.r = np.concatenate([pad, _r])
+        self.f = np.concatenate([pad, _f])
+        self.sigma = sigma
+        self.h = h
 
-    ordered_dims = dims + tuple(set(orig_dims) - set(dims)) + ('variable',)
-
-    # convert to DataArray
-    da_ordered = ds[variables].to_array().transpose(*ordered_dims)
-    da_filtered = da_ordered.copy()
-
-    # Pad dimensions to 3D (4D with variables)
-    # Extra dimensions are prepended
-    arr = np.array(da_ordered.values, ndmin=4, copy=False)
-    output = np.array(da_filtered.values, ndmin=4, copy=False)
-    pad = np.zeros(3 - len(r_), dtype=r_.dtype)
-    r_ = np.concatenate([pad, r_])
-    f_ = np.concatenate([pad, f_])
-
-    _pixelwise_nlmeans_3d(arr, output, r_, f_, sigma, h)
-
-    result = expand_variables(da_filtered).transpose(*orig_dims)
-
-    for v in other_variables:
-        result[v] = ds[v]
-
-    return result
+    def _filter(self, arr, axes, output):
+        values = np.array(arr, ndmin=4, copy=False)
+        _out = np.array(output, ndmin=4, copy=False)
+        _pixelwise_nlmeans_3d(values, _out, self.r, self.f,
+                              self.sigma, self.h)

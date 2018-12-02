@@ -7,7 +7,10 @@ in an arbitrary number of dimensions.
 .. autofunction:: _expand_kernel
 """
 
-from .nlmeans_ import nlmeans
-from .convolve_ import convolve, boxcar, gaussian, _expand_kernel
+from .filter_ import Filter
+from .nlmeans_ import NLMeansFilter
+from .convolve_ import ConvolutionFilter, BoxcarFilter, GaussianFilter, \
+                       _expand_kernel
 
-__all__ = ['convolve', 'boxcar', 'nlmeans', 'gaussian', '_expand_kernel']
+__all__ = ['Filter', 'ConvolutionFilter', 'BoxcarFilter', 'GaussianFilter',
+           'NLMeansFilter', '_expand_kernel']
