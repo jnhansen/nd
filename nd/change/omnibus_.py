@@ -6,7 +6,7 @@ TODO: Make all functions work with xarray Datasets
 
 """
 from ..io import disassemble_complex
-from ..filters import boxcar
+from ..filters import BoxcarFilter
 from . import ChangeDetection
 import numpy as np
 import xarray as xr
@@ -14,7 +14,7 @@ import xarray as xr
 # So if we are building the documentation ignore the error raised.
 try:
     from . import _omnibus
-except:
+except Exception:
     import os
     if os.environ.get('READTHEDOCS') != 'True':
         raise
@@ -50,7 +50,7 @@ def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
 
     # Multilooking
     if ml is not None:
-        ds_m = boxcar(ds_m, w=ml)
+        ds_m = BoxcarFilter(w=ml).apply(ds_m)
         n = ml ** 2
 
     values = ds_m[['C11', 'C12__re', 'C12__im', 'C22']].to_array() \
