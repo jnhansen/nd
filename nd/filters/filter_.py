@@ -17,9 +17,11 @@ class Filter(Algorithm):
     # each variable. Otherwise, all variables may be used to determine the
     # filter weights.
     per_variable = True
+    dims = ()
 
-    def __init__(self, dims):
-        self.dims = tuple(dims)
+    @abstractmethod
+    def __init__(self, *args, **kwargs):
+        return
 
     def apply(self, ds, inplace=False):
         """

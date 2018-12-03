@@ -65,7 +65,9 @@ class ConvolutionFilter(Filter):
     per_variable = True
     kwargs = {}
 
-    def __init__(self, dims, kernel, **kwargs):
+    def __init__(self, dims, kernel=None, **kwargs):
+        if kernel is None:
+            kernel = np.ones([1] * len(dims))
         self.dims = tuple(dims)
         self.kernel = kernel
         self.kwargs = kwargs
@@ -101,7 +103,7 @@ class BoxcarFilter(ConvolutionFilter):
         ``scipy.ndimage.filters.convolve``.
     """
 
-    def __init__(self, dims, w, **kwargs):
+    def __init__(self, dims, w=3, **kwargs):
         N = len(dims)
         self.dims = tuple(dims)
         self.kernel = np.ones((w,) * N, dtype=np.float64) / w**N
@@ -130,7 +132,7 @@ class GaussianFilter(Filter):
         The filtered dataset.
     """
 
-    def __init__(self, dims, sigma, **kwargs):
+    def __init__(self, dims, sigma=1, **kwargs):
         if isinstance(sigma, (int, float)):
             sigma = [sigma] * len(dims)
         self.dims = tuple(dims)
