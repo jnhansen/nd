@@ -72,11 +72,12 @@ class OmnibusTest(ChangeDetection):
     OmnibusTest
     """
 
-    def __init__(self, ml=None, n=1, *args, **kwargs):
+    def __init__(self, ml=None, n=1, alpha=0.01, *args, **kwargs):
         self.ml = ml
         self.n = n
+        self.alpha = alpha
         super().__init__(*args, **kwargs)
 
-    def detect(self, ds, alpha=0.01):
-        return _change_detection(ds, alpha=alpha, ml=self.ml, n=self.n,
+    def apply(self, ds):
+        return _change_detection(ds, alpha=self.alpha, ml=self.ml, n=self.n,
                                  njobs=self.njobs)
