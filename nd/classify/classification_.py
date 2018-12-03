@@ -1,8 +1,3 @@
-"""
-.. document private functions
-.. autofunction:: _cluster
-"""
-
 import xarray as xr
 try:
     from sklearn.cluster import MiniBatchKMeans
@@ -11,7 +6,7 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError('scikit-learn is required for this module.')
 
 import numpy as np
-from ..filters import boxcar
+from ..filters import BoxcarFilter
 
 
 __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
@@ -37,7 +32,7 @@ def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
 
     Returns
     -------
-    clustered, labels : (MiniBatchKMeans, xarray.DataArray)
+    clustered, labels : tuple (MiniBatchKMeans, xarray.DataArray)
         Returns the fitted MiniBatchKMeans instance and an xarray.DataArray
         with the cluster labels.
     """
@@ -50,7 +45,8 @@ def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
     if ml == 0 or ml is None:
         values = df.values
     else:
-        df_ml = boxcar(ds[variables], w=ml).to_dataframe()[variables]
+        df_ml = BoxcarFilter(w=ml).apply(ds[variables]) \
+            .to_dataframe()[variables]
         values = np.concatenate([df.values, df_ml.values], axis=1)
     if scale:
         values = preprocessing.scale(values)
@@ -63,11 +59,11 @@ def _cluster_smooth(ds, ml=5, scale=True, **kwargs):
     datavars = [v for v in ds.data_vars
                 if 'lat' in ds[v].coords and 'lon' in ds[v].coords]
     # The redundant [datavars] is necessary to remove the `time` coordinate
-    multilooked = boxcar(ds[datavars], w=ml)
+    multilooked = BoxcarFilter(w=ml).apply(ds[datavars])
     # Calculate variance:
     diff = (ds - multilooked)
     diff_sq = diff * diff
-    ds_var = boxcar(diff_sq[datavars], w=ml) * ml**2
+    ds_var = BoxcarFilter(w=ml).apply(diff_sq[datavars]) * ml**2
     df_ml = multilooked.to_dataframe()[datavars]
     df_var = ds_var.to_dataframe()[datavars]
     values = np.concatenate([df_ml.values, df_var.values], axis=1)
@@ -151,3 +147,36 @@ def _clustermean(ds, labels):
             where.mean(dim=['lat', 'lon']).compute()
         )
     return _means
+
+
+class Classifier:
+
+    def __init__(self, cls):
+        self.cls = cls
+
+    def fit(self, ds, labels):
+        """
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            The dataset on which to train the classifier.
+        labels : xarray.DataArray
+            The class labels to train the classifier.
+        """
+        self.cls.fit(...)
+        pass
+
+    def predict(self, ds):
+        """
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            The dataset for which to predict the class labels.
+
+        Returns
+        -------
+        xarray.DataArray
+            The predicted class labels.
+        """
+        # labels = self.cls.predict(...)
+        pass
