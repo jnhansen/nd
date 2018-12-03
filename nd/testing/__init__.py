@@ -2,6 +2,10 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import json
+import pkgutil
+import inspect
+import nd
+from nd.algorithm import Algorithm
 
 
 def generate_test_dataset(nlat=20, nlon=20, ntime=10,
@@ -73,3 +77,28 @@ def assert_all_true(ds):
 #     lat = (xy_poly * coefs_lat).sum(axis=1).reshape(shape)
 #     lon = (xy_poly * coefs_lon).sum(axis=1).reshape(shape)
 #     return lat, lon
+
+
+def all_algorithms(parent=nd):
+    """
+    Return a list of all algorithms.
+    """
+    all_classes = []
+    path = parent.__path__
+    prefix = parent.__name__ + '.'
+
+    for importer, modname, ispkg in pkgutil.walk_packages(
+            path=path, prefix=prefix, onerror=lambda x: None):
+        if (".tests." in modname):
+            continue
+        module = __import__(modname, fromlist="dummy")
+        classes = inspect.getmembers(module, inspect.isclass)
+        all_classes.extend(classes)
+
+    all_classes = set(all_classes)
+
+    algorithms = [c for c in all_classes
+                  if (issubclass(c[1], Algorithm) and
+                      c[0] != 'Algorithm')]
+
+    return algorithms
