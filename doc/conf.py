@@ -73,7 +73,7 @@ extensions = [
 
 # Mock imports for autodoc
 autodoc_mock_imports = ['matplotlib', 'cv2', 'dask', 'xarray', 'scipy',
-                        'affine', 'sklearn', 'osgeo',
+                        'affine', 'sklearn', 'osgeo', 'rasterio',
                         'dateutil', 'pandas', 'lxml']
 autodoc_warningiserror = False
 

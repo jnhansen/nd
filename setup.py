@@ -75,6 +75,7 @@ if not mock_install:
         "dask[dataframe]",
         "lxml",
         "pygdal>={},<={}".format(*gdal_version_range),
+        "rasterio",
         "pandas",
         "python-dateutil",
         "matplotlib",
