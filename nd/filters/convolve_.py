@@ -53,7 +53,7 @@ class ConvolutionFilter(Filter):
     ----------
     dims : tuple, optional
         The dataset dimensions corresponding to the kernel axes
-        (default: ('lat', 'lon')). The length of the tuple must match the
+        (default: ('y', 'x')). The length of the tuple must match the
         number of dimensions of the kernel.
     kernel : ndarray
         The convolution kernel.
@@ -94,7 +94,7 @@ class BoxcarFilter(ConvolutionFilter):
     ----------
     dims : tuple of str
         The dimensions along which to apply the filter
-        (default: ('lat', 'lon')).
+        (default: ('y', 'x')).
     w : int
         The width of the boxcar window. Should be an odd integer in order to
         ensure symmetry.
@@ -118,7 +118,7 @@ class GaussianFilter(Filter):
     ----------
     dims : tuple of str, optioal
         The dimensions along which to apply the Gaussian filtering
-        (default: ('lat', 'lon')).
+        (default: ('y', 'x')).
     sigma : float or sequence of float
         The standard deviation for the Gaussian kernel. If sequence, this is
         set individually for each dimension.

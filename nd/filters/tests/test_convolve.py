@@ -32,7 +32,7 @@ def test_convolve_ndarray():
 
 
 def test_convolve_dataset_identity():
-    dims = ('lat', 'lon')
+    dims = ('y', 'x')
     convolved = ConvolutionFilter(dims, identity_kernel).apply(ds)
     xr_assert_identical(ds, convolved)
 
@@ -40,7 +40,7 @@ def test_convolve_dataset_identity():
 def test_convolve_dataset():
     np.random.seed(42)
     kernel = np.random.rand(5, 5)
-    dims = ('lat', 'lon')
+    dims = ('y', 'x')
     nd_kernel = _expand_kernel(kernel, dims, ds.C11.dims)
     assert_equal(
         ConvolutionFilter(dims, kernel).apply(ds).C11.values,
@@ -51,7 +51,7 @@ def test_convolve_dataset():
 def test_convolve_complex():
     ds_complex = assemble_complex(ds)
     convolved_complex = ConvolutionFilter(
-        ('lat', 'lon'), identity_kernel).apply(ds_complex)
+        ('y', 'x'), identity_kernel).apply(ds_complex)
     xr_assert_identical(
         ds_complex, convolved_complex
     )
@@ -59,7 +59,7 @@ def test_convolve_complex():
 
 def test_boxcar():
     w = 5
-    dims = ('lat', 'lon')
+    dims = ('y', 'x')
     kernel = np.ones((w, w)) / w**2
     xr_assert_identical(
         BoxcarFilter(dims, w).apply(ds),

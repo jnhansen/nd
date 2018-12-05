@@ -302,7 +302,7 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
         *Must* take an xarray.Dataset as first argument.
     dim : str, optional
         The dimension along which to split the dataset for parallel execution.
-        If not passed, try 'lat' as default dimension.
+        If not passed, try 'y' as default dimension.
     chunks : int, optional
         The number of chunks to execute in parallel. If not passed, use the
         number of available CPUs.
@@ -321,7 +321,7 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
         arguments as `fn`.
     """
     if dim is None:
-        dim = 'lat'
+        dim = 'y'
     if chunks is None:
         chunks = mp.cpu_count()
 

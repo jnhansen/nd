@@ -11,7 +11,7 @@ from nd.filters import Filter
 from nd.testing import generate_test_dataset
 
 
-ds = generate_test_dataset(nlat=20, nlon=30, ntime=10)
+ds = generate_test_dataset(ny=20, nx=30, ntime=10)
 filters = [alg for alg in all_algorithms(nd.filters)
            if issubclass(alg[1], Filter) and alg[0] != 'Filter']
 filter_classes = [_[1] for _ in filters]
@@ -20,7 +20,7 @@ filter_classes = [_[1] for _ in filters]
 @pytest.mark.parametrize('f', filter_classes)
 def test_filter_input_output(f):
     instance = f(
-        dims=('lat', 'lon')
+        dims=('y', 'x')
     )
     result = instance.apply(ds)
 
@@ -29,6 +29,7 @@ def test_filter_input_output(f):
 
     # Check that the variable dimensions are unchanged.
     for v in ds.data_vars:
+        print(ds[v].dims, result[v].dims)
         assert_equal(ds[v].dims, result[v].dims)
         assert_equal(ds[v].shape, result[v].shape)
 
@@ -45,6 +46,6 @@ def test_filter_mutable_dimension(f):
     # Check that changing the order of dimensions doesn't change
     # the outcome up to numeric precision.
     xr_assert_allclose(
-        f(dims=('lat', 'lon')).apply(ds),
-        f(dims=('lon', 'lat')).apply(ds)
+        f(dims=('y', 'x')).apply(ds),
+        f(dims=('x', 'y')).apply(ds)
     )

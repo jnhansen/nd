@@ -10,7 +10,7 @@ ds = generate_test_dataset()
 def test_gaussian_scalar_sigma():
     sigma = 1
     ds_gauss = GaussianFilter(
-        dims=('lat', 'lon', 'time'), sigma=sigma).apply(ds)
+        dims=('y', 'x', 'time'), sigma=sigma).apply(ds)
     values_gauss = snf.gaussian_filter(ds.C11.values, sigma=sigma)
     assert_equal(ds_gauss.C11.values, values_gauss)
 
@@ -20,7 +20,7 @@ def test_gaussian_ignore_dimensions():
     # are not used for the Gaussian filter.
     sigma = 1
     ds_gauss = GaussianFilter(
-        dims=('lat', 'lon'), sigma=sigma).apply(ds).isel(time=0)
+        dims=('y', 'x'), sigma=sigma).apply(ds).isel(time=0)
     values_gauss = snf.gaussian_filter(
         ds.C11.isel(time=0).values, sigma=sigma
     )

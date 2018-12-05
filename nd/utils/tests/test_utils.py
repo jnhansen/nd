@@ -85,14 +85,14 @@ def test_select_dict_first():
 def test_get_vars_for_dims():
     ds = generate_test_dataset(var=['var1', 'var2'])
     ds['other'] = 1
-    ds['spatial'] = (('lat', 'lon'),
-                     np.ones((ds.dims['lat'], ds.dims['lon'])))
+    ds['spatial'] = (('y', 'x'),
+                     np.ones((ds.dims['y'], ds.dims['x'])))
     all_vars = {'var1', 'var2', 'other', 'spatial'}
 
     for dims, variables in [
         ([], all_vars),
-        (['lat', 'lon'], {'var1', 'var2', 'spatial'}),
-        (['lat', 'lon', 'time'], {'var1', 'var2'})
+        (['y', 'x'], {'var1', 'var2', 'spatial'}),
+        (['y', 'x', 'time'], {'var1', 'var2'})
     ]:
         assert_equal(
             set(utils.get_vars_for_dims(ds, dims)),

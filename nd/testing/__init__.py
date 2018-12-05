@@ -5,27 +5,33 @@ import json
 import pkgutil
 import inspect
 import nd
+import rasterio.transform
 from nd.algorithm import Algorithm
 
 
-def generate_test_dataset(nlat=20, nlon=20, ntime=10,
+def generate_test_dataset(ny=20, nx=20, ntime=10,
                           var=['C11', 'C12__im', 'C12__re', 'C22'],
                           mean=0, sigma=1,
                           extent=(-10.0, 50.0, 0.0, 60.0),
-                          random_seed=42):
+                          random_seed=42,
+                          crs='+init=epsg:4326'):
 
     np.random.seed(random_seed)
-    lats = np.linspace(extent[1], extent[3], nlat)
-    lons = np.linspace(extent[0], extent[2], nlon)
+    ys = np.linspace(extent[1], extent[3], ny)
+    xs = np.linspace(extent[0], extent[2], nx)
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
     times = pd.date_range('2017-01-01', '2018-01-01', periods=ntime)
-    ds = xr.Dataset(coords={'lat': lats, 'lon': lons, 'time': times},
+    ds = xr.Dataset(coords={'y': ys, 'x': xs, 'time': times},
                     attrs=meta)
+    transform = rasterio.transform.from_bounds(
+        *extent, width=nx-1, height=ny-1)
+    ds.attrs['crs'] = crs
+    ds.attrs['transform'] = transform
     if isinstance(mean, (int, float)):
         mean = [mean] * len(var)
     for v, m in zip(var, mean):
-        ds[v] = (('lat', 'lon', 'time'),
-                 np.random.normal(m, sigma, (nlat, nlon, ntime)))
+        ds[v] = (('y', 'x', 'time'),
+                 np.random.normal(m, sigma, (ny, nx, ntime)))
     return ds
 
 

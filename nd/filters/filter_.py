@@ -43,6 +43,8 @@ class Filter(Algorithm):
             raise NotImplementedError('Inplace filtering is not currently '
                                       'implemented.')
 
+        # This is not in the correct order, as ds.dims is always sorted
+        # alphabetically.
         orig_dims = tuple(ds.dims)
         ordered_dims = self.dims + tuple(set(orig_dims) - set(self.dims))
 
@@ -76,7 +78,11 @@ class Filter(Algorithm):
             self._filter(da_ordered.values, axes, output=da_filtered.values)
 
             # Reassemble Dataset
-            result = expand_variables(da_filtered).transpose(*orig_dims)
+            result = expand_variables(da_filtered)
+            # Make sure all variable dimensions are in the original order
+            for v in result.data_vars:
+                result[v] = result[v].transpose(*ds[v].dims)
+
             for v in other_variables:
                 result[v] = ds[v]
 
