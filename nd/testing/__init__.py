@@ -6,7 +6,10 @@ import pkgutil
 import inspect
 import nd
 import rasterio.transform
+import rasterio.warp
+from numpy.testing import assert_equal, assert_almost_equal
 from nd.algorithm import Algorithm
+from nd.warp.warp_ import _parse_crs
 
 
 def generate_test_dataset(ny=20, nx=20, ntime=10,
@@ -17,21 +20,30 @@ def generate_test_dataset(ny=20, nx=20, ntime=10,
                           crs='+init=epsg:4326'):
 
     np.random.seed(random_seed)
-    ys = np.linspace(extent[1], extent[3], ny)
-    xs = np.linspace(extent[0], extent[2], nx)
+    coords = {}
+    dims = {}
+    if ny:
+        coords['y'] = np.linspace(extent[1], extent[3], ny)
+        dims['y'] = ny
+    if nx:
+        coords['x'] = np.linspace(extent[0], extent[2], nx)
+        dims['x'] = nx
+    if ntime:
+        coords['time'] = pd.date_range('2017-01-01', '2018-01-01',
+                                       periods=ntime)
+        dims['time'] = ntime
+
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
-    times = pd.date_range('2017-01-01', '2018-01-01', periods=ntime)
-    ds = xr.Dataset(coords={'y': ys, 'x': xs, 'time': times},
-                    attrs=meta)
+    ds = xr.Dataset(coords=coords, attrs=meta)
     transform = rasterio.transform.from_bounds(
         *extent, width=nx-1, height=ny-1)
-    ds.attrs['crs'] = crs
-    ds.attrs['transform'] = transform
+    ds.attrs['crs'] = _parse_crs(crs).to_string()
+    ds.attrs['transform'] = transform[:6]
     if isinstance(mean, (int, float)):
         mean = [mean] * len(var)
     for v, m in zip(var, mean):
-        ds[v] = (('y', 'x', 'time'),
-                 np.random.normal(m, sigma, (ny, nx, ntime)))
+        ds[v] = (tuple(dims.keys()),
+                 np.random.normal(m, sigma, tuple(dims.values())))
     return ds
 
 
@@ -69,6 +81,13 @@ def equal_list_of_dicts(obj1, obj2, exclude=[]):
 def assert_all_true(ds):
     assert ds.to_array().values.all()
 
+
+def assert_equal_crs(crs1, crs2, *args, **kwargs):
+    xs = np.arange(10, dtype=np.float64)
+    ys = np.arange(10, dtype=np.float64)
+    newx, newy = rasterio.warp.transform(crs1, crs2, xs, ys)
+    assert_almost_equal(xs, np.array(newx), 6, *args, **kwargs)
+    assert_almost_equal(ys, np.array(newy), 6, *args, **kwargs)
 
 # def generate_test_latlon_grid(shape):
 #     y, x = np.meshgrid(np.arange(shape[1]),
