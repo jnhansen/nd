@@ -4,7 +4,7 @@ This module may be used to mosaic and tile multiple satellite image products.
 TODO: Contain buffer information in NetCDF metadata?
 
 """
-from ..io import from_netcdf, to_netcdf, add_time
+from ..io import open_netcdf, to_netcdf, add_time
 from .. import utils
 import os
 import glob
@@ -136,7 +136,7 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
 
     def _wrapper(f):
         # 1. Open dataset
-        data = from_netcdf(f)
+        data = open_netcdf(f)
         # 2. Apply function
         result = fn(data, *args, **kwargs)
         # 3. Write result to file
