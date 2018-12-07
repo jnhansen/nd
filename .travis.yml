@@ -10,8 +10,8 @@ addons:
   apt:
     packages:
       - libhdf5-serial-dev
-      - netcdf-bin
-      - libnetcdf-dev
+      # - netcdf-bin
+      # - libnetcdf-dev
       - gsl-bin
       - libgsl0-dev
       - libgdal1-dev
