@@ -19,6 +19,12 @@ def disassemble_complex(ds):
         and imaginary parts.
     """
 
+    if isinstance(ds, xr.DataArray):
+        name = ds.name
+        if name is None:
+            name = 'data'
+        ds = ds.to_dataset(name=name)
+
     new_ds = ds.copy()
     #
     # Find all complex variables and disassemble into their real and

@@ -1,23 +1,26 @@
 from .. import utils
 from .convert_ import assemble_complex
 import lxml.etree as ET
-from osgeo import gdal
+import rasterio as rio
 import numpy as np
 import os
 import affine
 import xarray as xr
+import pandas as pd
 from scipy.ndimage.interpolation import map_coordinates
 
 
-def from_beam_dimap(path, read_data=True):
+def open_beam_dimap(path, read_data=True):
     """Read a BEAM Dimap product into an xarray Dataset.
 
-    TODO: lat and lon should probably be single precision floats...
+    BEAM Dimap is the native file format of the SNAP software. It consists of
+    a ``*.dim`` XML file and a ``*.data`` directory containing the data.
+    ``path`` should point to the XML file.
 
     Parameters
     ----------
     path : str
-        The file path to the BEAM dimap product.
+        The file path to the BEAM Dimap product.
     read_data : bool, optional
         If True (default), read all data. Otherwise, read only the metadata.
 
@@ -26,6 +29,7 @@ def from_beam_dimap(path, read_data=True):
     xarray.Dataset
         The same dataset converted into xarray.
     """
+
     # -------------------------------------------------------------------------
     # Read metadata
     # -------------------------------------------------------------------------
@@ -93,7 +97,9 @@ def from_beam_dimap(path, read_data=True):
     for tf in tie_point_grid_files:
         p = os.path.splitext(tf)[0] + '.img'
         name = os.path.split(os.path.splitext(tf)[0])[1]
-        tp_grids[name] = gdal.Open(p).ReadAsArray()
+        with rio.open(p) as src:
+            # Read first bands
+            tp_grids[name] = src.read(1)
 
     #
     # Is an affine coord transform specified?
@@ -180,18 +186,24 @@ def from_beam_dimap(path, read_data=True):
     #
     times = [utils.str2date(meta['time_start'])]
     coords['time'] = times
-    ds = xr.Dataset(coords=coords, attrs=meta)
+    # ds = xr.Dataset(coords=coords, attrs=meta)
+    ds = xr.Dataset()
 
     if read_data:
         for rpath in data_files:
             # we don't want to open the ENVI .hdr file...
             im_path = os.path.splitext(rpath)[0] + '.img'
             name = os.path.splitext(os.path.split(im_path)[1])[0]
-            band = gdal.Open(im_path)
-            data = band.ReadAsArray()
-            # ndv = band.GetNoDataValue()
-            # data[data == ndv] = np.nan
-            ds[name] = (data_coords, data)
+            ds[name] = xr.open_rasterio(im_path)
+
+        # All attributes that are the same for each band
+        # should be attributes of the dataset instead.
+        attrs = pd.DataFrame(ds[v].attrs for v in ds.data_vars)
+        for col in attrs.columns:
+            if len(attrs[col].unique()) == 1:
+                ds.attrs[col] = attrs[col][0]
+                for v in ds.data_vars:
+                    del ds[v].attrs[col]
 
     ds = assemble_complex(ds)
 
