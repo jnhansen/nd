@@ -4,8 +4,6 @@ cache:
   - ~/.cache/pip
 dist: trusty
 language: python
-before_install:
-- sudo apt-get update -q
 addons:
   apt:
     packages:
@@ -15,6 +13,10 @@ addons:
       - gsl-bin
       - libgsl0-dev
       - libgdal1-dev
+before_install:
+- sudo apt-get update -q
+- nc-config --version
+- h5cc -showconfig
 matrix:
   include:
   - python: 3.5
@@ -23,7 +25,6 @@ matrix:
     dist: xenial
     sudo: true
 install:
-- h5cc -showconfig
 - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
   -O miniconda.sh
 - bash miniconda.sh -b -p $HOME/miniconda
