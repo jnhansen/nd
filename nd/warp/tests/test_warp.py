@@ -65,7 +65,6 @@ nc_path = os.path.join(data_path, 'slc.nc')
 tif_path = os.path.join(data_path, 'slc.tif')
 dim_path = os.path.join(data_path, 'slc.dim')
 slc_files = [nc_path, tif_path, dim_path]
-slc_datasets = [open_dataset(f) for f in slc_files]
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
@@ -127,8 +126,9 @@ def test_parse_crs(crs):
 @pytest.mark.skip(reason="This currently fails due to SNAP saving "
                          "inconsistent datasets.")
 def test_equal_datasets():
-    ds0 = slc_datasets[0]
-    for ds in slc_datasets[1:]:
+    ds0 = open_dataset(slc_files[0])
+    for f in slc_files[1:]:
+        ds = open_dataset(f)
         assert_equal(ds0['x'].values, ds['x'].values,
                      'x coordinates are not equal')
         assert_equal(ds0['y'].values, ds['y'].values,
@@ -177,8 +177,9 @@ def test_get_crs(name, kwargs):
     assert_equal_crs(get_crs(ds), kwargs['crs'])
 
 
-@pytest.mark.parametrize('ds', slc_datasets)
-def test_resolution_equal_transform_from_real_data(ds):
+@pytest.mark.parametrize('f', slc_files)
+def test_resolution_equal_transform_from_real_data(f):
+    ds = open_dataset(f)
     res = get_resolution(ds)
     tf = get_transform(ds)
     assert_almost_equal(res, (tf.a, abs(tf.e)))
