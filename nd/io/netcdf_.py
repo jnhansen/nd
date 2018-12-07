@@ -18,9 +18,11 @@ def to_netcdf(ds, path, *args, **kwargs):
     """
 
     write = disassemble_complex(ds)
-    if 'encoding' not in kwargs:
-        comp = dict(zlib=True, complevel=5)
-        kwargs['encoding'] = {var: comp for var in write.data_vars}
+    comp = dict(zlib=True, complevel=5)
+    encoding = {var: comp for var in write.variables}
+    if 'encoding' in kwargs:
+        encoding.update(kwargs['encoding'])
+    kwargs['encoding'] = encoding
     return write.to_netcdf(path, *args, **kwargs)
 
 
