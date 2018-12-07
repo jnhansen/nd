@@ -8,6 +8,7 @@ addons:
       - libhdf5-serial-dev
       - netcdf-bin
       - libnetcdf-dev
+      - libnetcdf4
       - gsl-bin
       - libgsl0-dev
       - libgdal1-dev

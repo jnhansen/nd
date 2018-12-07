@@ -64,17 +64,12 @@ include_dirs = []
 install_requires = []
 
 if not mock_install:
-    gdal_version = subprocess.check_output(
-        ['gdal-config', '--version']).decode('utf-8').strip('\n')
-    gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
-
     install_requires.extend([
         "numpy",
         "scipy",
         "xarray",
         "dask[dataframe]",
         "lxml",
-        "pygdal>={},<={}".format(*gdal_version_range),
         "rasterio",
         "pandas",
         "python-dateutil",
@@ -91,8 +86,5 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     include_dirs=include_dirs,
-    install_requires=install_requires,
-    # extras_require={
-    #     'gdal': ["pygdal>={},<={}".format(*gdal_version_range)]
-    # }
+    install_requires=install_requires
 )
