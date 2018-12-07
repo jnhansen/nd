@@ -143,6 +143,8 @@ def test_equal_datasets():
                      'bounds are not equal')
         assert_equal(get_extent(ds0), get_extent(ds),
                      'extents are not equal')
+        ds.close()
+    ds0.close()
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
@@ -182,6 +184,7 @@ def test_resolution_equal_transform_from_real_data(f):
     ds = open_dataset(f)
     res = get_resolution(ds)
     tf = get_transform(ds)
+    ds.close()
     assert_almost_equal(res, (tf.a, abs(tf.e)))
 
 
