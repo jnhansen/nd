@@ -1,14 +1,17 @@
-sudo: false
-cache: pip
+sudo: required
+cache:
+  directories:
+    - ~/.cache/pip
 dist: trusty
 language: python
+before_instal:
+  - sudo apt-get update -q
 addons:
   apt:
     packages:
       - libhdf5-serial-dev
       - netcdf-bin
       - libnetcdf-dev
-      - libnetcdf4
       - gsl-bin
       - libgsl0-dev
       - libgdal1-dev
