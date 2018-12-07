@@ -76,7 +76,9 @@ if not mock_install:
         "matplotlib",
         "affine",
         "opencv-python",
-        "NetCDF4"
+        # "NetCDF4"
+        "h5py",
+        "h5netcdf"
     ])
 
 include_dirs.append(numpy.get_include())

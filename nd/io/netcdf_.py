@@ -54,6 +54,8 @@ def open_netcdf(path, *args, **kwargs):
     # Make sure to load as lazy dask arrays:
     if 'chunks' not in kwargs:
         kwargs['chunks'] = {}
+    if 'engine' not in kwargs:
+        kwargs['engine'] = 'h5netcdf'
     ds = xr.open_dataset(path, *args, **kwargs)
     ds = assemble_complex(ds)
     #
