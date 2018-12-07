@@ -123,6 +123,12 @@ def get_transform(ds):
         a = list(map(float, transf_str.split(',')))
         return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
 
+    else:
+        resx, resy = get_resolution(ds)
+        xoff = ds['x'].values.min()
+        yoff = ds['y'].values.max()
+        return Affine(resx, 0, xoff, 0, resy, yoff)
+
 
 def get_resolution(ds):
     """Extract the resolution of the dataset in projection coordinates.
@@ -138,19 +144,18 @@ def get_resolution(ds):
         The raster resolution as (x, y)
     """
 
-    transform = get_transform(ds)
-    if transform is not None:
-        return (abs(transform.a), abs(transform.e))
-
-    elif 'x' in ds.coords and 'y' in ds.coords:
-        x = ds.coords['x']
-        y = ds.coords['y']
+    if 'x' in ds.coords and 'y' in ds.coords:
+        x = ds.coords['x'].values
+        y = ds.coords['y'].values
         resx = abs(x[-1] - x[0]) / (len(x) - 1)
         resy = abs(y[-1] - y[0]) / (len(y) - 1)
         return (resx, resy)
-
-    elif 'res' in ds.attrs:
-        return ds.attrs['res']
+    else:
+        transform = get_transform(ds)
+        if transform is not None:
+            return (abs(transform.a), abs(transform.e))
+        elif 'res' in ds.attrs:
+            return ds.attrs['res']
 
     return None
 

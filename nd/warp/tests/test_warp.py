@@ -6,7 +6,7 @@ from nd.warp.warp_ import _parse_crs, nrows, ncols
 from nd.io import open_dataset
 from nd.testing import generate_test_dataset, assert_equal_crs
 import numpy as np
-from numpy.testing import assert_equal
+from numpy.testing import assert_equal, assert_almost_equal
 from xarray.testing import assert_equal as xr_assert_equal
 import os
 from rasterio.crs import CRS
@@ -82,7 +82,7 @@ def test_resample_to_resolution_tuple(name, kwargs):
     res = (0.05, 0.01)
     ds = generate_test_dataset(**kwargs)
     resampled = Resample(res=res).apply(ds)
-    assert_equal(res, get_resolution(resampled))
+    assert_almost_equal(res, get_resolution(resampled))
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
@@ -90,7 +90,7 @@ def test_resample_to_resolution_float(name, kwargs):
     res = 0.05
     ds = generate_test_dataset(**kwargs)
     resampled = Resample(res=res).apply(ds)
-    assert_equal((res, res), get_resolution(resampled))
+    assert_almost_equal((res, res), get_resolution(resampled))
 
 
 @pytest.mark.parametrize('resample_kwargs', [{'width': 25}, {'height': 25}])
@@ -181,7 +181,7 @@ def test_get_crs(name, kwargs):
 def test_resolution_equal_transform_from_real_data(ds):
     res = get_resolution(ds)
     tf = get_transform(ds)
-    assert_equal(res, (tf.a, abs(tf.e)))
+    assert_almost_equal(res, (tf.a, abs(tf.e)))
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
@@ -191,7 +191,7 @@ def test_get_resolution(name, kwargs):
     bounds = get_bounds(ds)
     resx = abs(bounds.right - bounds.left) / (ncols(ds) - 1)
     resy = abs(bounds.bottom - bounds.top) / (nrows(ds) - 1)
-    assert_equal(res, (resx, resy))
+    assert_almost_equal(res, (resx, resy))
 
 
 def test_get_bounds():
