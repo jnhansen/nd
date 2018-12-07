@@ -23,6 +23,8 @@ def to_netcdf(ds, path, *args, **kwargs):
     if 'encoding' in kwargs:
         encoding.update(kwargs['encoding'])
     kwargs['encoding'] = encoding
+    if 'engine' not in kwargs:
+        kwargs['engine'] = 'h5netcdf'
     return write.to_netcdf(path, *args, **kwargs)
 
 

@@ -1,8 +1,10 @@
 import pytest
 import os
 import xarray as xr
-from nd.io import open_dataset, open_netcdf, open_beam_dimap, open_rasterio
+from nd.io import (open_dataset, open_netcdf, open_beam_dimap, open_rasterio,
+                   to_netcdf, assemble_complex)
 from nd.testing import generate_test_dataset
+from xarray.testing import assert_equal as xr_assert_equal
 
 
 data_path = 'data/'
@@ -39,3 +41,12 @@ def test_open_rasterio():
 def test_equivalent_formats():
     files = [nc_path, tif_path, dim_path]
     datasets = [open_dataset(f) for f in files]
+
+
+def test_write_read_netcdf(tmpdir):
+    ds = generate_test_dataset()
+    ds = assemble_complex(ds)
+    path = str(tmpdir.join('test_dataset.nc'))
+    to_netcdf(ds, path)
+    ds_read = open_dataset(path)
+    xr_assert_equal(ds, ds_read)
