@@ -11,7 +11,7 @@ addons:
     packages:
       - libhdf5-serial-dev
       - netcdf-bin
-      - libnetcdf-dev
+      - libnetcdf-dev=4.6.1
       - gsl-bin
       - libgsl0-dev
       - libgdal1-dev
