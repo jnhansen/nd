@@ -4,7 +4,7 @@ from nd.warp import (Reprojection, Resample, Alignment, get_bounds,
                      get_common_extent, get_extent, get_resolution,
                      get_common_resolution)
 from nd.warp.warp_ import _parse_crs, nrows, ncols, get_dims, _reproject
-from nd.io import open_dataset
+from nd.io import open_dataset, to_netcdf
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_crs)
 import numpy as np
@@ -101,6 +101,18 @@ def test_reprojection(name, kwargs):
     assert_equal_crs(crs, get_crs(reprojected))
 
 
+def test_reprojection_failure():
+    ds = generate_test_dataset()
+    transform = get_transform(ds)
+    extent = get_extent(ds)
+    with assert_raises_regex(
+            ValueError, ".* must also specify the `width` and `height`.*"):
+        proj = Reprojection(crs=epsg4326, transform=transform)
+    with assert_raises_regex(
+            ValueError, "Need to provide either `width` and `height` .*"):
+        proj = Reprojection(crs=epsg4326, extent=extent)
+
+
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_resample_to_resolution_tuple(name, kwargs):
     res = (0.05, 0.01)
@@ -132,10 +144,6 @@ def test_resample_to_width_or_height(name, kwargs, resample_kwargs):
         int(ncols(resampled) / nrows(resampled)),
         int(ncols(ds) / nrows(ds))
     )
-
-
-def test_alignment():
-    ...
 
 
 @pytest.mark.parametrize('crs', [
@@ -421,6 +429,10 @@ def test_reproject(generator):
     ]
     for proj in projected[1:]:
         xr_assert_equal(proj, projected[0])
+        assert_almost_equal(get_resolution(proj), res)
+        assert_almost_equal(get_bounds(proj), dst_bounds)
+        assert_almost_equal(get_transform(proj), dst_transform)
+        assert_equal_crs(get_crs(proj), dst_crs)
 
 
 def test_reprojection_nan_values():
@@ -467,6 +479,42 @@ def test_reproject_coordinates():
             continue
         assert c in warped.coords
         assert_equal(ds[c].dims, warped[c].dims)
+
+
+@pytest.mark.parametrize('extent', [
+    None, (-10.0, 50.0, 0.0, 60.0)
+])
+@pytest.mark.parametrize('from_files', [True, False])
+def test_alignment(tmpdir, extent, from_files):
+    datapath = tmpdir.mkdir('data')
+    path = tmpdir.mkdir('aligned')
+    bounds = [
+        (-10.0, 50.0, 0.0, 60.0),
+        (-12.0, 40.0, -2.0, 52.0),
+        (-13.0, 50.0, -3.0, 60.0),
+        (-9.0, 51.0, 1.0, 61.0)
+    ]
+    datasets = [generate_test_dataset(extent=ext) for ext in bounds]
+    if extent is None:
+        common_bounds = get_common_bounds(datasets)
+    else:
+        common_bounds = extent
+    files = [str(datapath.join('data_%d.nc' % i))
+             for i in range(len(datasets))]
+    if from_files:
+        for ds, f in zip(datasets, files):
+            to_netcdf(ds, f)
+        datasets = files
+    Alignment(extent=extent).apply(datasets, path=str(path))
+    aligned = [open_dataset(str(f)) for f in path.listdir()]
+    for ds in aligned:
+        assert_equal(get_bounds(ds), common_bounds)
+        assert_equal(
+            get_transform(ds),
+            get_transform(aligned[0])
+        )
+        xr_assert_equal(ds['x'], aligned[0]['x'])
+        xr_assert_equal(ds['y'], aligned[0]['y'])
 
 
 # def test_align(tmpdir):
