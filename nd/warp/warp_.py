@@ -31,11 +31,14 @@ def _parse_crs(crs):
         Raises an error if the input cannot be parsed.
     """
 
+    #
+    # NOTE: This doesn't currently throw an error if the EPSG code is invalid.
+    #
     if isinstance(crs, CRS):
         parsed = crs
     elif isinstance(crs, str):
         try:
-            # proj-string
+            # proj-string or wkt
             parsed = CRS.from_string(crs)
         except CRSError:
             # wkt
@@ -82,7 +85,7 @@ def get_crs(ds, format='crs'):
             except CRSError:
                 pass
             else:
-                continue
+                break
 
     if crs is None:
         return None
@@ -472,8 +475,9 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             height = int(abs(
                 (extent.top - extent.bottom) / res[1])) + 1
 
+        # The following doesn't give the correct result.
         dst_transform = rasterio.transform.from_bounds(
-            *extent, width=width, height=height
+            *extent, width=width-1, height=height-1
         )
 
     else:
@@ -521,7 +525,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #
         # Reproject a single data array
         #
-        extra_dims = src_dims.keys() - {'y', 'x'}
+        extra_dims = set(da.dims) - {'y', 'x'}
         dim_order = tuple(extra_dims) + ('y', 'x')
         values = da.transpose(*dim_order).values
         output = np.zeros(shape, dtype=da.dtype)
@@ -620,7 +624,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
     result.attrs['lines'] = nrows(result)
     result.attrs['samples'] = ncols(result)
 
-    _add_latlon(ds)
+    _add_latlon(result)
 
     return result
 
