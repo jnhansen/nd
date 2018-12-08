@@ -5,7 +5,7 @@ dataset.
 
 from .warp_ import Reprojection, Resample, Alignment, _parse_crs, get_crs, \
                    get_transform, get_resolution, get_bounds, get_extent, \
-                   get_common_bounds, get_common_extent
+                   get_common_bounds, get_common_extent, get_common_resolution
 
 __all__ = ['Reprojection',
            'Resample',
@@ -17,4 +17,5 @@ __all__ = ['Reprojection',
            'get_bounds',
            'get_extent',
            'get_common_bounds',
-           'get_common_extent']
+           'get_common_extent',
+           'get_common_resolution']

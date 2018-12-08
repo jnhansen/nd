@@ -47,6 +47,36 @@ def generate_test_dataset(ny=20, nx=20, ntime=10,
     return ds
 
 
+def generate_test_dataarray(ny=20, nx=20, ntime=10, name='variable',
+                            mean=0, sigma=1,
+                            extent=(-10.0, 50.0, 0.0, 60.0),
+                            random_seed=42,
+                            crs='+init=epsg:4326'):
+    np.random.seed(random_seed)
+    coords = {}
+    dims = {}
+    if ny:
+        coords['y'] = np.linspace(extent[1], extent[3], ny)
+        dims['y'] = ny
+    if nx:
+        coords['x'] = np.linspace(extent[0], extent[2], nx)
+        dims['x'] = nx
+    if ntime:
+        coords['time'] = pd.date_range('2017-01-01', '2018-01-01',
+                                       periods=ntime)
+        dims['time'] = ntime
+
+    meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
+    transform = rasterio.transform.from_bounds(
+        *extent, width=nx-1, height=ny-1)
+    meta['crs'] = _parse_crs(crs).to_string()
+    meta['transform'] = transform[:6]
+    data = np.random.normal(mean, sigma, tuple(dims.values()))
+    da = xr.DataArray(data, coords=coords, dims=list(dims.keys()),
+                      name=name, attrs=meta)
+    return da
+
+
 def equal_list_of_dicts(obj1, obj2, exclude=[]):
     """Check whether two lists of dictionaries are equal, independent of the
     order within the list.

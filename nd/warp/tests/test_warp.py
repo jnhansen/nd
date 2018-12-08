@@ -1,15 +1,23 @@
 import pytest
 from nd.warp import (Reprojection, Resample, Alignment, get_bounds,
                      get_transform, get_crs, get_common_bounds,
-                     get_common_extent, get_extent, get_resolution)
-from nd.warp.warp_ import _parse_crs, nrows, ncols
+                     get_common_extent, get_extent, get_resolution,
+                     get_common_resolution)
+from nd.warp.warp_ import _parse_crs, nrows, ncols, get_dims, _reproject
 from nd.io import open_dataset
-from nd.testing import generate_test_dataset, assert_equal_crs
+from nd.testing import (generate_test_dataset, generate_test_dataarray,
+                        assert_equal_crs)
 import numpy as np
-from numpy.testing import assert_equal, assert_almost_equal
+import xarray as xr
+from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
+                           assert_raises_regex)
 from xarray.testing import assert_equal as xr_assert_equal
+from xarray.testing import assert_identical as xr_assert_identical
 import os
 from rasterio.crs import CRS
+from rasterio.coords import BoundingBox
+from rasterio.errors import CRSError
+import rasterio.warp
 from affine import Affine
 
 
@@ -65,6 +73,23 @@ nc_path = os.path.join(data_path, 'slc.nc')
 tif_path = os.path.join(data_path, 'slc.tif')
 dim_path = os.path.join(data_path, 'slc.dim')
 slc_files = [nc_path, tif_path, dim_path]
+epsg4326 = CRS.from_epsg(4326)
+sinusoidal = CRS.from_string('+proj=sinu +lon_0=0 +x_0=0 +y_0=0 '
+                             '+ellps=WGS84 +datum=WGS84 +units=m no_defs')
+
+
+def create_snap_ds(*args, **kwargs):
+    ds = generate_test_dataset(*args, **kwargs)
+    crs = get_crs(ds)
+    t = get_transform(ds)
+    i2m_string = ','.join(map(str, [t.a, t.d, t.b, t.e, t.c, t.f]))
+    del ds.attrs['crs']
+    del ds.attrs['transform']
+    ds['crs'] = ((), 1)
+    attrs = {'crs': crs.wkt,
+             'i2m': i2m_string}
+    ds['crs'].attrs = attrs
+    return ds
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
@@ -121,6 +146,15 @@ def test_parse_crs(crs):
     assert_equal_crs(crs, _parse_crs(crs.to_string()))
     assert_equal_crs(crs, _parse_crs(crs.to_dict()))
     assert_equal_crs(crs, _parse_crs(crs.wkt))
+    assert_equal_crs(crs, _parse_crs(crs.to_epsg()))
+
+
+@pytest.mark.parametrize('invalidcrs', [
+    'not_a_crs'
+])
+def test_parse_crs_fails(invalidcrs):
+    with assert_raises(CRSError):
+        _parse_crs(invalidcrs)
 
 
 @pytest.mark.skip(reason="This currently fails due to SNAP saving "
@@ -173,10 +207,44 @@ def test_get_transform(name, kwargs):
     )
 
 
+# Test extraction of SNAP-style transform information.
+@pytest.mark.parametrize('crs', [
+    CRS.from_epsg(4326),
+    CRS.from_epsg(3395),
+])
+def test_get_transform_from_variable(crs):
+    ds = generate_test_dataset(crs=crs)
+    snap_ds = create_snap_ds(crs=crs)
+    assert_equal(
+        get_transform(ds),
+        get_transform(snap_ds)
+    )
+
+
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_get_crs(name, kwargs):
     ds = generate_test_dataset(**kwargs)
     assert_equal_crs(get_crs(ds), kwargs['crs'])
+
+
+@pytest.mark.parametrize('fmt,result', [
+    ('proj', '+init=epsg:4326 +no_defs'),
+    ('dict', {'init': 'epsg:4326', 'no_defs': True}),
+    ('wkt', epsg4326.wkt)
+])
+def test_get_crs_formats(fmt, result):
+    ds = generate_test_dataset(crs=CRS.from_epsg(4326))
+    assert_equal(get_crs(ds, format=fmt), result)
+
+
+# Test extraction of SNAP-style CRS information.
+@pytest.mark.parametrize('crs', [
+    CRS.from_epsg(4326),
+    CRS.from_epsg(3395),
+])
+def test_get_crs_from_variable(crs):
+    snap_ds = create_snap_ds(crs=crs)
+    assert_equal_crs(crs, get_crs(snap_ds))
 
 
 @pytest.mark.parametrize('f', slc_files)
@@ -198,20 +266,161 @@ def test_get_resolution(name, kwargs):
     assert_almost_equal(res, (resx, resy))
 
 
-def test_get_bounds():
+def test_get_bounds_dataset():
     bounds = (-10.0, 50.0, 0.0, 60.0)
     ds = generate_test_dataset(extent=bounds)
     assert_equal(bounds, get_bounds(ds))
 
 
-def test_get_common_extent():
-    ...
+def test_get_bounds_dataarray():
+    bounds = (-10.0, 50.0, 0.0, 60.0)
+    da = generate_test_dataarray(extent=bounds)
+    assert_equal(bounds, get_bounds(da))
 
 
-def test_get_extent():
+def test_get_extent_dataset():
     extent = (-10.0, 50.0, 0.0, 60.0)
-    ds = generate_test_dataset(extent=extent)
+    ds = generate_test_dataset(extent=extent, crs=epsg4326)
     assert_equal(extent, get_extent(ds))
+
+
+def test_get_extent_dataarray():
+    extent = (-10.0, 50.0, 0.0, 60.0)
+    da = generate_test_dataarray(extent=extent, crs=epsg4326)
+    assert_equal(extent, get_extent(da))
+
+
+def test_get_common_bounds():
+    bounds = [
+        (-10.0, 50.0, 0.0, 60.0),
+        (-12.0, 40.0, -2.0, 52.0),
+        (-13.0, 50.0, -3.0, 60.0),
+        (-9.0, 51.0, 1.0, 61.0)
+    ]
+    datasets = [generate_test_dataset(extent=ext) for ext in bounds]
+    assert_equal(
+        get_common_bounds(datasets),
+        (-13.0, 40.0, 1.0, 61.0)
+    )
+
+
+def test_get_common_extent():
+    bounds = [
+        (-10.0, 50.0, 0.0, 60.0),
+        (-12.0, 40.0, -2.0, 52.0),
+        (-13.0, 50.0, -3.0, 60.0),
+        (-9.0, 51.0, 1.0, 61.0)
+    ]
+    common_extent = (-13.0, 40.0, 1.0, 61.0)
+    datasets = [generate_test_dataset(extent=ext) for ext in bounds]
+
+    # Reproject such that the projected bounds change,
+    # but the extent remains the same:
+    proj = Reprojection(crs=sinusoidal)
+    datasets_sinu = [proj.apply(ds) for ds in datasets]
+
+    common_bounds = get_common_bounds(datasets_sinu)
+    expected_result = BoundingBox(*rasterio.warp.transform_bounds(
+        sinusoidal, epsg4326, **common_bounds._asdict()
+    ))
+
+    assert_raises(AssertionError, assert_equal,
+                  common_bounds, common_extent)
+    assert_almost_equal(get_common_extent(datasets_sinu),
+                        expected_result)
+
+
+@pytest.mark.parametrize('mode,fn', [
+    ('min', np.min),
+    ('max', np.max),
+    ('mean', np.mean)
+])
+def test_get_common_resolution(mode, fn):
+    bounds = [
+        (-10.0, 50.0, 0.0, 60.0),
+        (-12.0, 40.0, -2.0, 52.0),
+        (-13.0, 50.0, -3.0, 60.0),
+        (-9.0, 51.0, 1.0, 61.0)
+    ]
+    datasets = [generate_test_dataset(extent=ext) for ext in bounds]
+    res = np.array([get_resolution(ds) for ds in datasets])
+    common_res = tuple(fn(res, axis=0))
+    assert_equal(get_common_resolution(datasets, mode=mode),
+                 common_res)
+
+
+def test_get_common_resolution_invalid_mode():
+    datasets = [generate_test_dataset() for i in range(3)]
+    with assert_raises_regex(ValueError,
+                             "Unsupported mode: 'invalid'"):
+        get_common_resolution(datasets, mode='invalid')
+
+
+def test_get_common_resolution_different_projections():
+    crs = [epsg4326, sinusoidal]
+    datasets = [generate_test_dataset(crs=c) for c in crs]
+    with assert_raises_regex(ValueError,
+                             "All datasets must have the same projection."):
+        get_common_resolution(datasets)
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_get_dims(generator):
+    dims = {'x': 5, 'y': 10, 'time': 15}
+    ds = generator(nx=dims['x'], ny=dims['y'], ntime=dims['time'])
+    assert_equal(get_dims(ds), dims)
+
+
+def test_reproject_no_hidden_effects():
+    src_crs = epsg4326
+    dst_crs = sinusoidal
+    ds = generate_test_dataset(crs=src_crs)
+    ds_copy = ds.copy(deep=True)
+    projected = _reproject(ds_copy, dst_crs=dst_crs)
+    xr_assert_identical(ds, ds_copy)
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_reproject(generator):
+    src_crs = epsg4326
+    dst_crs = sinusoidal
+    ds = generator(crs=src_crs)
+    src_bounds = get_bounds(ds)
+    dst_bounds_latlon = BoundingBox(
+        left=src_bounds.left - 1,
+        bottom=src_bounds.bottom - 1,
+        right=src_bounds.right + 1,
+        top=src_bounds.top + 1,
+    )
+    dst_bounds = BoundingBox(*rasterio.warp.transform_bounds(
+        src_crs, dst_crs, **dst_bounds_latlon._asdict()
+    ))
+    dst_width, dst_height = 35, 21
+    resx = (dst_bounds.right - dst_bounds.left) / (dst_width - 1)
+    resy = (dst_bounds.bottom - dst_bounds.top) / (dst_height - 1)
+    res = (abs(resx), abs(resy))
+    xoff = dst_bounds.left
+    yoff = dst_bounds.top
+    dst_transform = Affine(resx, 0, xoff, 0, resy, yoff)
+
+    projected = [
+        _reproject(ds, dst_crs=dst_crs, dst_transform=dst_transform,
+                   width=dst_width, height=dst_height),
+        _reproject(ds, dst_crs=dst_crs, dst_transform=dst_transform,
+                   extent=dst_bounds),
+        _reproject(ds, dst_crs=dst_crs, extent=dst_bounds,
+                   res=res),
+        _reproject(ds, dst_crs=dst_crs, extent=dst_bounds,
+                   width=dst_width, height=dst_height)
+    ]
+    for proj in projected[1:]:
+        xr_assert_equal(proj, projected[0])
 
 
 # def test_warp_grid_shift():
