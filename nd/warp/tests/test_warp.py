@@ -423,24 +423,50 @@ def test_reproject(generator):
         xr_assert_equal(proj, projected[0])
 
 
-# def test_warp_grid_shift():
-#     ds = generate_test_dataset(ntime=1)
+def test_reprojection_nan_values():
+    src_crs = epsg4326
+    dst_crs = sinusoidal
+    ds = generate_test_dataset(crs=src_crs)
+    bounds = get_bounds(ds)
+    proj = Reprojection(crs=dst_crs)
+    warped = proj.apply(ds)
+    xgrid, ygrid = np.meshgrid(warped.x, warped.y)
+    lon, lat = rasterio.warp.transform(dst_crs, src_crs, xgrid.flatten(),
+                                       ygrid.flatten())
+    lon = np.array(lon).reshape(xgrid.shape)
+    lat = np.array(lat).reshape(ygrid.shape)
 
-#     # [llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat]
-#     old_extent = [
-#         ds['lon'].min(),
-#         ds['lat'].min(),
-#         ds['lon'].max(),
-#         ds['lat'].max()
-#     ]
-#     new_extent = [
-#         ds['lon'].min() + 2,
-#         ds['lat'].min() + 2,
-#         ds['lon'].max() + 2,
-#         ds['lat'].max() + 2
-#     ]
-#     warped = warp.warp(ds, new_extent)
-#     # Check that values outside old_extent are NaN
+    inside_bounds = np.logical_and(
+        np.logical_and(lon >= bounds.left, lon <= bounds.right),
+        np.logical_and(lat >= bounds.bottom, lat <= bounds.top)
+    )
+    for v in warped.data_vars:
+        if not set(warped[v].dims).issuperset({'y', 'x'}):
+            continue
+        dim_order = tuple(set(warped[v].dims) - {'y', 'x'}) + ('y', 'x')
+        values = warped[v].transpose(*dim_order).values
+        # Check that pixels strictly inside the original bounds are not NaN
+        assert np.isnan(values[..., inside_bounds]).sum() == 0
+        # Pixel outside of the original bounds should be mostly NaN,
+        # although some pixels near the edges may have values.
+        outside_values = values[..., ~inside_bounds]
+        assert np.isnan(outside_values).sum() / outside_values.size > 0.5
+
+
+def test_reproject_coordinates():
+    ds = generate_test_dataset(crs=epsg4326)
+    dims = get_dims(ds)
+    ds.coords['lat'] = ds['y']
+    ds.coords['lon'] = ds['x']
+    ds.coords['altitude'] = (('y', 'x'),
+                             np.zeros((dims['y'], dims['x'])))
+    proj = Reprojection(crs=sinusoidal)
+    warped = proj.apply(ds)
+    for c in ds.coords:
+        if c in ['lat', 'lon']:
+            continue
+        assert c in warped.coords
+        assert_equal(ds[c].dims, warped[c].dims)
 
 
 # def test_align(tmpdir):
