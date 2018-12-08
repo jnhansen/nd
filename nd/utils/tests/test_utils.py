@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
@@ -46,7 +47,12 @@ def test_parallel():
     parallel_time = time.time() - t
     # Assert that the results are identical
     xr_assert_identical(result_serial, result_parallel)
+
     # Assert that the parallel execution was more than three times faster
+    import multiprocessing as mp
+    if mp.cpu_count() <= 1:
+        pytest.skip("Execution time is only faster if there are "
+                    "multiple cores")
     assert serial_time > parallel_time
 
 
