@@ -678,7 +678,7 @@ class Reprojection(Algorithm):
 
         return _reproject(ds, dst_crs=self.crs, dst_transform=self.transform,
                           width=self.width, height=self.height, res=self.res,
-                          **self.kwargs)
+                          extent=self.extent, **self.kwargs)
 
 
 class Resample(Algorithm):
