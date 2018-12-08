@@ -4,10 +4,10 @@
 Kernel Convolutions
 ===================
 
-``nd`` implements generic kernel convolutions as well as several convenience functions
+:mod:`nd.filters` implements generic kernel convolutions as well as several convenience functions
 for special cases. Every filter supports the argument ``dims`` to specify a subset of dimensions along which to apply the filter. If a kernel is given, the number of dimensions must match the shape of the kernel.
 
-The following example performs a Sobel edge detection filter along the ``lon`` dimension using :meth:`nd.filters.convolve`.
+The following example performs a simple Sobel edge detection filter along the ``lon`` dimension using :meth:`nd.filters.convolve`.
 
 Example::
 
