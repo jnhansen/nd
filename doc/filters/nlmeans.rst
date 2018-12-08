@@ -8,14 +8,15 @@ Non-Local Means is a denoising filter that computes filtered pixel values as a w
 
 Example::
 
-   from geo.filters import nlmeans
-   ds_filtered = nlmeans(ds, r={'lat': 3, 'lon': 3, 'time': 1},
-                         sigma=1, h=1, f=1)
+   from geo.filters import NLMeansFilter
+   nlm = NLMeansFilter(dims=('y', 'x', 'time), r=(3, 3, 1),
+                       sigma=1, h=1, f=1)
+   ds_filtered = nlm.apply(ds)
 
 
 .. topic:: See Also:
 
- * :meth:`nd.filters.nlmeans`
+ * :meth:`nd.filters.NLMeansFilter`
 
 
 .. topic:: References:
