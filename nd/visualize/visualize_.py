@@ -183,16 +183,16 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     Parameters
     ----------
     ds : xarray.Dataset or xarray.DataArray
-        The dataset must have dimensions 'lat', 'lon', and 'time'.
+        The dataset must have dimensions 'y', 'x', and 'time'.
     path : str
         The output file path of the video.
     timestamp : bool, optional
         Whether to print the timestamp in the upper left corner
         (default: True).
     width : int, optional
-        The width of the video (default: ds.dim['lon'])
+        The width of the video (default: ds.dim['x'])
     height : int, optional
-        The height of the video (default: ds.dim['lat'])
+        The height of the video (default: ds.dim['y'])
     fps : int, optional
         Frames per second (default: 1).
     codec : str, optional
@@ -217,14 +217,15 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
 
     # Use coords rather than dims so it also works for DataArray
     if height is None:
-        height = ds.coords['lat'].size
+        height = ds.coords['y'].size
     if width is None:
-        width = ds.coords['lon'].size
+        width = ds.coords['x'].size
 
     if codec is None:
         fourcc = -1
     else:
         fourcc = cv2.VideoWriter_fourcc(*codec)
+
     video = cv2.VideoWriter(path, fourcc, fps, (width, height))
 
     for t in ds.time.values:
