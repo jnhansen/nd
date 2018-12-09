@@ -2,11 +2,10 @@ name: ndtest
 channels:
   - conda-forge
 dependencies:
-  - python=3.6
+  # - python=3.6
   - gsl
   - numpy
   - sphinx
-  - sphinxcontrib-apidoc
   - cythongsl
   - ipython
   - matplotlib
