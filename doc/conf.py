@@ -73,9 +73,7 @@ extensions = [
 # apidoc_toc_file = False
 
 # Mock imports for autodoc
-autodoc_mock_imports = ['matplotlib', 'cv2', 'dask', 'xarray', 'scipy',
-                        'affine', 'sklearn', 'rasterio', 'h5netcdf',
-                        'dateutil', 'pandas', 'lxml']
+autodoc_mock_imports = ['sklearn']
 autodoc_warningiserror = False
 
 # Add any paths that contain templates here, relative to this directory.

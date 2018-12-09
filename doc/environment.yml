@@ -9,3 +9,11 @@ dependencies:
   - sphinxcontrib-apidoc
   - cythongsl
   - ipython
+  - matplotlib
+  - imageio
+  - opencv
+  - rasterio
+  - xarray
+  - h5netcdf
+  - lxml
+  - scipy
