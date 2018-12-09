@@ -8,3 +8,4 @@ dependencies:
   - sphinx
   - sphinxcontrib-apidoc
   - cythongsl
+  - ipython
