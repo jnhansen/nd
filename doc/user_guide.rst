@@ -11,5 +11,8 @@ User Guide
 
    setup
    getting_started
+   read_and_write
+   projections
+   visualize
    change/index
    filters/index

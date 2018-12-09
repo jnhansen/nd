@@ -4,7 +4,9 @@
 Installing nd
 =============
 
-``nd`` requires the ``gdal`` and ``libgsl-dev`` C libraries, so make sure you have those installed before installing ``nd``. You can find out whether they are installed by checking if the commands ``gdal-config`` and ``gsl-config`` exist on your machine.
+``nd`` requires the ``libgsl-dev`` C library, so make sure you have it installed before installing ``nd``. You can find out whether it is installed by checking if the command ``gsl-config`` exists on your machine.
+
+You may also want to install the GDAL library, but ``rasterio`` comes with a stripped down version of GDAL so for most use cases this should not be necessary.
 
 The easiest way to install ``nd`` is via ``pip`` from the github source:
 
