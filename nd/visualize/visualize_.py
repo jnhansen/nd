@@ -4,6 +4,8 @@ Quickly visualize datasets.
 TODO: Update to work with xarray Dataset rather than GDAL.
 
 """
+import os
+import imageio
 import cv2
 import xarray as xr
 import numpy as np
@@ -221,28 +223,46 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     if width is None:
         width = ds.coords['x'].size
 
-    if codec is None:
-        fourcc = -1
+    _, ext = os.path.splitext(path)
+
+    if ext == '.gif':
+        with imageio.get_writer(path, mode='I', fps=fps
+                                ) as writer:
+            for t in ds.time.values:
+                d = ds.sel(time=t)
+                frame = to_rgb(rgb(d))
+                if timestamp:
+                    cv2.putText(frame, str(t)[:10],
+                                bottomLeftCornerOfText,
+                                font,
+                                fontScale,
+                                fontColor,
+                                lineType)
+                writer.append_data(frame)
+
     else:
-        fourcc = cv2.VideoWriter_fourcc(*codec)
+        if codec is None:
+            fourcc = -1
+        else:
+            fourcc = cv2.VideoWriter_fourcc(*codec)
 
-    video = cv2.VideoWriter(path, fourcc, fps, (width, height))
+        video = cv2.VideoWriter(path, fourcc, fps, (width, height))
 
-    for t in ds.time.values:
-        d = ds.sel(time=t)
-        frame = to_rgb(rgb(d))
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        if timestamp:
-            cv2.putText(frame, str(t)[:10],
-                        bottomLeftCornerOfText,
-                        font,
-                        fontScale,
-                        fontColor,
-                        lineType)
-        video.write(frame)
+        for t in ds.time.values:
+            d = ds.sel(time=t)
+            frame = to_rgb(rgb(d))
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if timestamp:
+                cv2.putText(frame, str(t)[:10],
+                            bottomLeftCornerOfText,
+                            font,
+                            fontScale,
+                            fontColor,
+                            lineType)
+            video.write(frame)
 
-    cv2.destroyAllWindows()
-    video.release()
+        cv2.destroyAllWindows()
+        video.release()
 
 
 # def plot_basemap(src, name, *args, **kwargs):

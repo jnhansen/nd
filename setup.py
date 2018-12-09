@@ -78,7 +78,8 @@ if not mock_install:
         "opencv-python",
         # "NetCDF4"
         "h5py",
-        "h5netcdf"
+        "h5netcdf",
+        "imageio"
     ])
 
 include_dirs.append(numpy.get_include())
