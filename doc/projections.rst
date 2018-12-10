@@ -41,23 +41,26 @@ You can reproject your dataset to a different coordinate system using :class:`nd
     >>> get_crs(ds_reprojected)
     ...
 
-.. ipython:: python
+::
 
-    from nd.io import open_dataset
-    ds = open_dataset('../data/C2.nc')
-    @savefig c2.png width=500px
-    ds.C11.mean('time').plot(size=6)
+    >>> from nd.io import open_dataset
+    >>> ds = open_dataset('data/C2.nc')
+    >>> ds.C11.mean('time').plot(size=6)
 
-.. ipython:: python
-    :okwarning:
+.. image:: images/c2_latlong.png
+    :width: 500px
+    :align: center
 
-    from nd.warp import Reprojection
-    goode = Reprojection(crs='+proj=goode +ellps=sphere +datum=wgs84')
-    proj = goode.apply(ds)
-    @savefig c2_goode.png width=500px
-    proj.C11.mean('time').plot()
+::
 
+    >>> from nd.warp import Reprojection
+    >>> goode = Reprojection(crs='+proj=goode +ellps=sphere +datum=wgs84')
+    >>> proj = goode.apply(ds)
+    >>> proj.C11.mean('time').plot()
 
+.. image:: images/c2_goode.png
+    :width: 500px
+    :align: center
 
 
 ``Reprojection()`` lets you specify many more options, such as the desired extent and resolution.
