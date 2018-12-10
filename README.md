@@ -6,66 +6,38 @@
 # nd
 
 This package contains a selection of tools to handle and analyze satellite data.
+``nd`` is making heavy use of the ``xarray`` and ``rasterio`` libraries.
+The GDAL library is only used via ``rasterio`` as a compatibility layer in ``nd.io`` to enable reading supported file formats.
+Internally, all data is passed around as ``xarray`` Datasets and all provided methods expect this format as inputs.
+:meth:`nd.io.open_rasterio` may be used to convert any GDAL-readable file into an ``xarray.Dataset``.
 
-`nd` is making heavy use of the `xarray` library. `dask` is used for parallelization.
-
-The GDAL library is only used as a compatibility layer in `nd.io` to enable reading supported file formats.
-Internally, all data is passed around as `xarray` Datasets and all provided functions expect this format as inputs.
-`nd.io.from_gdal_dataset` may be used to convert any `gdal.Dataset` object or GDAL-readable file into an `xarray` Dataset.
-
-
----
-
-## Submodules
-
-### nd.io
-Several functions to read and write satellite data.
-* to/from NetCDF
-* read data from open GDAL datasets and any GDAL-readable file
-* deal with complex-valued data (not supported by NetCDF) by disassembling into two reals when writing to NetCDF, and vice versa when reading.
+An ``xarray.Dataset`` is essentially a Python representation of the NetCDF file format and as such easily reads/writes NetCDF files.
 
 
-### nd.change
-A module implementing change detection algorithms.
-* convert dual polarization data into the complex covariance matrix representation
-* OmnibusTest (change detection algorithm by Conradsen et al. (2015))
+## What does this library add?
+
+``xarray`` provides all data structures required for dealing with `n`-dimensional data in Python. ``nd`` explicitly does not aim to add additional data structures or file formats.
+Rather, the aim is to bring the various corners of the scientific ecosystem in Python closer together.
+
+As such, ``nd`` adds functionality to more seamlessly integrate libraries like ``xarray``, ``rasterio``, ``scikit-learn``, etc.
+
+For example:
+
+ * ``nd`` allows to reproject an entire multivariate and multi-temporal dataset between different coordinate systems by wrapping ``rasterio`` methods.
+
+ * ``nd`` provides a wrapper for ``scikit-learn`` estimators to easily apply classification algorithms to raster data [in progress].
+
+Additionally, ``nd`` contains a growing library of algorithms that are especially useful for spatio-temporal datacubes, for example:
+
+ * change detection algorithms
+
+ * spatio-temporal filters
+
+Since ``xarray`` is our library of choice for representing geospatial raster data, this is also an attempt to promote the use of ``xarray`` and the NetCDF file format in the Earth Observation community.
 
 
-### nd.classify
-A collection of classification and clustering methods.
+## Why NetCDF?
 
-... *work in progress* ...
-
-
-### nd.filter
-Implements several filters, currently:
-* kernel convolutions
-* non-local means
-
-
-### nd.utils
-Several utility functions.
-* split/merge numpy arrays, xarray datasets, ...
-* parallelize operations acting on xarray datasets
-
-
-### nd.warp
-Given a dataset with Ground Control Points (GCPs), usually in the form of a tie point grid,
-warp the dataset onto an equirectangular projection (WGS84), such that lat/lon directly correspond to the
-y and x coordinates, respectively.
-
-This makes concatenating datasets easier and reduces storage size, because lat/lon coordinates
-do not need to be stored for each pixel.
-
-
-### nd.visualize
-Several functions to quickly visualize data.
-* create RGB images from data
-* create video from a spatiotemporal dataset
-
-
-### nd.tiling
-* Split a dataset into tiles.
-* Read a tiled dataset.
-* Map a function across a tiled dataset.
-* Create and merge tiles with buffer to avoid edge affects.
+NetCDF (specifically NetCDF-4) is a highly efficient file format that was built on top of HDF5. It is capable of random access which ties in with indexing and slicing in ``numpy``.
+Because slices of a large dataset can be accessed independently, it becomes feasible to handle larger-than-memory file sizes. NetCDF-4 also supports data compression using ``zlib``. Random access capability for compressed data is maintained through data chunking.
+Furthermore, NetCDF is designed to be fully self-descriptive. Crucially, it has a concept of named dimensions and coordinates, can store units and arbitrary metadata.
