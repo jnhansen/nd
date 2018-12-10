@@ -9,7 +9,7 @@ This package contains a selection of tools to handle and analyze satellite data.
 ``nd`` is making heavy use of the ``xarray`` and ``rasterio`` libraries.
 The GDAL library is only used via ``rasterio`` as a compatibility layer in ``nd.io`` to enable reading supported file formats.
 Internally, all data is passed around as ``xarray`` Datasets and all provided methods expect this format as inputs.
-:meth:`nd.io.open_rasterio` may be used to convert any GDAL-readable file into an ``xarray.Dataset``.
+`nd.io.open_rasterio` may be used to convert any GDAL-readable file into an ``xarray.Dataset``.
 
 An ``xarray.Dataset`` is essentially a Python representation of the NetCDF file format and as such easily reads/writes NetCDF files.
 
