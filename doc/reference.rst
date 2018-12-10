@@ -4,32 +4,10 @@
 API Reference
 =============
 
-:Release: |version|
-:Date: |today|
+.. module:: nd
 
-.. module:: geo
-
-This reference ...
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
-   reference/io
-   reference/change
-   reference/classify
-   reference/utils
-   reference/visualize
-   reference/testing
-   reference/warp
-   reference/tiling
-   reference/filter
-
-
-.. _io_ref:
-
-:mod:`geo.io`: Geospatial I/O
-==================================
-
-.. automodule:: geo.io
-   :members:
-   :no-inherited-members:
+   api/nd

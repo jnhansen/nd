@@ -1,7 +1,18 @@
 from setuptools import setup, Extension
 import subprocess
-import numpy
-import cython_gsl
+import os
+try:
+    import numpy
+except (ImportError, ModuleNotFoundError):
+    raise ImportError('This package requires "numpy" to be installed. '
+                      'Install it first: "pip install numpy".')
+try:
+    import cython_gsl
+except (ImportError, ModuleNotFoundError):
+    raise ImportError('This package requires "cythongsl" to be installed. '
+                      'Install it first: "pip install cythongsl".')
+
+mock_install = os.environ.get('READTHEDOCS') == 'True'
 
 try:
     from Cython.Distutils import build_ext
@@ -18,51 +29,65 @@ ext = '.pyx' if use_cython else '.c'
 # directive_defaults['linetrace'] = True
 # directive_defaults['binding'] = True
 
+omnibus_libraries = []
+omnibus_library_dirs = []
+omnibus_include_dirs = ['.']
+
+if use_cython:
+    omnibus_libraries.extend(cython_gsl.get_libraries())
+    omnibus_library_dirs.append(cython_gsl.get_library_dir())
+    omnibus_include_dirs.append(cython_gsl.get_cython_include_dir())
+
+
+cmdclass = {}
+
 extensions = [
-    Extension("geo.change._omnibus", ["geo/change/_omnibus" + ext],
-              libraries=cython_gsl.get_libraries(),
-              library_dirs=[cython_gsl.get_library_dir()],
-              include_dirs=['.', cython_gsl.get_cython_include_dir()],
+    Extension("nd.change._omnibus", ["nd/change/_omnibus" + ext],
+              libraries=omnibus_libraries,
+              library_dirs=omnibus_library_dirs,
+              include_dirs=omnibus_include_dirs,
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("geo.filter._nlmeans", ["geo/filter/_nlmeans" + ext],
+    Extension("nd.filters._nlmeans", ["nd/filters/_nlmeans" + ext],
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("geo._warp", ["geo/_warp" + ext]),
+    Extension("nd.warp._warp", ["nd/warp/_warp" + ext]),
 ]
 
 if use_cython:
     extensions = cythonize(extensions)
     cmdclass = {'build_ext': build_ext}
-else:
-    cmdclass = {}
 
+include_dirs = []
+install_requires = []
 
-gdal_version = subprocess.check_output(
-    ['gdal-config', '--version']).decode('utf-8').strip('\n')
-gdal_version_range = [gdal_version + '.0', gdal_version + '.999']
-
-setup(
-    cmdclass=cmdclass,
-    ext_modules=extensions,
-    include_dirs=[
-        numpy.get_include(),
-        cython_gsl.get_include()
-    ],
-    install_requires=[
+if not mock_install:
+    install_requires.extend([
         "numpy",
         "scipy",
         "xarray",
         "dask[dataframe]",
         "lxml",
-        "pygdal>={},<={}".format(*gdal_version_range),
+        "rasterio",
         "pandas",
         "python-dateutil",
         "matplotlib",
         "affine",
         "opencv-python",
-        "NetCDF4"
-    ]
+        # "NetCDF4"
+        "h5py",
+        "h5netcdf",
+        "imageio"
+    ])
+
+include_dirs.append(numpy.get_include())
+include_dirs.append(cython_gsl.get_include())
+
+setup(
+    cmdclass=cmdclass,
+    ext_modules=extensions,
+    include_dirs=include_dirs,
+    install_requires=install_requires
 )

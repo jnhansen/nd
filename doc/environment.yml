@@ -1,0 +1,8 @@
+name: ndtest
+channels:
+  - conda-forge
+dependencies:
+  - gsl
+  - numpy
+  - sphinx
+  - cythongsl
