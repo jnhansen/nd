@@ -1,12 +1,12 @@
 from nd.io.convert_ import assemble_complex, disassemble_complex
-from nd.testing import generate_test_dataset
+from nd.testing import generate_test_dataset, generate_test_dataarray
 from xarray.testing import assert_identical as xr_assert_identical
 from xarray.testing import assert_equal as xr_assert_equal
 from numpy.testing import assert_equal
 import numpy as np
 
 
-def test_disassemble_complex():
+def test_disassemble_complex_dataset():
     # Create complex dataset
     ds = generate_test_dataset(var=['b', 'c'])
     dims = tuple(ds.dims.keys())
@@ -20,7 +20,18 @@ def test_disassemble_complex():
     xr_assert_equal(ds['a'].imag, ds_real['a__im'])
 
 
-def test_assemble_complex():
+def test_disassemble_complex_dataarray():
+    # Create complex dataset
+    da = generate_test_dataarray(name='data')
+    complex_data = np.random.rand(*da.shape) + 1j * np.random.rand(*da.shape)
+    da.values = complex_data
+    ds_real = disassemble_complex(da)
+    assert_equal(set(ds_real.data_vars), {'data__re', 'data__im'})
+    xr_assert_equal(da.real, ds_real['data__re'])
+    xr_assert_equal(da.imag, ds_real['data__im'])
+
+
+def test_assemble_complex_dataset():
     # Create real dataset with real and imag part
     ds = generate_test_dataset(var=['a__im', 'a__re', 'b', 'c'])
     # Check that assembling into complex works
