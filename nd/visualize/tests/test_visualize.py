@@ -1,8 +1,14 @@
-from nd.visualize import to_rgb
+from nd.visualize import to_rgb, write_video
 from numpy.testing import assert_equal
 from nd.testing import generate_test_dataset
 import numpy as np
 import pytest
+import imageio
+
+
+def _get_video_frame_count(path):
+    video = imageio.mimread(path)
+    return len(video)
 
 
 def test_to_rgb_gray():
@@ -33,3 +39,15 @@ def test_to_rgb_color():
 def test_to_rgb_invalid_datatype():
     with pytest.raises(ValueError):
         to_rgb('string')
+
+
+@pytest.mark.parametrize('path', [
+    'video.gif',
+    'video.avi',
+    'video.mp4'
+])
+def test_write_video(tmpdir, path):
+    ntime = 10
+    ds = generate_test_dataset(ntime=ntime)
+    write_video(ds, path)
+    assert _get_video_frame_count(path) == ntime
