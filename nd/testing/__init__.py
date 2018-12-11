@@ -112,6 +112,13 @@ def assert_all_true(ds):
     assert ds.to_array().values.all()
 
 
+def assert_equal_data(ds1, ds2):
+    """Assert that the data in two datasets is the same, independent
+    of the order of the dimensions.
+    """
+    assert_all_true(ds1 - ds2 == 0)
+
+
 def assert_equal_crs(crs1, crs2, *args, **kwargs):
     xs = np.arange(10, dtype=np.float64)
     ys = np.arange(10, dtype=np.float64)

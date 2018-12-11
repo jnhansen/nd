@@ -21,13 +21,21 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
     Parameters
     ----------
     ds : xarray.Dataset
+        The dataset to split into tiles.
     path : str
+        The output directory in which to place the tiles.
     prefix : str, optional
+        The tile names will start with ```{prefix}.```
     chunks : dict, optional
+        A dictionary of the chunksize for every dimension along which to split.
+        By default, use the dask array chunksize if the data is represented as
+        dask arrays.
     buffer : int or dict, optional
         The number of overlapping pixels to store around each tile
-        (default: 0).
+        (default: 0). Can be given as an integer or per dimension as
+        dictionary.
     """
+
     # Prepare output directory
     if os.path.isfile(path):
         raise ValueError("`path` cannot be a file!")
@@ -36,7 +44,7 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
 
     #  Treat `ds` as a file path
     if isinstance(ds, str):
-        ds = xr.open_dataset(ds)
+        ds = xr.open_dataset(ds, engine='h5netcdf')
 
     # Prepare chunk sizes
     if chunks is None:
@@ -52,8 +60,8 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
 
         if isinstance(buffer, int):
             _buf = buffer
-        elif isinstance(buffer, dict):
-            _buf = buffer[dim] if dim in buffer else 0
+        elif isinstance(buffer, dict) and dim in buffer:
+            _buf = buffer[dim]
         else:
             _buf = 0
 
@@ -79,7 +87,8 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
         # Slice the dataset and write to disk.
         subset = ds.isel(slice_dict)
         suffix = '.'.join(
-            ['{}_{}'.format(dim, s.start) for dim, s in slice_dict.items()]
+            ['{}_{}_{}'.format(dim, s.start, s.stop)
+             for dim, s in slice_dict.items()]
         )
         tile_name = '{}.{}.nc'.format(prefix, suffix)
         # Skip existing files.
@@ -127,7 +136,9 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
     Returns
     -------
     xarray.Dataset
+        The (merged) output dataset.
     """
+
     if isinstance(files, str):
         files = glob.glob(files)
 
@@ -206,7 +217,8 @@ def auto_merge(datasets, buffer='auto', chunks={}):
     # Treat `datasets` as a list of file paths
     if isinstance(datasets[0], str):
         # Pass chunks={} to ensure the dataset is read as a dask array
-        datasets = [add_time(xr.open_dataset(path, chunks=chunks))
+        datasets = [add_time(xr.open_dataset(path, chunks=chunks,
+                                             engine='h5netcdf'))
                     for path in datasets]
 
     if buffer == 'auto':
@@ -231,9 +243,11 @@ def auto_merge(datasets, buffer='auto', chunks={}):
                 if len(vals) < 2 or vals[-1] >= vals[0]:
                     # ascending order
                     keys.append(vals[0])
+                    keys.append(vals[-1])
                 else:
                     # descending order
                     keys.append(-vals[0])
+                    keys.append(-vals[-1])
             return tuple(keys)
 
         sorted_ds = sorted(datasets, key=lambda ds: sort_key(ds, split_dims))
@@ -243,36 +257,53 @@ def auto_merge(datasets, buffer='auto', chunks={}):
                 ):
             group = list(group)
 
+            #
+            # Compute slices based on the buffer
+            #
+
             # Auto-detect buffer?
             if buffer == 'auto':
-                if concat_dim in buf_cache:
-                    _buf = buf_cache[concat_dim]
-                else:
-                    # Determine overlap along concat_dim
-                    values0 = group[0][concat_dim].values
-                    values1 = group[1][concat_dim].values
-                    diff = values1 - values0[-1]
-                    _buf = int((np.argmin(np.abs(diff)) + 1) / 2)
-                    buf_cache[concat_dim] = _buf
+                values = [d[concat_dim].values for d in group]
 
-            elif isinstance(buffer, int):
-                _buf = buffer
+                # overlap with previous
+                prev_diffs = [np.abs(values[i] - values[i-1][-1])
+                              for i in range(1, len(values))]
 
-            elif isinstance(buffer, dict):
-                _buf = buffer[concat_dim] if concat_dim in buffer else 0
+                # The +1 is necessary because this is the stop index of a slice
+                # cast to float because it may be a timedelta
+                prev_idx = [int(np.argmin(diff)) + 1
+                            if float(np.min(diff)) == 0 else 0
+                            for diff in prev_diffs]
+                prev_idx = [None] + [int(np.ceil(i/2)) for i in prev_idx]
+
+                # overlap with next
+                next_diffs = [np.abs(values[i] - values[i+1][0])
+                              for i in range(0, len(values)-1)]
+                next_idx = [int(np.argmin(diff))
+                            for diff in next_diffs]
+
+                next_idx = [int(np.ceil((i + len(v)) / 2))
+                            for i, v in zip(next_idx, values)] + [None]
+
+                slices = [slice(*args) for args in zip(prev_idx, next_idx)]
 
             else:
-                _buf = 0
+                if isinstance(buffer, int):
+                    _buf = buffer
 
-            # Apply buffer
-            if _buf > 0:
-                idx_first = {concat_dim: slice(None, -_buf)}
-                idx_middle = {concat_dim: slice(_buf, -_buf)}
-                idx_end = {concat_dim: slice(_buf, None)}
-                # Requires that group is sorted by concat_dim
-                group = [group[0].isel(idx_first)] + \
-                        [_.isel(idx_middle) for _ in group[1:-1]] + \
-                        [group[-1].isel(idx_end)]
+                elif isinstance(buffer, dict):
+                    _buf = buffer[concat_dim] if concat_dim in buffer else 0
+
+                else:
+                    _buf = 0
+
+                slices = [slice(None, -_buf)] + \
+                         [slice(_buf, -_buf)] * (len(group) - 2) + \
+                         [slice(_buf, None)]
+
+            # Apply buffered slices
+            idx = [{concat_dim: s} for s in slices]
+            group = [d.isel(i) for d, i in zip(group, idx)]
 
             # Merge along concat_dim
             merged.append(xr.auto_combine(group, concat_dim=concat_dim))
