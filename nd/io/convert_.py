@@ -160,19 +160,18 @@ def generate_covariance_matrix(ds, compact=False):
     """Convert from the canonical complex representation to the covariance
     matrix representation.
 
-    TODO: make accept xarray.Dataset √
-
     Parameters
     ----------
-    ds : numpy.array, shape (M, N, 2)
-        A dual polarization matrix as returned from read_dualpol_dimap.
+    ds : xarray.Dataset
+        A dual polarization dataset, containing two complex variables
+        ``VH`` and ``VV``.
     compact : bool, optional
         If True, return a compact real representation. (default: False)
 
     Returns
     -------
     numpy.array, shape (M, N, 2, 2)
-
+        The covariance matrix representation of the data.
     """
 
     if isinstance(ds, xr.Dataset):
@@ -214,31 +213,3 @@ def generate_covariance_matrix(ds, compact=False):
             cov[:, :, 0, 1] = C_12
             cov[:, :, 1, 0] = np.conj(C_12)
         return cov
-
-
-def compact_to_complex(arr):
-    """Convert from compact real representation to the complex form.
-
-    NOTE: deprecate?
-
-    TODO: make accept xarray.Dataset
-
-    Parameters
-    ----------
-    arr : numpy.array, shape (M, N, 2, 2)
-        A dual polarization backscatter image in compact covariance matrix
-        representation.
-
-    Returns
-    -------
-    numpy.array, shape (M, N, 2, 2)
-        A dual polarization backscatter image in complex covariance matrix
-        representation.
-    """
-    result = np.empty_like(arr, dtype=np.complex64)
-    result[:, :, 0, 0] = arr[:, :, 0, 0]
-    result[:, :, 1, 1] = arr[:, :, 1, 1]
-    C_12 = arr[:, :, 0, 1] + 1j * arr[:, :, 1, 0]
-    result[:, :, 0, 1] = C_12
-    result[:, :, 1, 0] = np.conj(C_12)
-    return result
