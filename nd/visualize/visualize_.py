@@ -74,7 +74,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
     pmin : float
         lowest percentile to plot (default: 2). Ignored if vmin is passed.
     pmax : float
-        highest percentile to plot (default: 2). Ignored if vmax is passed.
+        highest percentile to plot (default: 98). Ignored if vmax is passed.
 
     Returns
     -------
