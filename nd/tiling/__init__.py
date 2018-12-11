@@ -305,20 +305,6 @@ def auto_merge(datasets, buffer='auto', chunks={}):
             idx = [{concat_dim: s} for s in slices]
             group = [d.isel(i) for d, i in zip(group, idx)]
 
-            # if (isinstance(_buf, list) and max(_buf) > 0) or \
-            #         (isinstance(_buf, int) and _buf > 0):
-
-            #     idx = [{concat_dim: slice(_buf, -_buf)} for b in _buf]
-            #     group = [d.isel(i) for d, i in zip(group, idx)]
-
-            #     # idx_first = {concat_dim: slice(None, -_buf)}
-            #     # idx_middle = {concat_dim: slice(_buf, -_buf)}
-            #     # idx_end = {concat_dim: slice(_buf, None)}
-            #     # # Requires that group is sorted by concat_dim
-            #     # group = [group[0].isel(idx_first)] + \
-            #     #         [_.isel(idx_middle) for _ in group[1:-1]] + \
-            #     #         [group[-1].isel(idx_end)]
-
             # Merge along concat_dim
             merged.append(xr.auto_combine(group, concat_dim=concat_dim))
 
