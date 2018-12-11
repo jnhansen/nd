@@ -83,7 +83,7 @@ def tile(ds, path, prefix='part', chunks=None, buffer=0):
     # for k in ordered_keys:
     #     ordered_slices[k] = slices[k]
 
-    def _write_tile(slices):
+    def _write_tile(slice_dict):
         # Slice the dataset and write to disk.
         subset = ds.isel(slice_dict)
         suffix = '.'.join(
@@ -176,6 +176,13 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
         return result.compute()
     else:
         return result
+
+
+def _combined_attrs(datasets):
+    attrs = {}
+    for ds in datasets:
+        attrs.update(ds.attrs)
+    return attrs
 
 
 def auto_merge(datasets, buffer='auto', chunks={}):
@@ -306,7 +313,9 @@ def auto_merge(datasets, buffer='auto', chunks={}):
             group = [d.isel(i) for d, i in zip(group, idx)]
 
             # Merge along concat_dim
-            merged.append(xr.auto_combine(group, concat_dim=concat_dim))
+            combined = xr.auto_combine(group, concat_dim=concat_dim)
+            combined.attrs = _combined_attrs(group)
+            merged.append(combined)
 
         return merged
 
@@ -319,7 +328,3 @@ def auto_merge(datasets, buffer='auto', chunks={}):
         d.close()
 
     return merged[0]
-
-
-if __name__ == '__main__':
-    pass
