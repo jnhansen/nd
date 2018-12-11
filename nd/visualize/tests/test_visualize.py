@@ -47,7 +47,7 @@ def test_to_rgb_invalid_datatype():
     'video.mp4'
 ])
 def test_write_video(tmpdir, fname):
-    path = str(tmpdir / fname)
+    path = str(tmpdir.join(fname))
     ntime = 10
     ds = generate_test_dataset(ntime=ntime)
     write_video(ds, path)
