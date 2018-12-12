@@ -13,7 +13,6 @@ addons:
       - gsl-bin
       - libgsl0-dev
       - libgdal1-dev
-      - libav
 before_install:
 - sudo apt-get update -q
 - nc-config --version

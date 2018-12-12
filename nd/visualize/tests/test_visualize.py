@@ -4,11 +4,7 @@ from nd.testing import generate_test_dataset
 import numpy as np
 import pytest
 import imageio
-
-
-def _get_video_frame_count(path):
-    video = imageio.mimread(path)
-    return len(video)
+import os
 
 
 def test_to_rgb_gray():
@@ -51,7 +47,9 @@ def test_write_video(tmpdir, fname):
     ntime = 10
     ds = generate_test_dataset(ntime=ntime)
     write_video(ds, path)
-    assert _get_video_frame_count(path) == ntime
+    assert os.path.isfile(path)
+    video = imageio.mimread(path)
+    assert len(video) == ntime
 
 
 def test_colorize():
