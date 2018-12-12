@@ -7,6 +7,7 @@ from nd.io import open_dataset
 from nd import tiling
 from xarray.testing import assert_equal as xr_assert_equal
 from numpy.testing import assert_equal
+from nd.filters import BoxcarFilter
 
 
 # Synthesize test data
@@ -82,10 +83,27 @@ def test_tile(tmpdir, chunks, buffer):
         assert_equal_data(ds, merged)
 
 
-@pytest.mark.parametrize('fn', [
-    lambda x: x,
-    lambda x: x+1
+@pytest.mark.parametrize('buffer', [0, 3])
+@pytest.mark.parametrize('chunks', [
+    {'time': 3},
+    {'y': 10, 'x': 10}
 ])
-def test_map_over_tiles(fn):
-    # mapped = tiling.map_over_tiles(fn)
-    ...
+def test_tile_and_merge(tmpdir, chunks, buffer):
+    tile_path = tmpdir / 'tiles'
+    tiling.tile(ds, str(tile_path), chunks=chunks, buffer=buffer)
+    merged = tiling.auto_merge(str(tile_path / '*.nc'))
+    xr_assert_equal(merged, ds)
+
+
+@pytest.mark.parametrize('fn,buffer', [
+    (lambda x: x, 0),
+    (lambda x: x * 2, 0),
+    (BoxcarFilter(w=3, dims=('x', 'y')).apply, 1)
+])
+def test_map_over_tiles(tmpdir, fn, buffer):
+    tile_path = tmpdir / 'tiles'
+    chunks = {'y': 10, 'x': 10}
+    tiling.tile(ds, str(tile_path), chunks=chunks, buffer=buffer)
+    files = str(tile_path / '*.nc')
+    mapped = tiling.map_over_tiles(files, fn)
+    xr_assert_equal(mapped, fn(ds))

@@ -6,10 +6,20 @@ from xarray.testing import assert_identical as xr_assert_identical
 from nd import utils
 from nd.testing import equal_list_of_dicts, generate_test_dataset
 import time
+from datetime import datetime
+from dateutil.tz import tzutc
 
 
-def test_str2date():
-    pass
+@pytest.mark.parametrize('fmt', [
+    '%Y-%m-%d %H:%M:%S',
+    '%Y-%m-%d %H:%M:%S.%f',
+    '%Y/%m/%dT%H:%M:%S.%fZ'
+])
+def test_str2date(fmt):
+    d = datetime(2018, 1, 6, 12, 34, 56, tzinfo=tzutc())
+    dstr = d.strftime(fmt)
+    assert_equal(utils.str2date(dstr), d)
+    assert_equal(utils.str2date(dstr, fmt=fmt), d)
 
 
 def test_dict_product():
@@ -28,6 +38,49 @@ def test_chunks():
     n = 15
     for i, c in enumerate(utils.chunks(ll, n)):
         assert_equal(c, ll[i*n:(i+1)*n])
+
+
+def test_array_chunks():
+    arr = np.random.rand(30, 30, 30)
+    for axis in range(arr.ndim):
+        for chunk in utils.array_chunks(arr, 5, axis=axis):
+            assert chunk.shape[axis] == 5
+        merged = np.concatenate(
+            [chunk for chunk in utils.array_chunks(arr, 5, axis=axis)],
+            axis=axis
+        )
+        assert_equal(arr, merged)
+
+
+def test_block_split():
+    arr = np.random.rand(30, 30, 30)
+    nblocks = (1, 2, 3)
+    blocks = utils.block_split(arr, nblocks)
+    assert len(blocks) == np.prod(nblocks)
+
+
+def test_block_merge():
+    arr = np.arange(16).reshape((4, 4))
+    blocks = [
+        arr[0:2, 0:2],
+        arr[0:2, 2:4],
+        arr[2:4, 0:2],
+        arr[2:4, 2:4]
+    ]
+    merged = utils.block_merge(blocks, (2, 2))
+    assert_equal(merged, arr)
+
+
+@pytest.mark.parametrize('nblocks', [
+    (1, 1, 1),
+    (1, 2, 3),
+    (7, 6, 5)
+])
+def test_block_split_and_merge(nblocks):
+    arr = np.random.rand(30, 30, 30)
+    blocks = utils.block_split(arr, nblocks)
+    merged = utils.block_merge(blocks, nblocks)
+    assert_equal(arr, merged)
 
 
 def _parallel_fn(ds):
