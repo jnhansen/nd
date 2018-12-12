@@ -13,9 +13,9 @@ addons:
       - gsl-bin
       - libgsl0-dev
       - libgdal1-dev
+      - libav
 before_install:
 - sudo apt-get update -q
-- sudo apt-get install -y ffmpeg
 - nc-config --version
 - h5cc -showconfig
 matrix:
