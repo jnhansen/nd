@@ -156,7 +156,7 @@ def dualpol_to_complex(ds, inplace=False):
         return ds_c
 
 
-def generate_covariance_matrix(ds, compact=False):
+def generate_covariance_matrix(ds):
     """Convert from the canonical complex representation to the covariance
     matrix representation.
 
@@ -165,51 +165,21 @@ def generate_covariance_matrix(ds, compact=False):
     ds : xarray.Dataset
         A dual polarization dataset, containing two complex variables
         ``VH`` and ``VV``.
-    compact : bool, optional
-        If True, return a compact real representation. (default: False)
 
     Returns
     -------
-    numpy.array, shape (M, N, 2, 2)
+    xarray.Dataset
         The covariance matrix representation of the data.
     """
 
-    if isinstance(ds, xr.Dataset):
-        ds_cov = ds.copy()
-        vh = ds['VH']
-        vv = ds['VV']
-    else:
-        vv = ds[:, :, 0]
-        vh = ds[:, :, 1]
-
-    shape = vh.shape + (2, 2)
-
-    if isinstance(ds, xr.Dataset):
-        ds_cov['C11'] = np.real(vv * np.conj(vv))
-        ds_cov['C22'] = np.real(vh * np.conj(vh))
-        ds_cov['C12'] = vv * np.conj(vh)
-        # NOTE: C21 is np.conj(C12) and hence is redundant information
-        # and need not be stored.
-        del ds_cov['VH']
-        del ds_cov['VV']
-        return ds_cov
-
-    else:
-        #
-        # NOTE: The following is the legacy code for numpy arrays.
-        #
-        if compact:
-            cov = np.empty(shape, dtype=np.float32)
-        else:
-            cov = np.empty(shape, dtype=np.complex64)
-        cov[:, :, 0, 0] = vv * np.conj(vv)
-        cov[:, :, 1, 1] = vh * np.conj(vh)
-        C_12 = vv * np.conj(vh)
-        if compact:
-            cov[:, :, 0, 1] = np.real(C_12)
-            cov[:, :, 1, 0] = np.imag(C_12)
-        else:
-            # C_12
-            cov[:, :, 0, 1] = C_12
-            cov[:, :, 1, 0] = np.conj(C_12)
-        return cov
+    ds_cov = ds.copy()
+    vh = ds['VH']
+    vv = ds['VV']
+    ds_cov['C11'] = np.real(vv * np.conj(vv))
+    ds_cov['C22'] = np.real(vh * np.conj(vh))
+    ds_cov['C12'] = vv * np.conj(vh)
+    # NOTE: C21 is np.conj(C12) and hence is redundant information
+    # and need not be stored.
+    del ds_cov['VH']
+    del ds_cov['VV']
+    return ds_cov

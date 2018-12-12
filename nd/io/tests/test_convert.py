@@ -1,8 +1,11 @@
-from nd.io.convert_ import assemble_complex, disassemble_complex
+import pytest
+from nd.io.convert_ import (assemble_complex, disassemble_complex,
+                            generate_covariance_matrix)
 from nd.testing import generate_test_dataset, generate_test_dataarray
 from xarray.testing import assert_identical as xr_assert_identical
 from xarray.testing import assert_equal as xr_assert_equal
-from numpy.testing import assert_equal
+from xarray.testing import assert_allclose as xr_assert_allclose
+from numpy.testing import assert_equal, assert_allclose
 import numpy as np
 
 
@@ -57,7 +60,12 @@ def test_dualpol_to_complex():
 
 
 def test_generate_covariance_matrix():
-    pass
+    ds = generate_test_dataset(var=['VV__im', 'VV__re', 'VH__im', 'VH__re'])
+    assemble_complex(ds, inplace=True)
+    cov = generate_covariance_matrix(ds)
+    xr_assert_allclose(np.abs(ds.VV)**2, cov.C11)
+    xr_assert_allclose(np.abs(ds.VH)**2, cov.C22)
+    xr_assert_allclose(ds.VV * np.conj(ds.VH), cov.C12)
 
 
 def test_compact_to_complex():
