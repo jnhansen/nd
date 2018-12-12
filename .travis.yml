@@ -33,8 +33,9 @@ install:
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 - conda info -a
-- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION cython numpy scikit-learn pytest pytest-cov coverage ffmpeg
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION cython numpy scikit-learn pytest pytest-cov coverage
 - source activate test-environment
+- conda install ffpmeg -c conda-forge
 - pip install cythongsl codecov
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal
 - export C_INCLUDE_PATH=/usr/include/gdal
