@@ -4,19 +4,21 @@ import re
 from .. import utils
 
 
-def disassemble_complex(ds):
+def disassemble_complex(ds, inplace=False):
     """Disassemble complex valued data into real and imag parts.
 
     Parameters
     ----------
     ds : xarray.Dataset
         The input dataset with complex variables.
+    inplace : bool, optional
+        Whether to modify the dataset inplace (default: False).
 
     Returns
     -------
-    xarray.Dataset
-        A dataset where all complex variables have been split into their real
-        and imaginary parts.
+    xarray.Dataset or None
+        If inplace, returns None. Otherwise, returns a dataset where all
+        complex variables have been split into their real and imaginary parts.
     """
 
     if isinstance(ds, xr.DataArray):
@@ -25,7 +27,10 @@ def disassemble_complex(ds):
             name = 'data'
         ds = ds.to_dataset(name=name)
 
-    new_ds = ds.copy()
+    if inplace:
+        new_ds = ds
+    else:
+        new_ds = ds.copy()
     #
     # Find all complex variables and disassemble into their real and
     # imaginary parts.
@@ -39,8 +44,10 @@ def disassemble_complex(ds):
         del new_ds[vn]
 
     # reapply chunks
-    new_ds = new_ds.chunk(ds.chunks)
-    return new_ds
+    if len(ds.chunks) > 0:
+        new_ds = new_ds.chunk(ds.chunks)
+    if not inplace:
+        return new_ds
 
 
 def assemble_complex(ds, inplace=False):
@@ -53,12 +60,15 @@ def assemble_complex(ds, inplace=False):
     ds : xarray.Dataset
         The input dataset with complex variables split into real and imaginary
         parts.
+    inplace : bool, optional
+        Whether to modify the dataset inplace (default: False).
 
     Returns
     -------
-    xarray.Dataset
-        A dataset where the real and imaginary parts have been combined into
-        the respective complex variables.
+    xarray.Dataset or None
+        If inplace, returns None. Otherwise, returns a dataset where the
+        real and imaginary parts have been combined into the respective
+        complex variables.
     """
 
     if inplace:
