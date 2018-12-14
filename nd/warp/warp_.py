@@ -3,6 +3,7 @@ import os
 import numpy as np
 import xarray as xr
 import rasterio.warp
+import warnings
 from rasterio.coords import BoundingBox
 from rasterio.crs import CRS
 from rasterio.errors import CRSError
@@ -127,9 +128,12 @@ def get_transform(ds):
         return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
 
     else:
-        resx, resy = get_resolution(ds)
-        xoff = ds['x'].values.min()
-        yoff = ds['y'].values.max()
+        x = ds.coords['x'].values
+        y = ds.coords['y'].values
+        resx = (x[-1] - x[0]) / (len(x) - 1)
+        resy = (y[-1] - y[0]) / (len(y) - 1)
+        xoff = x[0]
+        yoff = y[0]
         return Affine(resx, 0, xoff, 0, resy, yoff)
 
 
@@ -423,9 +427,6 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         The projected dataset.
     """
 
-    if 'resampling' not in kwargs:
-        kwargs['resampling'] = rasterio.warp.Resampling.cubic
-
     src_crs = get_crs(ds)
     src_bounds = get_bounds(ds)
     if extent is not None:
@@ -525,8 +526,19 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #
         # Reproject a single data array
         #
-        extra_dims = set(da.dims) - {'y', 'x'}
-        dim_order = tuple(extra_dims) + ('y', 'x')
+        coord_dims = tuple(c for c in ('y', 'x') if c in da.dims)
+        extra_dims = set(da.dims) - set(coord_dims)
+        dim_order = tuple(extra_dims) + coord_dims
+
+        if np.issubdtype(da.dtype, np.integer):
+            nodata = 0
+            default_resampling = rasterio.warp.Resampling.nearest
+        else:
+            nodata = np.nan
+            default_resampling = rasterio.warp.Resampling.cubic
+        if 'resampling' not in kwargs:
+            kwargs['resampling'] = default_resampling
+
         values = da.transpose(*dim_order).values
         output = np.zeros(shape, dtype=da.dtype)
         output[:] = np.nan
@@ -554,7 +566,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             src_crs=src_crs,
             dst_transform=dst_transform,
             dst_crs=dst_crs,
-            dst_nodata=np.nan,
+            dst_nodata=nodata,
             **kwargs
         )
 
@@ -635,6 +647,8 @@ class Reprojection(Algorithm):
 
     Parameters
     ----------
+    target : xarray.Dataset or xarray.DataArray, optional
+        A reference to which a dataset will be aligned.
     crs : dict or str
         The output coordinate reference system as dictionary or proj-string
     extent : tuple, optional
@@ -643,8 +657,8 @@ class Reprojection(Algorithm):
         Extra keyword arguments for ``rasterio.warp.reproject``.
     """
 
-    def __init__(self, crs, extent=None, res=None, width=None, height=None,
-                 transform=None, **kwargs):
+    def __init__(self, target=None, crs=None, extent=None, res=None,
+                 width=None, height=None, transform=None, **kwargs):
         if transform is not None and (width is None or height is None):
             raise ValueError('If `transform` is given, you must also specify '
                              'the `width` and `height` arguments.')
@@ -653,6 +667,20 @@ class Reprojection(Algorithm):
                 (width is None or height is None):
             raise ValueError('Need to provide either `width` and `height` or '
                              'resolution when specifying the extent.')
+
+        if target is not None:
+            # Parse target information
+            for param in ['crs', 'transform', 'width', 'height', 'extent',
+                          'res']:
+                if locals()[param] is not None:
+                    warnings.warn('`{}` is ignored if `target` is '
+                                  'specified.'.format(param))
+
+            crs = get_crs(target)
+            transform = get_transform(target)
+            width = ncols(target)
+            height = nrows(target)
+            res = extent = None
 
         self.crs = _parse_crs(crs)
         self.extent = extent
