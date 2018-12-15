@@ -71,7 +71,7 @@ class Filter(Algorithm):
 
             # convert to DataArray
             da_ordered = ds[variables].to_array().transpose(*ordered_dims)
-            da_filtered = da_ordered.copy()
+            da_filtered = da_ordered.copy(deep=True)
             axes = tuple([da_ordered.dims.index(d) for d in self.dims])
 
             # Prepare data and output as numpy arrays
