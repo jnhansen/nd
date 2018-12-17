@@ -6,10 +6,62 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError('scikit-learn is required for this module.')
 
 import numpy as np
+import geopandas as gpd
+import rasterio.features
 from ..filters import BoxcarFilter
+from ..warp import get_transform, nrows, ncols
+from ..utils import get_vars_for_dims
 
 
 __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
+
+
+def rasterize(shp, ds):
+    """Rasterize features to match a reference dataset.
+
+    Parameters
+    ----------
+    shp : str or geopandas.geodataframe.GeoDataFrame
+        Either the filename of a shapefile or an iterable
+    ds : xarray.Dataset
+        The reference dataset to match the raster shape.
+    class_field : str, optional
+        The name of field containing the label (default: 'class').
+        Ignored if `shapes` is not a shapefile.
+
+    Returns
+    -------
+    xarray.Dataset or xarray.DataArray
+        The rasterized features.
+    """
+
+    if isinstance(shp, str):
+        shp = gpd.read_file(shp)
+    layer = xr.Dataset(coords=ds.coords)
+    shape = (len(layer['y']), len(layer['x']))
+    for col, dtype in shp.dtypes.iteritems():
+        if col in ['id', 'geometry']:
+            continue
+        layer[col] = (('y', 'x'), np.zeros(shape, dtype=dtype))
+
+    for s in shp.iterfeatures():
+        # mask is True outside the polygons.
+        mask = rasterio.features.geometry_mask(
+            [s['geometry']], shape, get_transform(ds)
+        )
+        for col, dtype in shp.dtypes.iteritems():
+            if not col in layer.data_vars:
+                if col in ['id', 'geometry']:
+                    continue
+                layer[col] = (('y', 'x'), np.zeros(shape, dtype=dtype))
+            else:
+                # Update the values inside the polygon to
+                # the attribute of the polygon
+                value = s['properties'][col]
+                layer[col] = layer[col].where(mask, value)
+
+    return layer
+
 
 
 def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
@@ -39,7 +91,7 @@ def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
 
     if variables is None:
         variables = [v for v in ds.data_vars
-                     if 'lat' in ds[v].coords and 'lon' in ds[v].coords]
+                     if 'y' in ds[v].coords and 'x' in ds[v].coords]
     # The redundant [variables] is necessary to remove the `time` coordinate
     df = ds[variables].to_dataframe()[variables]
     if ml == 0 or ml is None:
@@ -57,7 +109,7 @@ def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
 
 def _cluster_smooth(ds, ml=5, scale=True, **kwargs):
     datavars = [v for v in ds.data_vars
-                if 'lat' in ds[v].coords and 'lon' in ds[v].coords]
+                if 'y' in ds[v].coords and 'x' in ds[v].coords]
     # The redundant [datavars] is necessary to remove the `time` coordinate
     multilooked = BoxcarFilter(w=ml).apply(ds[datavars])
     # Calculate variance:
@@ -149,10 +201,23 @@ def _clustermean(ds, labels):
     return _means
 
 
-class Classifier:
+def _build_X(ds):
+    variables = get_vars_for_dims(ds, ('y', 'x'))
+    data = ds[variables].to_array().transpose('y', 'x', 'variable').values
+    return data.reshape((-1, len(variables)))
 
-    def __init__(self, cls):
-        self.cls = cls
+
+class Classifier:
+    """
+    Parameters
+    ----------
+    clf : sklearn classifier
+        An initialized classifier object as provided by scikit-learn.
+        Must provide methods ``fit`` and ``predict``.
+    """
+
+    def __init__(self, clf):
+        self.clf = clf
 
     def fit(self, ds, labels):
         """
@@ -163,8 +228,12 @@ class Classifier:
         labels : xarray.DataArray
             The class labels to train the classifier.
         """
-        self.cls.fit(...)
-        pass
+
+        mask = np.array(labels > 0).reshape(-1)
+        X = _build_X(ds)[mask]
+        y = np.array(labels).reshape(-1)[mask]
+        # print(mask.shape, X.shape, y.shape)
+        self.clf.fit(X, y)
 
     def predict(self, ds):
         """
@@ -178,5 +247,10 @@ class Classifier:
         xarray.DataArray
             The predicted class labels.
         """
-        # labels = self.cls.predict(...)
-        pass
+
+        X = _build_X(ds)
+        labels_flat = self.clf.predict(X)
+        shape = (nrows(ds), ncols(ds))
+        labels = xr.DataArray(labels_flat.reshape(shape), dims=('y', 'x'),
+                              coords=ds.coords)
+        return labels

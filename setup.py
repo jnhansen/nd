@@ -79,7 +79,8 @@ if not mock_install:
         # "NetCDF4"
         "h5py",
         "h5netcdf",
-        "imageio"
+        "imageio",
+        "geopandas"
     ])
 
 include_dirs.append(numpy.get_include())
