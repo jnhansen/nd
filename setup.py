@@ -53,6 +53,7 @@ extensions = [
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
+    Extension("nd.filters._correlation", ["nd/filters/_correlation" + ext]),
     Extension("nd.warp._warp", ["nd/warp/_warp" + ext]),
 ]
 
@@ -80,6 +81,7 @@ if not mock_install:
         "h5py",
         "h5netcdf",
         "imageio",
+        "pyproj",
         "geopandas"
     ])
 
@@ -90,5 +92,8 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     include_dirs=include_dirs,
-    install_requires=install_requires
+    install_requires=install_requires,
+    dependency_links=[
+        "https://github.com/jswhit/pyproj.git#egg=pyproj"
+    ]
 )
