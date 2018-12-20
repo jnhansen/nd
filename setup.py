@@ -53,7 +53,7 @@ extensions = [
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("nd.filters._correlation", ["nd/filters/_correlation" + ext]),
+    # Extension("nd.filters._correlation", ["nd/filters/_correlation" + ext]),
     Extension("nd.warp._warp", ["nd/warp/_warp" + ext]),
 ]
 
