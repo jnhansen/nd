@@ -92,8 +92,5 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     include_dirs=include_dirs,
-    install_requires=install_requires,
-    dependency_links=[
-        "https://github.com/jswhit/pyproj.git#egg=pyproj"
-    ]
+    install_requires=install_requires
 )
