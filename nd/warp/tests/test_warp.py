@@ -236,8 +236,8 @@ def test_get_crs(name, kwargs):
 
 
 @pytest.mark.parametrize('fmt,result', [
-    ('proj', '+init=epsg:4326 +no_defs'),
-    ('dict', {'init': 'epsg:4326', 'no_defs': True}),
+    ('proj', '+init=epsg:4326'),
+    ('dict', {'init': 'epsg:4326'}),
     ('wkt', epsg4326.wkt)
 ])
 def test_get_crs_formats(fmt, result):

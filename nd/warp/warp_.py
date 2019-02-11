@@ -94,7 +94,7 @@ def get_crs(ds, format='crs'):
     if format == 'crs':
         return crs
     if format == 'proj':
-        return crs.to_string()
+        return crs.to_proj4()
     if format == 'dict':
         return crs.to_dict()
     if format == 'wkt':
