@@ -25,7 +25,7 @@ class NLMeansFilter(Filter):
 
     per_variable = False
 
-    def __init__(self, dims, r=1, sigma=1, h=1, f=1):
+    def __init__(self, dims=('y', 'x'), r=1, sigma=1, h=1, f=1):
         if isinstance(r, (int, float)):
             r = [r] * len(dims)
         self.dims = tuple(dims)
