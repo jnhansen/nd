@@ -82,7 +82,8 @@ if not mock_install:
         "h5netcdf",
         "imageio",
         "pyproj",
-        "geopandas"
+        "geopandas",
+        "skimage",
     ])
 
 include_dirs.append(numpy.get_include())
