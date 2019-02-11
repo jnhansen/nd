@@ -52,4 +52,4 @@ def test_coregistration():
     ds_cor = cor.apply(ds)
     shifts = check_shifts(ds_cor)
     print(shifts)
-    assert (np.abs(shifts) < 0.1).all()
+    assert (np.abs(shifts) <= 0.1).all()
