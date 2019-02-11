@@ -8,9 +8,12 @@ from .warp_ import Reprojection, Resample, Alignment, _parse_crs, get_crs, \
                    nrows, ncols, \
                    get_common_bounds, get_common_extent, get_common_resolution
 
+from .coregister_ import Coregistration
+
 __all__ = ['Reprojection',
            'Resample',
            'Alignment',
+           'Coregistration'
            '_parse_crs',
            'get_crs',
            'get_transform',
