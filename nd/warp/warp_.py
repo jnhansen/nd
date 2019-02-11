@@ -188,10 +188,10 @@ def get_bounds(ds):
             dims = ds.dims
         elif isinstance(ds, xr.DataArray):
             dims = dict(zip(ds.dims, ds.shape))
-        nrows = dims['y']
-        ncols = dims['x']
-        corners = (np.array([0, 0, ncols-1, ncols-1]),
-                   np.array([0, nrows-1, 0, nrows-1]))
+        n_rows = dims['y']
+        n_cols = dims['x']
+        corners = (np.array([0, 0, n_cols-1, n_cols-1]),
+                   np.array([0, n_rows-1, 0, n_rows-1]))
         corner_x, corner_y = trans * corners
         return BoundingBox(
             left=corner_x.min(),
@@ -659,15 +659,6 @@ class Reprojection(Algorithm):
 
     def __init__(self, target=None, crs=None, extent=None, res=None,
                  width=None, height=None, transform=None, **kwargs):
-        if transform is not None and (width is None or height is None):
-            raise ValueError('If `transform` is given, you must also specify '
-                             'the `width` and `height` arguments.')
-
-        elif extent is not None and res is None and \
-                (width is None or height is None):
-            raise ValueError('Need to provide either `width` and `height` or '
-                             'resolution when specifying the extent.')
-
         if target is not None:
             # Parse target information
             for param in ['crs', 'transform', 'width', 'height', 'extent',
@@ -681,6 +672,15 @@ class Reprojection(Algorithm):
             width = ncols(target)
             height = nrows(target)
             res = extent = None
+
+        elif transform is not None and (width is None or height is None):
+            raise ValueError('If `transform` is given, you must also specify '
+                             'the `width` and `height` arguments.')
+
+        elif extent is not None and res is None and \
+                (width is None or height is None):
+            raise ValueError('Need to provide either `width` and `height` or '
+                             'resolution when specifying the extent.')
 
         self.crs = _parse_crs(crs)
         self.extent = extent
