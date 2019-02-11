@@ -55,6 +55,7 @@ extensions = [
               ),
     # Extension("nd.filters._correlation", ["nd/filters/_correlation" + ext]),
     Extension("nd.warp._warp", ["nd/warp/_warp" + ext]),
+    Extension("nd.change._bayes", ["nd/change/_bayes" + ext]),
 ]
 
 if use_cython:
@@ -83,7 +84,7 @@ if not mock_install:
         "imageio",
         "pyproj",
         "geopandas",
-        "skimage",
+        "scikit-image",
     ])
 
 include_dirs.append(numpy.get_include())
