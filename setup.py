@@ -81,6 +81,7 @@ if not mock_install:
         "h5py",
         "h5netcdf",
         "imageio",
+        "imageio-ffmpeg",
         "pyproj",
         "geopandas",
         "scikit-image",
