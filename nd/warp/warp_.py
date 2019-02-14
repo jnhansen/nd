@@ -8,7 +8,7 @@ from rasterio.coords import BoundingBox
 from rasterio.crs import CRS
 from rasterio.errors import CRSError
 from affine import Affine
-from ..algorithm import Algorithm
+from ..algorithm import Algorithm, wrap_algorithm
 from ..io import to_netcdf, open_dataset
 
 
@@ -709,6 +709,9 @@ class Reprojection(Algorithm):
                           extent=self.extent, **self.kwargs)
 
 
+reproject = wrap_algorithm(Reprojection, 'reproject')
+
+
 class Resample(Algorithm):
     """Resample a dataset to the specified resolution or width and height.
 
@@ -748,6 +751,9 @@ class Resample(Algorithm):
 
         return _reproject(ds, width=self.width, height=self.height,
                           res=self.res, **self.kwargs)
+
+
+resample = wrap_algorithm(Resample, 'resample')
 
 
 class Alignment(Algorithm):
@@ -823,3 +829,6 @@ class Alignment(Algorithm):
                 ds = open_dataset(ds)
             res = proj.apply(ds)
             to_netcdf(res, outfile)
+
+
+align = wrap_algorithm(Alignment, 'align')

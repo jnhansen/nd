@@ -1,6 +1,7 @@
 import numpy as np
 from ._nlmeans import _pixelwise_nlmeans_3d
 from .filter_ import Filter
+from ..algorithm import wrap_algorithm
 
 
 class NLMeansFilter(Filter):
@@ -53,3 +54,6 @@ class NLMeansFilter(Filter):
 
     def _pixelfilter(self, pixel, output):
         ...
+
+
+nlmeans = wrap_algorithm(NLMeansFilter, 'nlmeans')

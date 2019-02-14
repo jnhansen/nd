@@ -5,6 +5,7 @@ Conradsen et al. (2015).
 from ..io import disassemble_complex
 from ..filters import BoxcarFilter
 from . import ChangeDetection
+from ..algorithm import wrap_algorithm
 import numpy as np
 import xarray as xr
 # Cannot install libgsl-dev on ReadTheDocs.
@@ -98,3 +99,6 @@ class OmnibusTest(ChangeDetection):
     def apply(self, ds):
         return _change_detection(ds, alpha=self.alpha, ml=self.ml, n=self.n,
                                  njobs=self.njobs)
+
+
+omnibus = wrap_algorithm(OmnibusTest, 'omnibus')

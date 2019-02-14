@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.ndimage.filters as snf
 from . import Filter
+from ..algorithm import wrap_algorithm
 
 
 def _expand_kernel(kernel, kernel_dims, new_dims):
@@ -86,6 +87,9 @@ class ConvolutionFilter(Filter):
             snf.convolve(arr, nd_kernel, output=output, **self.kwargs)
 
 
+convolution = wrap_algorithm(ConvolutionFilter, 'convolution')
+
+
 class BoxcarFilter(ConvolutionFilter):
     """
     A boxcar filter.
@@ -108,6 +112,9 @@ class BoxcarFilter(ConvolutionFilter):
         self.dims = tuple(dims)
         self.kernel = np.ones((w,) * N, dtype=np.float64) / w**N
         self.kwargs = kwargs
+
+
+boxcar = wrap_algorithm(BoxcarFilter, 'boxcar')
 
 
 class GaussianFilter(Filter):
@@ -153,3 +160,6 @@ class GaussianFilter(Filter):
         else:
             snf.gaussian_filter(arr, sigma=ndsigma, output=output,
                                 **self.kwargs)
+
+
+gaussian = wrap_algorithm(GaussianFilter, 'gaussian')

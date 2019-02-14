@@ -8,9 +8,19 @@ in an arbitrary number of dimensions.
 """
 
 from .filter_ import Filter
-from .nlmeans_ import NLMeansFilter
-from .convolve_ import ConvolutionFilter, BoxcarFilter, GaussianFilter, \
-                       _expand_kernel
+from .nlmeans_ import NLMeansFilter, nlmeans
+from .convolve_ import (ConvolutionFilter, convolution,
+                        BoxcarFilter, boxcar,
+                        GaussianFilter, gaussian,
+                        _expand_kernel)
 
-__all__ = ['Filter', 'ConvolutionFilter', 'BoxcarFilter', 'GaussianFilter',
-           'NLMeansFilter', '_expand_kernel']
+__all__ = ['Filter',
+           'ConvolutionFilter',
+           'convolution',
+           'BoxcarFilter',
+           'boxcar',
+           'GaussianFilter',
+           'gaussian',
+           'NLMeansFilter',
+           'nlmeans',
+           '_expand_kernel']
