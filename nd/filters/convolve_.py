@@ -64,6 +64,7 @@ class ConvolutionFilter(Filter):
     """
 
     per_variable = True
+    supports_complex = True
     kwargs = {}
 
     def __init__(self, dims=('y', 'x'), kernel=None, **kwargs):
