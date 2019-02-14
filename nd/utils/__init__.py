@@ -27,6 +27,7 @@ __all__ = ['str2date',
            'select',
            'get_vars_for_dims',
            'expand_variables',
+           'is_complex'
            ]
 
 
@@ -384,3 +385,20 @@ def expand_variables(da, dim='variable'):
     result = xr.merge(_vars)
     result.attrs = attrs
     return result
+
+
+def is_complex(ds):
+    """Check if a dataset contains any complex variables.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+
+    Returns
+    -------
+    bool
+        True if `ds` contains any complex variables, False otherwise.
+    """
+    return np.any(
+        [np.iscomplexobj(v) for v in ds.data_vars.values()]
+    )
