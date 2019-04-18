@@ -9,14 +9,14 @@ import numpy as np
 import geopandas as gpd
 import rasterio.features
 from ..filters import BoxcarFilter
-from ..warp import get_transform, nrows, ncols
+from ..warp import get_transform, nrows, ncols, get_bounds
 from ..utils import get_vars_for_dims
 
 
 __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
 
 
-def rasterize(shp, ds):
+def rasterize(shp, ds, columns=None):
     """Rasterize features to match a reference dataset.
 
     Parameters
@@ -34,9 +34,9 @@ def rasterize(shp, ds):
     xarray.Dataset or xarray.DataArray
         The rasterized features.
     """
-
+    ds_bbox = get_bounds(ds)
     if isinstance(shp, str):
-        shp = gpd.read_file(shp)
+        shp = gpd.read_file(shp, bbox=ds_bbox)
     layer = xr.Dataset(coords=ds.coords)
     shape = (len(layer['y']), len(layer['x']))
     for col, dtype in shp.dtypes.iteritems():
@@ -50,7 +50,7 @@ def rasterize(shp, ds):
             [s['geometry']], shape, get_transform(ds)
         )
         for col, dtype in shp.dtypes.iteritems():
-            if not col in layer.data_vars:
+            if col not in layer.data_vars:
                 if col in ['id', 'geometry']:
                     continue
                 layer[col] = (('y', 'x'), np.zeros(shape, dtype=dtype))
@@ -61,7 +61,6 @@ def rasterize(shp, ds):
                 layer[col] = layer[col].where(mask, value)
 
     return layer
-
 
 
 def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
@@ -229,18 +228,21 @@ class Classifier:
             The class labels to train the classifier.
         """
 
-        mask = np.array(labels > 0).reshape(-1)
+        mask = np.array(np.logical_and(
+            ~np.isnan(labels), labels > 0)).reshape(-1)
         X = _build_X(ds)[mask]
         y = np.array(labels).reshape(-1)[mask]
-        # print(mask.shape, X.shape, y.shape)
         self.clf.fit(X, y)
 
-    def predict(self, ds):
+    def predict(self, ds, func='predict'):
         """
         Parameters
         ----------
         ds : xarray.Dataset
             The dataset for which to predict the class labels.
+        func : str, optional
+            The method of the classifier to use for prediction
+            (default: 'predict').
 
         Returns
         -------
@@ -248,8 +250,10 @@ class Classifier:
             The predicted class labels.
         """
 
+        if func not in dir(self.clf):
+            raise AttributeError('Classifier has no method {}.'.format(func))
         X = _build_X(ds)
-        labels_flat = self.clf.predict(X)
+        labels_flat = self.clf.__getattribute__(func)(X)
         shape = (nrows(ds), ncols(ds))
         labels = xr.DataArray(labels_flat.reshape(shape), dims=('y', 'x'),
                               coords=ds.coords)
