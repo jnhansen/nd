@@ -1,9 +1,9 @@
+import skimage
 import numpy as np
 import xarray as xr
 from ..algorithm import Algorithm, wrap_algorithm
 from ..utils import get_vars_for_dims
 from ..io import disassemble_complex
-import skimage
 
 
 class Coregistration(Algorithm):
