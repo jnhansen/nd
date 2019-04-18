@@ -186,8 +186,7 @@ def open_beam_dimap(path, read_data=True):
     #
     times = [utils.str2date(meta['time_start'])]
     coords['time'] = times
-    # ds = xr.Dataset(coords=coords, attrs=meta)
-    ds = xr.Dataset()
+    ds = xr.Dataset(coords=coords, attrs=meta)
 
     if read_data:
         for rpath in data_files:
