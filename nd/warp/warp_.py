@@ -79,7 +79,7 @@ def get_crs(ds, format='crs'):
     crs = None
     if 'crs' in ds.attrs:
         crs = _parse_crs(ds.attrs['crs'])
-    elif 'crs' in ds.data_vars:
+    elif isinstance(ds, xr.Dataset) and 'crs' in ds.data_vars:
         for attr in ds['crs'].attrs:
             try:
                 crs = _parse_crs(ds['crs'].attrs[attr])
@@ -122,7 +122,8 @@ def get_transform(ds):
         else:
             return Affine(*ds_trans)
 
-    elif 'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
+    elif isinstance(ds, xr.Dataset) and \
+            'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
         transf_str = ds.data_vars['crs'].attrs['i2m']
         a = list(map(float, transf_str.split(',')))
         return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
