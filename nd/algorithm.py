@@ -17,15 +17,37 @@ class Algorithm(ABC):
         return parallel(self.apply, dim=dim, chunks=jobs)
 
 
+def extract_arguments(fn, args, kwargs):
+    """
+    Given a function fn, return the leftover *args and **kwargs.
+    """
+    def _(*args, **kwargs):
+        pass
+    sig = inspect.signature(fn)
+    if 'self' in sig.parameters:
+        sig = sig.replace(parameters=tuple(sig.parameters.values())[1:])
+    parameters = dict(sig.parameters)
+    parameters.update(dict(inspect.signature(_).parameters))
+    new_sig = sig.replace(parameters=tuple(parameters.values()))
+    bound = new_sig.bind(*args, **kwargs)
+    return bound.arguments
+
+
 def wrap_algorithm(algo, name=None):
     """
     Return the function representation of an Algorithm derived class.
+
+    NOTE: If algo.apply has *args and **kwargs parameters, this doesn't work.
     """
     if not issubclass(algo, Algorithm):
         raise ValueError('Class must be an instance of `nd.Algorithm`.')
 
-    def _wrapper(ds, *args, **kwargs):
-        return algo(*args, **kwargs).apply(ds)
+    def _wrapper(*args, **kwargs):
+        # First, apply the arguments to .apply():
+        apply_kwargs = extract_arguments(algo.apply, args, kwargs)
+        init_args = apply_kwargs.pop('args', ())
+        init_kwargs = apply_kwargs.pop('kwargs', {})
+        return algo(*init_args, **init_kwargs).apply(**apply_kwargs)
 
     # Override function module
     _wrapper.__module__ = algo.__module__
@@ -67,7 +89,7 @@ def wrap_algorithm(algo, name=None):
     # Override signature
     sig_init = inspect.signature(algo.__init__)
     sig_apply = inspect.signature(algo.apply)
-    parameters = (tuple(sig_apply.parameters.values())[1],) + \
+    parameters = tuple(sig_apply.parameters.values())[1:] + \
         tuple(sig_init.parameters.values())[1:]
     sig = sig_init.replace(parameters=parameters)
     _wrapper.__signature__ = sig
