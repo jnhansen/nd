@@ -24,6 +24,18 @@ def _get_dim_order(ds):
         return list(ds.sizes.mapping)
 
 
+def _get_projection_dim_order(ds):
+    """
+    Return the dimension order required by the projection operations.
+    This moves the x and y dimensions to the end.
+    """
+    dims = _get_dim_order(ds)
+    extra_dims = set(dims) - {'y', 'x'}
+    ordered_extra_dims = \
+        tuple(d for d in dims if d in extra_dims)
+    return ordered_extra_dims + ('y', 'x')
+
+
 def _parse_crs(crs):
     """Parse a coordinate reference system from a variety of representations.
 
@@ -524,9 +536,6 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
     # or 'band'
     #
     extra_dims = set(src_dims) - {'y', 'x'}
-    ordered_extra_dims = \
-        tuple(d for d in src_dims if d in extra_dims)
-    dst_dims = ordered_extra_dims + ('y', 'x')
 
     for c in extra_dims:
         dst_coords[c] = ds.coords[c]
@@ -630,13 +639,12 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         # Reproject the actual data
         #
         for v in ds.data_vars:
-            if set(ds[v].dims) == set(dst_dims):
+            vdims = _get_projection_dim_order(ds[v])
+            if set(ds[v].dims) == set(vdims) or set(ds[v].dims) == {'y', 'x'}:
                 shape = (height, width)
-                result[v] = (dst_dims, _reproject_da(ds[v], shape))
-            elif set(ds[v].dims) == {'y', 'x'}:
-                shape = (height, width)
-                result[v] = (dst_dims, _reproject_da(ds[v], shape))
+                result[v] = (vdims, _reproject_da(ds[v], shape))
             else:
+                # The variable doesn't contain y and x dimensions.
                 result[v] = (ds[v].dims, ds[v])
 
         #
@@ -650,6 +658,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
 
     elif isinstance(ds, xr.DataArray):
         shape = (height, width)
+        dst_dims = _get_projection_dim_order(ds)
         result = xr.DataArray(_reproject_da(ds, shape), dims=dst_dims,
                               coords=dst_coords, name=ds.name)
 
