@@ -25,44 +25,32 @@ from affine import Affine
 ds_params = [
     ('notime', {
         # Default
-        'nx': 10,
-        'ny': 20,
-        'ntime': None,
+        'dims': {'y': 20, 'x': 10},
         'crs': CRS({'init': 'epsg:4326'})
     }),
     ('notime_mercator', {
         # Default
-        'nx': 10,
-        'ny': 20,
-        'ntime': None,
+        'dims': {'y': 20, 'x': 10},
         'crs': CRS({'init': 'epsg:3395'})
     }),
     ('standard', {
         # Default
-        'nx': 10,
-        'ny': 20,
-        'ntime': 1,
+        'dims': {'y': 20, 'x': 10, 'time': 1},
         'crs': CRS({'init': 'epsg:4326'})
     }),
     ('standard_mercator', {
         # Test Mercator Projection
-        'nx': 10,
-        'ny': 20,
-        'ntime': 1,
+        'dims': {'y': 20, 'x': 10, 'time': 1},
         'crs': CRS({'init': 'epsg:3395'})
     }),
     ('ntime=5', {
         # Test temporal dimension
-        'nx': 10,
-        'ny': 20,
-        'ntime': 5,
+        'dims': {'y': 20, 'x': 10, 'time': 5},
         'crs': CRS({'init': 'epsg:4326'})
     }),
     ('variables', {
         # Test different variables
-        'nx': 10,
-        'ny': 20,
-        'ntime': 1,
+        'dims': {'y': 20, 'x': 10, 'time': 1},
         'crs': CRS({'init': 'epsg:4326'}),
         'var': ['v1', 'v2', 'v3']
     })
@@ -192,13 +180,13 @@ def test_equal_datasets():
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_nrows(name, kwargs):
     ds = generate_test_dataset(**kwargs)
-    assert_equal(nrows(ds), kwargs['ny'])
+    assert_equal(nrows(ds), kwargs['dims']['y'])
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_ncols(name, kwargs):
     ds = generate_test_dataset(**kwargs)
-    assert_equal(ncols(ds), kwargs['nx'])
+    assert_equal(ncols(ds), kwargs['dims']['x'])
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
@@ -378,7 +366,7 @@ def test_get_common_resolution_different_projections():
 ])
 def test_get_dims(generator):
     dims = {'x': 5, 'y': 10, 'time': 15}
-    ds = generator(nx=dims['x'], ny=dims['y'], ntime=dims['time'])
+    ds = generator(dims=dims)
     assert_equal(get_dims(ds), dims)
 
 
@@ -515,6 +503,9 @@ def test_alignment(tmpdir, extent, from_files):
         )
         xr_assert_equal(ds['x'], aligned[0]['x'])
         xr_assert_equal(ds['y'], aligned[0]['y'])
+
+
+# def test_reproject_with_extra_dims():
 
 
 # def test_align(tmpdir):

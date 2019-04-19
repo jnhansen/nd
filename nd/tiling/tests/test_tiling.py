@@ -14,7 +14,7 @@ from nd.filters import BoxcarFilter
 ny = 20
 nx = 20
 ntime = 10
-ds = generate_test_dataset(ny=ny, nx=nx, ntime=ntime)
+ds = generate_test_dataset(dims={'y': ny, 'x': nx, 'time': ntime})
 
 # Generate tiles along y, x, and time dimension
 slices = dict(y=[slice(None, 10), slice(10, None)],

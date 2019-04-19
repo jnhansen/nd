@@ -31,7 +31,7 @@ def create_misaligned_dataset(**kwargs):
             ds[v].loc[dict(time=ds['time'][t])] = \
                 skimage.transform.warp(src[v].values, transf, order=3)
 
-    return ds, shifts
+    return ds, shifts[1:, :]
 
 
 def check_shifts(ds):
@@ -47,9 +47,11 @@ def check_shifts(ds):
 
 
 def test_coregistration():
-    ds, shifts = create_misaligned_dataset(nx=100, ny=100)
-    cor = Coregistration(upsampling=30)
+    ds, old_shifts = create_misaligned_dataset(
+        dims={'y': 100, 'x': 100, 'time': 10})
+    cor = Coregistration(upsampling=50)
     ds_cor = cor.apply(ds)
     shifts = check_shifts(ds_cor)
     print(shifts)
+    assert (np.abs(shifts) <= np.abs(old_shifts)).all()
     assert (np.abs(shifts) <= 0.1).all()

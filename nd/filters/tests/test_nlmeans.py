@@ -3,7 +3,7 @@ from nd.testing import generate_test_dataset, assert_all_true
 import numpy as np
 
 
-ds = generate_test_dataset(ny=20, nx=20, ntime=10)
+ds = generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10})
 
 
 def test_nlmeans():
