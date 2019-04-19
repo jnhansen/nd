@@ -12,6 +12,18 @@ from ..algorithm import Algorithm, wrap_algorithm
 from ..io import to_netcdf, open_dataset
 
 
+def _get_dim_order(ds):
+    """
+    Return the dimension of dataset `ds` in order.
+    """
+    # The ordered dictionary is hidden behind two wrappers,
+    # need to access the dict behind the Frozen(SortedKeysDict).
+    if isinstance(ds, xr.Dataset):
+        return list(ds.sizes.mapping.mapping)
+    elif isinstance(ds, xr.DataArray):
+        return list(ds.sizes.mapping)
+
+
 def _parse_crs(crs):
     """Parse a coordinate reference system from a variety of representations.
 
@@ -497,7 +509,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
                 **src_bounds._asdict())
 
     src_transform = get_transform(ds)
-    src_dims = get_dims(ds)
+    src_dims = _get_dim_order(ds)
     dst_crs = _parse_crs(dst_crs)
 
     #
@@ -511,17 +523,13 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
     # Handle the case where there are extra dimensions, e.g. 'time'
     # or 'band'
     #
-    extra_dims = src_dims.keys() - {'y', 'x'}
-    if len(extra_dims) == 0:
-        dst_shape = (height, width)
-        dst_dims = ('y', 'x')
-    elif len(extra_dims) == 1:
-        extra_dim = extra_dims.pop()
-        dst_shape = (src_dims[extra_dim], height, width)
-        dst_dims = (extra_dim, 'y', 'x')
-        dst_coords[extra_dim] = ds.coords[extra_dim]
-    else:
-        raise ValueError('More than three dimensions are not supported.')
+    extra_dims = set(src_dims) - {'y', 'x'}
+    ordered_extra_dims = \
+        tuple(d for d in src_dims if d in extra_dims)
+    dst_dims = ordered_extra_dims + ('y', 'x')
+
+    for c in extra_dims:
+        dst_coords[c] = ds.coords[c]
 
     def _reproject_da(da, shape):
         #
@@ -529,8 +537,13 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #
         coord_dims = tuple(c for c in ('y', 'x') if c in da.dims)
         extra_dims = set(da.dims) - set(coord_dims)
-        dim_order = tuple(extra_dims) + coord_dims
+        # Preserve original dimension order
+        orig_dim_order = _get_dim_order(da)
+        ordered_extra_dims = \
+            tuple(d for d in orig_dim_order if d in extra_dims)
+        dim_order = ordered_extra_dims + coord_dims
 
+        # Determine best resampling method from data type
         if np.issubdtype(da.dtype, np.integer):
             nodata = 0
             default_resampling = rasterio.warp.Resampling.nearest
@@ -540,8 +553,20 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         if 'resampling' not in kwargs:
             kwargs['resampling'] = default_resampling
 
+        # Get values as numpy array such that last two axes are
+        # y and x
         values = da.transpose(*dim_order).values
-        output = np.zeros(shape, dtype=da.dtype)
+
+        # Flatten multidimensional data to ONE extra dimension
+        if values.ndim > 2:
+            output_shape = values.shape[:-2] + shape
+            values = values.reshape((-1,) + values.shape[-2:])
+            output_shape_flat = (values.shape[0],) + shape
+        else:
+            output_shape = shape
+            output_shape_flat = shape
+
+        output = np.zeros(output_shape_flat, dtype=da.dtype)
         output[:] = np.nan
 
         # Fix data shape for one-dimensional data
@@ -572,7 +597,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         )
 
         # Final reshape in case the input was one-dimensional
-        return output.reshape(shape)
+        return output.reshape(output_shape)
 
     if isinstance(ds, xr.Dataset):
         result = xr.Dataset(coords=dst_coords)
@@ -606,7 +631,8 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #
         for v in ds.data_vars:
             if set(ds[v].dims) == set(dst_dims):
-                result[v] = (dst_dims, _reproject_da(ds[v], dst_shape))
+                shape = (height, width)
+                result[v] = (dst_dims, _reproject_da(ds[v], shape))
             elif set(ds[v].dims) == {'y', 'x'}:
                 shape = (height, width)
                 result[v] = (dst_dims, _reproject_da(ds[v], shape))
@@ -623,9 +649,16 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #     result.coords['lat'] = (('y',), lat)
 
     elif isinstance(ds, xr.DataArray):
-        result = xr.DataArray(_reproject_da(ds, dst_shape), dims=dst_dims,
+        shape = (height, width)
+        result = xr.DataArray(_reproject_da(ds, shape), dims=dst_dims,
                               coords=dst_coords, name=ds.name)
 
+    # Reorder dimensions to match original.
+    result = result.transpose(*_get_dim_order(ds))
+
+    #
+    # Add metadata
+    #
     result.attrs = ds.attrs
 
     # Serialize transform to tuple and store in metadata
@@ -802,7 +835,7 @@ class Alignment(Algorithm):
             # Pass chunks={} to ensure the dataset is read as a dask array
             product_names = [os.path.splitext(os.path.split(_)[1])[0]
                              for _ in products]
-            datasets = [open_dataset(path) for path in datasets]
+            datasets = [open_dataset(d) for d in datasets]
         else:
             product_names = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
                              if 'metadata' in ds else 'data{}'.format(i)

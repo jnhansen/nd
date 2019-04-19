@@ -505,7 +505,34 @@ def test_alignment(tmpdir, extent, from_files):
         xr_assert_equal(ds['y'], aligned[0]['y'])
 
 
-# def test_reproject_with_extra_dims():
+@pytest.mark.parametrize('dims', [
+    {'y': 20, 'x': 20, 'time': 10, 'band': 5},
+    {'x': 20, 'y': 20, 'time': 10, 'band': 5},
+    {'time': 10, 'band': 5, 'x': 20, 'y': 20},
+    {'time': 10, 'x': 20, 'band': 5, 'y': 20},
+    {'y': 20, 'x': 20, 'time': 10, 'band': 5, 'extra': 2}
+])
+def test_reproject_with_extra_dims(dims):
+    crs1 = _parse_crs('+init=epsg:4326')
+    crs2 = _parse_crs('+init=epsg:3395')
+    ds = generate_test_dataset(
+        dims=dims, crs=crs1
+    )
+
+    proj = Reprojection(crs=crs2)
+    reprojected = proj.apply(ds)
+
+    # Check that a reprojected slice of the dataset is the same as
+    # the slice of the reprojection of the entire dataset.
+    slices = [
+        {'band': 3},
+        {'time': slice(1, 3)}
+    ]
+    for s in slices:
+        xr_assert_equal(
+            proj.apply(ds.isel(**s)),
+            reprojected.isel(**s)
+        )
 
 
 # def test_align(tmpdir):
