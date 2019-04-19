@@ -22,13 +22,16 @@ def generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10},
     np.random.seed(random_seed)
 
     coords = {}
-    if 'y' in dims:
-        coords['y'] = np.linspace(extent[1], extent[3], dims['y'])
-    if 'x' in dims:
-        coords['x'] = np.linspace(extent[0], extent[2], dims['x'])
-    if 'time' in dims:
-        coords['time'] = pd.date_range('2017-01-01', '2018-01-01',
-                                       periods=dims['time'])
+    for name, size in dims.items():
+        if name == 'y':
+            coords[name] = np.linspace(extent[1], extent[3], size)
+        elif name == 'x':
+            coords[name] = np.linspace(extent[0], extent[2], size)
+        elif name == 'time':
+            coords[name] = pd.date_range('2017-01-01', '2018-01-01',
+                                         periods=size)
+        else:
+            coords[name] = np.arange(size)
 
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
     ds = xr.Dataset(coords=coords, attrs=meta)
