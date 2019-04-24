@@ -844,7 +844,7 @@ class Alignment(Algorithm):
             # Pass chunks={} to ensure the dataset is read as a dask array
             product_names = [os.path.splitext(os.path.split(_)[1])[0]
                              for _ in products]
-            datasets = [open_dataset(d) for d in datasets]
+            datasets = [open_dataset(d, as_complex=False) for d in datasets]
         else:
             product_names = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
                              if 'metadata' in ds else 'data{}'.format(i)
