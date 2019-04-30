@@ -185,6 +185,95 @@ def _combined_attrs(datasets):
     return attrs
 
 
+def _combine_along_last_dim(datasets, buffer):
+    merged = []
+
+    # Determine the dimension along which the dataset is split
+    split_dims = [d for d in datasets[0].dims if
+                  len(np.unique([ds[d].values[0] for ds in datasets])) > 1]
+
+    # Concatenate along one of the split dimensions
+    concat_dim = split_dims[-1]
+
+    # Group along the remaining dimensions and concatenate within each
+    # group.
+    def sort_key(ds, dims):
+        keys = []
+        for d in dims:
+            vals = ds[d].values
+            if len(vals) < 2 or vals[-1] >= vals[0]:
+                # ascending order
+                keys.append(vals[0])
+                keys.append(vals[-1])
+            else:
+                # descending order
+                keys.append(-vals[0])
+                keys.append(-vals[-1])
+        return tuple(keys)
+
+    sorted_ds = sorted(datasets, key=lambda ds: sort_key(ds, split_dims))
+    for _, group in itertools.groupby(
+            sorted_ds,
+            key=lambda ds: tuple(ds[d].values[0] for d in split_dims[:-1])
+            ):
+        group = list(group)
+
+        #
+        # Compute slices based on the buffer
+        #
+
+        # Auto-detect buffer?
+        if buffer == 'auto':
+            values = [d[concat_dim].values for d in group]
+
+            # overlap with previous
+            prev_diffs = [np.abs(values[i] - values[i-1][-1])
+                          for i in range(1, len(values))]
+
+            # The +1 is necessary because this is the stop index of a slice
+            # cast to float because it may be a timedelta
+            prev_idx = [int(np.argmin(diff)) + 1
+                        if float(np.min(diff)) == 0 else 0
+                        for diff in prev_diffs]
+            prev_idx = [None] + [int(np.ceil(i/2)) for i in prev_idx]
+
+            # overlap with next
+            next_diffs = [np.abs(values[i] - values[i+1][0])
+                          for i in range(0, len(values)-1)]
+            next_idx = [int(np.argmin(diff))
+                        for diff in next_diffs]
+
+            next_idx = [int(np.ceil((i + len(v)) / 2))
+                        for i, v in zip(next_idx, values)] + [None]
+
+            slices = [slice(*args) for args in zip(prev_idx, next_idx)]
+
+        else:
+            if isinstance(buffer, int):
+                _buf = buffer
+
+            elif isinstance(buffer, dict):
+                _buf = buffer[concat_dim] if concat_dim in buffer else 0
+
+            else:
+                _buf = 0
+
+            slices = [slice(None, -_buf)] + \
+                     [slice(_buf, -_buf)] * (len(group) - 2) + \
+                     [slice(_buf, None)]
+
+        # Apply buffered slices
+        idx = [{concat_dim: s} for s in slices]
+        group = [d.isel(i) for d, i in zip(group, idx)]
+
+        # Merge along concat_dim
+        combined = xr.auto_combine(group, concat_dim=concat_dim)
+        combined.attrs = _combined_attrs(group)
+        merged.append(combined)
+
+    return merged
+
+
 def auto_merge(datasets, buffer='auto', chunks={}):
     """
     Automatically merge a split xarray Dataset. This is designed to behave like
@@ -231,97 +320,9 @@ def auto_merge(datasets, buffer='auto', chunks={}):
     if buffer == 'auto':
         buf_cache = {}
 
-    def _combine_along_last_dim(datasets):
-        merged = []
-
-        # Determine the dimension along which the dataset is split
-        split_dims = [d for d in datasets[0].dims if
-                      len(np.unique([ds[d].values[0] for ds in datasets])) > 1]
-
-        # Concatenate along one of the split dimensions
-        concat_dim = split_dims[-1]
-
-        # Group along the remaining dimensions and concatenate within each
-        # group.
-        def sort_key(ds, dims):
-            keys = []
-            for d in dims:
-                vals = ds[d].values
-                if len(vals) < 2 or vals[-1] >= vals[0]:
-                    # ascending order
-                    keys.append(vals[0])
-                    keys.append(vals[-1])
-                else:
-                    # descending order
-                    keys.append(-vals[0])
-                    keys.append(-vals[-1])
-            return tuple(keys)
-
-        sorted_ds = sorted(datasets, key=lambda ds: sort_key(ds, split_dims))
-        for _, group in itertools.groupby(
-                sorted_ds,
-                key=lambda ds: tuple(ds[d].values[0] for d in split_dims[:-1])
-                ):
-            group = list(group)
-
-            #
-            # Compute slices based on the buffer
-            #
-
-            # Auto-detect buffer?
-            if buffer == 'auto':
-                values = [d[concat_dim].values for d in group]
-
-                # overlap with previous
-                prev_diffs = [np.abs(values[i] - values[i-1][-1])
-                              for i in range(1, len(values))]
-
-                # The +1 is necessary because this is the stop index of a slice
-                # cast to float because it may be a timedelta
-                prev_idx = [int(np.argmin(diff)) + 1
-                            if float(np.min(diff)) == 0 else 0
-                            for diff in prev_diffs]
-                prev_idx = [None] + [int(np.ceil(i/2)) for i in prev_idx]
-
-                # overlap with next
-                next_diffs = [np.abs(values[i] - values[i+1][0])
-                              for i in range(0, len(values)-1)]
-                next_idx = [int(np.argmin(diff))
-                            for diff in next_diffs]
-
-                next_idx = [int(np.ceil((i + len(v)) / 2))
-                            for i, v in zip(next_idx, values)] + [None]
-
-                slices = [slice(*args) for args in zip(prev_idx, next_idx)]
-
-            else:
-                if isinstance(buffer, int):
-                    _buf = buffer
-
-                elif isinstance(buffer, dict):
-                    _buf = buffer[concat_dim] if concat_dim in buffer else 0
-
-                else:
-                    _buf = 0
-
-                slices = [slice(None, -_buf)] + \
-                         [slice(_buf, -_buf)] * (len(group) - 2) + \
-                         [slice(_buf, None)]
-
-            # Apply buffered slices
-            idx = [{concat_dim: s} for s in slices]
-            group = [d.isel(i) for d, i in zip(group, idx)]
-
-            # Merge along concat_dim
-            combined = xr.auto_combine(group, concat_dim=concat_dim)
-            combined.attrs = _combined_attrs(group)
-            merged.append(combined)
-
-        return merged
-
     merged = datasets
     while len(merged) > 1:
-        merged = _combine_along_last_dim(merged)
+        merged = _combine_along_last_dim(merged, buffer)
 
     # Close opened files
     for d in datasets:
