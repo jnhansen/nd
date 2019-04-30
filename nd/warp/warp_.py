@@ -59,6 +59,7 @@ def _parse_crs(crs):
     #
     # NOTE: This doesn't currently throw an error if the EPSG code is invalid.
     #
+    parsed = None
     if isinstance(crs, CRS):
         parsed = crs
     elif isinstance(crs, str):
@@ -72,7 +73,8 @@ def _parse_crs(crs):
         parsed = CRS(crs)
     elif isinstance(crs, int):
         parsed = CRS.from_epsg(crs)
-    else:
+
+    if parsed is None or not parsed.is_valid:
         raise CRSError('Could not parse CRS: {}'.format(crs))
 
     return parsed
