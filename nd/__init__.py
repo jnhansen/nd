@@ -11,9 +11,10 @@ from .visualize import to_rgb, write_video
 from .algorithm import Algorithm
 from .tiling import auto_merge
 
-from . import (change, classify, io, visualize, filters, utils, warp)
+from . import (change, classify, io, visualize, filters, utils, warp, vector)
 
 __all__ = ['change', 'classify', 'io', 'visualize', 'filters', 'utils', 'warp',
+           'vector',
            # Non-modules:
            'Algorithm',
            'open_dataset',
