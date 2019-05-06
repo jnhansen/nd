@@ -871,9 +871,10 @@ class Alignment(Algorithm):
         for name, ds in zip(product_names, products):
             outfile = os.path.join(path, name + '_aligned.nc')
             if isinstance(ds, str):
-                ds = open_dataset(ds)
+                ds = open_dataset(ds, as_complex=False)
             res = proj.apply(ds)
             to_netcdf(res, outfile)
+            del res
 
 
 align = wrap_algorithm(Alignment, 'align')
