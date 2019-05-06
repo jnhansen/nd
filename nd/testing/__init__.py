@@ -106,6 +106,21 @@ def equal_list_of_dicts(obj1, obj2, exclude=[]):
     return set(serial1) == set(serial2)
 
 
+def assert_equal_dict(dict1, dict2):
+    """Check whether two lists of dictionaries are equal, independent of the
+    order within the list.
+
+    Parameters
+    ----------
+    dict1, dict2 : dict
+        Dictioniaries to compare
+    """
+
+    j1 = json.dumps(dict1, sort_keys=True)
+    j2 = json.dumps(dict2, sort_keys=True)
+    assert j1 == j2
+
+
 def assert_all_true(ds):
     assert ds.to_array().values.all()
 

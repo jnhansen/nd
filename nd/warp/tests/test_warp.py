@@ -6,7 +6,7 @@ from nd.warp import (Reprojection, Resample, Alignment, get_bounds,
 from nd.warp.warp_ import _parse_crs, nrows, ncols, get_dims, _reproject
 from nd.io import open_dataset, to_netcdf
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
-                        assert_equal_crs)
+                        assert_equal_crs, assert_equal_dict)
 import numpy as np
 import xarray as xr
 from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
@@ -240,7 +240,8 @@ def test_get_crs_formats(fmt, result):
 ])
 def test_get_crs_from_variable(crs):
     snap_ds = create_snap_ds(crs=crs)
-    assert_equal_crs(crs, get_crs(snap_ds))
+    parsed_crs = get_crs(snap_ds)
+    assert_equal_crs(crs, parsed_crs)
 
 
 @pytest.mark.parametrize('f', slc_files)
@@ -466,7 +467,7 @@ def test_reproject_coordinates():
         if c in ['lat', 'lon']:
             continue
         assert c in warped.coords
-        assert_equal(ds[c].dims, warped[c].dims)
+        assert_equal_dict(ds[c].dims, warped[c].dims)
 
 
 @pytest.mark.parametrize('extent', [
