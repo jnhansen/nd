@@ -16,53 +16,6 @@ from ..utils import get_vars_for_dims
 __all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
 
 
-def rasterize(shp, ds, columns=None):
-    """Rasterize features to match a reference dataset.
-
-    Parameters
-    ----------
-    shp : str or geopandas.geodataframe.GeoDataFrame
-        Either the filename of a shapefile or an iterable
-    ds : xarray.Dataset
-        The reference dataset to match the raster shape.
-    class_field : str, optional
-        The name of field containing the label (default: 'class').
-        Ignored if `shapes` is not a shapefile.
-
-    Returns
-    -------
-    xarray.Dataset or xarray.DataArray
-        The rasterized features.
-    """
-    ds_bbox = get_bounds(ds)
-    if isinstance(shp, str):
-        shp = gpd.read_file(shp, bbox=ds_bbox)
-    layer = xr.Dataset(coords=ds.coords)
-    shape = (len(layer['y']), len(layer['x']))
-    for col, dtype in shp.dtypes.iteritems():
-        if col in ['id', 'geometry']:
-            continue
-        layer[col] = (('y', 'x'), np.zeros(shape, dtype=dtype))
-
-    for s in shp.iterfeatures():
-        # mask is True outside the polygons.
-        mask = rasterio.features.geometry_mask(
-            [s['geometry']], shape, get_transform(ds)
-        )
-        for col, dtype in shp.dtypes.iteritems():
-            if col not in layer.data_vars:
-                if col in ['id', 'geometry']:
-                    continue
-                layer[col] = (('y', 'x'), np.zeros(shape, dtype=dtype))
-            else:
-                # Update the values inside the polygon to
-                # the attribute of the polygon
-                value = s['properties'][col]
-                layer[col] = layer[col].where(mask, value)
-
-    return layer
-
-
 def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
     """
     Cluster a dataset using MiniBatchKMeans.
