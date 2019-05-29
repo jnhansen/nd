@@ -467,7 +467,7 @@ def test_reproject_coordinates():
         if c in ['lat', 'lon']:
             continue
         assert c in warped.coords
-        assert_equal_dict(ds[c].dims, warped[c].dims)
+        assert_equal(sorted(ds[c].dims), sorted(warped[c].dims))
 
 
 @pytest.mark.parametrize('extent', [
