@@ -48,16 +48,16 @@ def check_shifts(ds):
 
 def test_coregistration():
     ds, old_shifts = create_misaligned_dataset(
-        dims={'y': 100, 'x': 100, 'time': 10})
+        dims={'y': 200, 'x': 200, 'time': 50})
     cor = Coregistration(upsampling=50)
     ds_cor = cor.apply(ds)
     shifts = check_shifts(ds_cor)
     print(shifts)
-    assert (np.abs(shifts) <= 0.1).all()
+    assert (np.abs(shifts) <= 0.2).all()
     #
     # New shifts may be slightly larger if the original shifts were very small
     #
     assert np.logical_or(
         np.abs(shifts) <= np.abs(old_shifts),
-        np.abs(shifts) <= 0.05
+        np.abs(shifts) <= 0.1
     ).all()
