@@ -28,7 +28,7 @@ def to_netcdf(ds, path, *args, **kwargs):
     return write.to_netcdf(path, *args, **kwargs)
 
 
-def open_netcdf(path, *args, **kwargs):
+def open_netcdf(path, as_complex=True, *args, **kwargs):
     """Read a NetCDF file into an xarray Dataset.
 
     Wrapper function for `xarray.open_dataset` that preserves complex
@@ -56,7 +56,8 @@ def open_netcdf(path, *args, **kwargs):
     if 'engine' not in kwargs:
         kwargs['engine'] = 'h5netcdf'
     ds = xr.open_dataset(path, *args, **kwargs)
-    ds = assemble_complex(ds)
+    if as_complex:
+        ds = assemble_complex(ds)
     #
     # If the dataset dimensions are named lon and lat,
     # rename them to x and y for consistency.

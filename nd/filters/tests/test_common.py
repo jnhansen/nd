@@ -11,7 +11,7 @@ from nd.filters import Filter
 from nd.testing import generate_test_dataset
 
 
-ds = generate_test_dataset(ny=20, nx=30, ntime=10)
+ds = generate_test_dataset(dims={'y': 20, 'x': 30, 'time': 10})
 filters = [alg for alg in all_algorithms(nd.filters)
            if issubclass(alg[1], Filter) and alg[0] != 'Filter']
 filter_classes = [_[1] for _ in filters]

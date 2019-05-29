@@ -6,7 +6,7 @@ from nd.warp import (Reprojection, Resample, Alignment, get_bounds,
 from nd.warp.warp_ import _parse_crs, nrows, ncols, get_dims, _reproject
 from nd.io import open_dataset, to_netcdf
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
-                        assert_equal_crs)
+                        assert_equal_crs, assert_equal_dict)
 import numpy as np
 import xarray as xr
 from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
@@ -25,44 +25,32 @@ from affine import Affine
 ds_params = [
     ('notime', {
         # Default
-        'nx': 10,
-        'ny': 20,
-        'ntime': None,
+        'dims': {'y': 20, 'x': 10},
         'crs': CRS({'init': 'epsg:4326'})
     }),
     ('notime_mercator', {
         # Default
-        'nx': 10,
-        'ny': 20,
-        'ntime': None,
+        'dims': {'y': 20, 'x': 10},
         'crs': CRS({'init': 'epsg:3395'})
     }),
     ('standard', {
         # Default
-        'nx': 10,
-        'ny': 20,
-        'ntime': 1,
+        'dims': {'y': 20, 'x': 10, 'time': 1},
         'crs': CRS({'init': 'epsg:4326'})
     }),
     ('standard_mercator', {
         # Test Mercator Projection
-        'nx': 10,
-        'ny': 20,
-        'ntime': 1,
+        'dims': {'y': 20, 'x': 10, 'time': 1},
         'crs': CRS({'init': 'epsg:3395'})
     }),
     ('ntime=5', {
         # Test temporal dimension
-        'nx': 10,
-        'ny': 20,
-        'ntime': 5,
+        'dims': {'y': 20, 'x': 10, 'time': 5},
         'crs': CRS({'init': 'epsg:4326'})
     }),
     ('variables', {
         # Test different variables
-        'nx': 10,
-        'ny': 20,
-        'ntime': 1,
+        'dims': {'y': 20, 'x': 10, 'time': 1},
         'crs': CRS({'init': 'epsg:4326'}),
         'var': ['v1', 'v2', 'v3']
     })
@@ -192,13 +180,13 @@ def test_equal_datasets():
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_nrows(name, kwargs):
     ds = generate_test_dataset(**kwargs)
-    assert_equal(nrows(ds), kwargs['ny'])
+    assert_equal(nrows(ds), kwargs['dims']['y'])
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_ncols(name, kwargs):
     ds = generate_test_dataset(**kwargs)
-    assert_equal(ncols(ds), kwargs['nx'])
+    assert_equal(ncols(ds), kwargs['dims']['x'])
 
 
 @pytest.mark.parametrize('name,kwargs', ds_params)
@@ -236,8 +224,8 @@ def test_get_crs(name, kwargs):
 
 
 @pytest.mark.parametrize('fmt,result', [
-    ('proj', '+init=epsg:4326 +no_defs'),
-    ('dict', {'init': 'epsg:4326', 'no_defs': True}),
+    ('proj', '+init=epsg:4326'),
+    ('dict', {'init': 'epsg:4326'}),
     ('wkt', epsg4326.wkt)
 ])
 def test_get_crs_formats(fmt, result):
@@ -252,7 +240,8 @@ def test_get_crs_formats(fmt, result):
 ])
 def test_get_crs_from_variable(crs):
     snap_ds = create_snap_ds(crs=crs)
-    assert_equal_crs(crs, get_crs(snap_ds))
+    parsed_crs = get_crs(snap_ds)
+    assert_equal_crs(crs, parsed_crs)
 
 
 @pytest.mark.parametrize('f', slc_files)
@@ -378,7 +367,7 @@ def test_get_common_resolution_different_projections():
 ])
 def test_get_dims(generator):
     dims = {'x': 5, 'y': 10, 'time': 15}
-    ds = generator(nx=dims['x'], ny=dims['y'], ntime=dims['time'])
+    ds = generator(dims=dims)
     assert_equal(get_dims(ds), dims)
 
 
@@ -478,7 +467,7 @@ def test_reproject_coordinates():
         if c in ['lat', 'lon']:
             continue
         assert c in warped.coords
-        assert_equal(ds[c].dims, warped[c].dims)
+        assert_equal_dict(ds[c].dims, warped[c].dims)
 
 
 @pytest.mark.parametrize('extent', [
@@ -515,6 +504,36 @@ def test_alignment(tmpdir, extent, from_files):
         )
         xr_assert_equal(ds['x'], aligned[0]['x'])
         xr_assert_equal(ds['y'], aligned[0]['y'])
+
+
+@pytest.mark.parametrize('dims', [
+    {'y': 20, 'x': 20, 'time': 10, 'band': 5},
+    {'x': 20, 'y': 20, 'time': 10, 'band': 5},
+    {'time': 10, 'band': 5, 'x': 20, 'y': 20},
+    {'time': 10, 'x': 20, 'band': 5, 'y': 20},
+    {'y': 20, 'x': 20, 'time': 10, 'band': 5, 'extra': 2}
+])
+def test_reproject_with_extra_dims(dims):
+    crs1 = _parse_crs('+init=epsg:4326')
+    crs2 = _parse_crs('+init=epsg:3395')
+    ds = generate_test_dataset(
+        dims=dims, crs=crs1
+    )
+
+    proj = Reprojection(crs=crs2)
+    reprojected = proj.apply(ds)
+
+    # Check that a reprojected slice of the dataset is the same as
+    # the slice of the reprojection of the entire dataset.
+    slices = [
+        {'band': 3},
+        {'time': slice(1, 3)}
+    ]
+    for s in slices:
+        xr_assert_equal(
+            proj.apply(ds.isel(**s)),
+            reprojected.isel(**s)
+        )
 
 
 # def test_align(tmpdir):

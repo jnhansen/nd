@@ -112,11 +112,11 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
             if vmin is not None:
                 minval = vmin[i]
             else:
-                minval = np.percentile(channel, pmin)
+                minval = np.nanpercentile(channel, pmin)
             if vmax is not None:
                 maxval = vmax[i]
             else:
-                maxval = np.percentile(channel, pmax)
+                maxval = np.nanpercentile(channel, pmax)
             if maxval > minval:
                 channel = (channel - minval) / (maxval - minval) * 255
 
@@ -178,7 +178,8 @@ def plot_image(src, name, N=1):
 
 
 def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
-                codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22]):
+                codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
+                **kwargs):
     """
     Create a video from an xarray.Dataset.
 
@@ -229,6 +230,7 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         'mode': 'I',
         'fps': fps,
     }
+    writer_kwargs.update(kwargs)
     if ext != '.gif':
         writer_kwargs['macro_block_size'] = None
         writer_kwargs['ffmpeg_log_level'] = 'error'

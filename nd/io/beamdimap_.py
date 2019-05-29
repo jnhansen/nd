@@ -10,7 +10,7 @@ import pandas as pd
 from scipy.ndimage.interpolation import map_coordinates
 
 
-def open_beam_dimap(path, read_data=True):
+def open_beam_dimap(path, read_data=True, as_complex=True):
     """Read a BEAM Dimap product into an xarray Dataset.
 
     BEAM Dimap is the native file format of the SNAP software. It consists of
@@ -186,8 +186,7 @@ def open_beam_dimap(path, read_data=True):
     #
     times = [utils.str2date(meta['time_start'])]
     coords['time'] = times
-    # ds = xr.Dataset(coords=coords, attrs=meta)
-    ds = xr.Dataset()
+    ds = xr.Dataset(coords=coords, attrs=meta)
 
     if read_data:
         for rpath in data_files:
@@ -205,6 +204,7 @@ def open_beam_dimap(path, read_data=True):
                 for v in ds.data_vars:
                     del ds[v].attrs[col]
 
-    ds = assemble_complex(ds)
+    if as_complex:
+        ds = assemble_complex(ds)
 
     return ds

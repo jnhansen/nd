@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.ndimage.filters as snf
 from . import Filter
+from ..algorithm import wrap_algorithm
 
 
 def _expand_kernel(kernel, kernel_dims, new_dims):
@@ -63,9 +64,10 @@ class ConvolutionFilter(Filter):
     """
 
     per_variable = True
+    supports_complex = True
     kwargs = {}
 
-    def __init__(self, dims, kernel=None, **kwargs):
+    def __init__(self, dims=('y', 'x'), kernel=None, **kwargs):
         if kernel is None:
             kernel = np.ones([1] * len(dims))
         self.dims = tuple(dims)
@@ -86,13 +88,16 @@ class ConvolutionFilter(Filter):
             snf.convolve(arr, nd_kernel, output=output, **self.kwargs)
 
 
+convolution = wrap_algorithm(ConvolutionFilter, 'convolution')
+
+
 class BoxcarFilter(ConvolutionFilter):
     """
     A boxcar filter.
 
     Parameters
     ----------
-    dims : tuple of str
+    dims : tuple of str, optional
         The dimensions along which to apply the filter
         (default: ('y', 'x')).
     w : int
@@ -103,11 +108,14 @@ class BoxcarFilter(ConvolutionFilter):
         ``scipy.ndimage.filters.convolve``.
     """
 
-    def __init__(self, dims, w=3, **kwargs):
+    def __init__(self, dims=('y', 'x'), w=3, **kwargs):
         N = len(dims)
         self.dims = tuple(dims)
         self.kernel = np.ones((w,) * N, dtype=np.float64) / w**N
         self.kwargs = kwargs
+
+
+boxcar = wrap_algorithm(BoxcarFilter, 'boxcar')
 
 
 class GaussianFilter(Filter):
@@ -116,7 +124,7 @@ class GaussianFilter(Filter):
 
     Parameters
     ----------
-    dims : tuple of str, optioal
+    dims : tuple of str, optional
         The dimensions along which to apply the Gaussian filtering
         (default: ('y', 'x')).
     sigma : float or sequence of float
@@ -132,7 +140,7 @@ class GaussianFilter(Filter):
         The filtered dataset.
     """
 
-    def __init__(self, dims, sigma=1, **kwargs):
+    def __init__(self, dims=('y', 'x'), sigma=1, **kwargs):
         if isinstance(sigma, (int, float)):
             sigma = [sigma] * len(dims)
         self.dims = tuple(dims)
@@ -153,3 +161,6 @@ class GaussianFilter(Filter):
         else:
             snf.gaussian_filter(arr, sigma=ndsigma, output=output,
                                 **self.kwargs)
+
+
+gaussian = wrap_algorithm(GaussianFilter, 'gaussian')

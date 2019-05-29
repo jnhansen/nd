@@ -1,6 +1,7 @@
 from ..algorithm import Algorithm
 from abc import abstractmethod
-from ..utils import get_vars_for_dims, expand_variables
+from ..utils import get_vars_for_dims, expand_variables, is_complex
+from ..io import disassemble_complex, assemble_complex
 
 
 class Filter(Algorithm):
@@ -17,6 +18,9 @@ class Filter(Algorithm):
     # each variable. Otherwise, all variables may be used to determine the
     # filter weights.
     per_variable = True
+    # If supports_complex is False, complex-values variables are disassembled
+    # into two reals before applying the filter and reassembled afterwards.
+    supports_complex = False
     dims = ()
 
     @abstractmethod
@@ -48,6 +52,11 @@ class Filter(Algorithm):
         orig_dims = tuple(ds.dims)
         ordered_dims = self.dims + tuple(set(orig_dims) - set(self.dims))
 
+        # Check if any of the variables are complex
+        convert_complex = is_complex(ds) and not self.supports_complex
+        if convert_complex:
+            disassemble_complex(ds, inplace=True)
+
         # Find all variables that match the given dimensions
         variables = get_vars_for_dims(ds, self.dims)
         other_variables = get_vars_for_dims(ds, self.dims, invert=True)
@@ -71,7 +80,7 @@ class Filter(Algorithm):
 
             # convert to DataArray
             da_ordered = ds[variables].to_array().transpose(*ordered_dims)
-            da_filtered = da_ordered.copy()
+            da_filtered = da_ordered.copy(deep=True)
             axes = tuple([da_ordered.dims.index(d) for d in self.dims])
 
             # Prepare data and output as numpy arrays
@@ -85,6 +94,10 @@ class Filter(Algorithm):
 
             for v in other_variables:
                 result[v] = ds[v]
+
+        # Reassemble complex variabbles if previously disassembled
+        if convert_complex:
+            assemble_complex(ds, inplace=True)
 
         return result
 

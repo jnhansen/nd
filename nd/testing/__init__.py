@@ -12,7 +12,7 @@ from nd.algorithm import Algorithm
 from nd.warp.warp_ import _parse_crs
 
 
-def generate_test_dataset(ny=20, nx=20, ntime=10,
+def generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10},
                           var=['C11', 'C12__im', 'C12__re', 'C22'],
                           mean=0, sigma=1,
                           extent=(-10.0, 50.0, 0.0, 60.0),
@@ -20,23 +20,23 @@ def generate_test_dataset(ny=20, nx=20, ntime=10,
                           crs='+init=epsg:4326'):
 
     np.random.seed(random_seed)
+
     coords = {}
-    dims = {}
-    if ny:
-        coords['y'] = np.linspace(extent[1], extent[3], ny)
-        dims['y'] = ny
-    if nx:
-        coords['x'] = np.linspace(extent[0], extent[2], nx)
-        dims['x'] = nx
-    if ntime:
-        coords['time'] = pd.date_range('2017-01-01', '2018-01-01',
-                                       periods=ntime)
-        dims['time'] = ntime
+    for name, size in dims.items():
+        if name == 'y':
+            coords[name] = np.linspace(extent[1], extent[3], size)
+        elif name == 'x':
+            coords[name] = np.linspace(extent[0], extent[2], size)
+        elif name == 'time':
+            coords[name] = pd.date_range('2017-01-01', '2018-01-01',
+                                         periods=size)
+        else:
+            coords[name] = np.arange(size)
 
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
     ds = xr.Dataset(coords=coords, attrs=meta)
     transform = rasterio.transform.from_bounds(
-        *extent, width=nx-1, height=ny-1)
+        *extent, width=dims['x']-1, height=dims['y']-1)
     ds.attrs['crs'] = _parse_crs(crs).to_string()
     ds.attrs['transform'] = transform[:6]
     if isinstance(mean, (int, float)):
@@ -47,28 +47,26 @@ def generate_test_dataset(ny=20, nx=20, ntime=10,
     return ds
 
 
-def generate_test_dataarray(ny=20, nx=20, ntime=10, name='variable',
+def generate_test_dataarray(dims={'y': 20, 'x': 20, 'time': 10},
+                            name='variable',
                             mean=0, sigma=1,
                             extent=(-10.0, 50.0, 0.0, 60.0),
                             random_seed=42,
                             crs='+init=epsg:4326'):
     np.random.seed(random_seed)
+
     coords = {}
-    dims = {}
-    if ny:
-        coords['y'] = np.linspace(extent[1], extent[3], ny)
-        dims['y'] = ny
-    if nx:
-        coords['x'] = np.linspace(extent[0], extent[2], nx)
-        dims['x'] = nx
-    if ntime:
+    if 'y' in dims:
+        coords['y'] = np.linspace(extent[1], extent[3], dims['y'])
+    if 'x' in dims:
+        coords['x'] = np.linspace(extent[0], extent[2], dims['x'])
+    if 'time' in dims:
         coords['time'] = pd.date_range('2017-01-01', '2018-01-01',
-                                       periods=ntime)
-        dims['time'] = ntime
+                                       periods=dims['time'])
 
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
     transform = rasterio.transform.from_bounds(
-        *extent, width=nx-1, height=ny-1)
+        *extent, width=dims['x']-1, height=dims['y']-1)
     meta['crs'] = _parse_crs(crs).to_string()
     meta['transform'] = transform[:6]
     data = np.random.normal(mean, sigma, tuple(dims.values()))
@@ -106,6 +104,21 @@ def equal_list_of_dicts(obj1, obj2, exclude=[]):
     serial2 = [json.dumps(_, sort_keys=True) for _ in obj2]
 
     return set(serial1) == set(serial2)
+
+
+def assert_equal_dict(dict1, dict2):
+    """Check whether two lists of dictionaries are equal, independent of the
+    order within the list.
+
+    Parameters
+    ----------
+    dict1, dict2 : dict
+        Dictioniaries to compare
+    """
+
+    j1 = json.dumps(dict1, sort_keys=True)
+    j2 = json.dumps(dict2, sort_keys=True)
+    assert j1 == j2
 
 
 def assert_all_true(ds):

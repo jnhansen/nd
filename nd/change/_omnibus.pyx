@@ -13,21 +13,8 @@ ctypedef np.float64_t DOUBLE
 ctypedef np.float32_t FLOAT
 ctypedef Py_ssize_t SIZE_TYPE
 ctypedef unsigned char BOOL
-# ctypedef np.uint8_t BOOL
 
 # =================================================================
-
-# cpdef double chisq_pdf(double x, double nu):
-#     return gsl_ran_chisq_pdf(x, nu)
-
-
-# cpdef double chisq_cdf_P(double x, double nu):
-#     return gsl_cdf_chisq_P(x, nu)
-
-
-# cpdef double chisq_cdf_Q(double x, double nu):
-#     return gsl_cdf_chisq_Q(x, nu)
-
 
 @cython.cdivision(True)
 cdef double _f(double p, double k, double n) nogil:
@@ -97,7 +84,8 @@ cpdef floating _z(floating [:, :] ts, unsigned int n) nogil:
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts, unsigned int n):
+cpdef np.ndarray[floating, ndim=2] array_omnibus(floating [:, :, :, :] ts,
+                                                 unsigned int n):
     if floating is float:
         dtype = np.float32
     else:

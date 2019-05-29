@@ -1,13 +1,11 @@
 """
 This module contains the change detection algorithm by
 Conradsen et al. (2015).
-
-TODO: Make all functions work with xarray Datasets
-
 """
 from ..io import disassemble_complex
 from ..filters import BoxcarFilter
 from . import ChangeDetection
+from ..algorithm import wrap_algorithm
 import numpy as np
 import xarray as xr
 # Cannot install libgsl-dev on ReadTheDocs.
@@ -44,6 +42,7 @@ def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
         A boolean DataArray indicating whether a change occurred at each
         (y, x, time) coordinate.
     """
+
     ds.persist()
 
     ds_m = disassemble_complex(ds)
@@ -100,3 +99,6 @@ class OmnibusTest(ChangeDetection):
     def apply(self, ds):
         return _change_detection(ds, alpha=self.alpha, ml=self.ml, n=self.n,
                                  njobs=self.njobs)
+
+
+omnibus = wrap_algorithm(OmnibusTest, 'omnibus')

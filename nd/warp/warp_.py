@@ -3,12 +3,37 @@ import os
 import numpy as np
 import xarray as xr
 import rasterio.warp
+import warnings
 from rasterio.coords import BoundingBox
 from rasterio.crs import CRS
 from rasterio.errors import CRSError
 from affine import Affine
-from ..algorithm import Algorithm
+from ..algorithm import Algorithm, wrap_algorithm
 from ..io import to_netcdf, open_dataset
+
+
+def _get_dim_order(ds):
+    """
+    Return the dimension of dataset `ds` in order.
+    """
+    # The ordered dictionary is hidden behind two wrappers,
+    # need to access the dict behind the Frozen(SortedKeysDict).
+    if isinstance(ds, xr.Dataset):
+        return list(ds.sizes.mapping.mapping)
+    elif isinstance(ds, xr.DataArray):
+        return list(ds.sizes.mapping)
+
+
+def _get_projection_dim_order(ds):
+    """
+    Return the dimension order required by the projection operations.
+    This moves the x and y dimensions to the end.
+    """
+    dims = _get_dim_order(ds)
+    extra_dims = set(dims) - {'y', 'x'}
+    ordered_extra_dims = \
+        tuple(d for d in dims if d in extra_dims)
+    return ordered_extra_dims + ('y', 'x')
 
 
 def _parse_crs(crs):
@@ -34,6 +59,7 @@ def _parse_crs(crs):
     #
     # NOTE: This doesn't currently throw an error if the EPSG code is invalid.
     #
+    parsed = None
     if isinstance(crs, CRS):
         parsed = crs
     elif isinstance(crs, str):
@@ -47,7 +73,8 @@ def _parse_crs(crs):
         parsed = CRS(crs)
     elif isinstance(crs, int):
         parsed = CRS.from_epsg(crs)
-    else:
+
+    if parsed is None or not parsed.is_valid:
         raise CRSError('Could not parse CRS: {}'.format(crs))
 
     return parsed
@@ -78,7 +105,7 @@ def get_crs(ds, format='crs'):
     crs = None
     if 'crs' in ds.attrs:
         crs = _parse_crs(ds.attrs['crs'])
-    elif 'crs' in ds.data_vars:
+    elif isinstance(ds, xr.Dataset) and 'crs' in ds.data_vars:
         for attr in ds['crs'].attrs:
             try:
                 crs = _parse_crs(ds['crs'].attrs[attr])
@@ -93,7 +120,7 @@ def get_crs(ds, format='crs'):
     if format == 'crs':
         return crs
     if format == 'proj':
-        return crs.to_string()
+        return crs.to_proj4()
     if format == 'dict':
         return crs.to_dict()
     if format == 'wkt':
@@ -121,15 +148,19 @@ def get_transform(ds):
         else:
             return Affine(*ds_trans)
 
-    elif 'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
+    elif isinstance(ds, xr.Dataset) and \
+            'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
         transf_str = ds.data_vars['crs'].attrs['i2m']
         a = list(map(float, transf_str.split(',')))
         return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
 
     else:
-        resx, resy = get_resolution(ds)
-        xoff = ds['x'].values.min()
-        yoff = ds['y'].values.max()
+        x = ds.coords['x'].values
+        y = ds.coords['y'].values
+        resx = (x[-1] - x[0]) / (len(x) - 1)
+        resy = (y[-1] - y[0]) / (len(y) - 1)
+        xoff = x[0]
+        yoff = y[0]
         return Affine(resx, 0, xoff, 0, resy, yoff)
 
 
@@ -184,10 +215,10 @@ def get_bounds(ds):
             dims = ds.dims
         elif isinstance(ds, xr.DataArray):
             dims = dict(zip(ds.dims, ds.shape))
-        nrows = dims['y']
-        ncols = dims['x']
-        corners = (np.array([0, 0, ncols-1, ncols-1]),
-                   np.array([0, nrows-1, 0, nrows-1]))
+        n_rows = dims['y']
+        n_cols = dims['x']
+        corners = (np.array([0, 0, n_cols-1, n_cols-1]),
+                   np.array([0, n_rows-1, 0, n_rows-1]))
         corner_x, corner_y = trans * corners
         return BoundingBox(
             left=corner_x.min(),
@@ -423,9 +454,6 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         The projected dataset.
     """
 
-    if 'resampling' not in kwargs:
-        kwargs['resampling'] = rasterio.warp.Resampling.cubic
-
     src_crs = get_crs(ds)
     src_bounds = get_bounds(ds)
     if extent is not None:
@@ -495,7 +523,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
                 **src_bounds._asdict())
 
     src_transform = get_transform(ds)
-    src_dims = get_dims(ds)
+    src_dims = _get_dim_order(ds)
     dst_crs = _parse_crs(dst_crs)
 
     #
@@ -509,26 +537,47 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
     # Handle the case where there are extra dimensions, e.g. 'time'
     # or 'band'
     #
-    extra_dims = src_dims.keys() - {'y', 'x'}
-    if len(extra_dims) == 0:
-        dst_shape = (height, width)
-        dst_dims = ('y', 'x')
-    elif len(extra_dims) == 1:
-        extra_dim = extra_dims.pop()
-        dst_shape = (src_dims[extra_dim], height, width)
-        dst_dims = (extra_dim, 'y', 'x')
-        dst_coords[extra_dim] = ds.coords[extra_dim]
-    else:
-        raise ValueError('More than three dimensions are not supported.')
+    extra_dims = set(src_dims) - {'y', 'x'}
+
+    for c in extra_dims:
+        dst_coords[c] = ds.coords[c]
 
     def _reproject_da(da, shape):
         #
         # Reproject a single data array
         #
-        extra_dims = set(da.dims) - {'y', 'x'}
-        dim_order = tuple(extra_dims) + ('y', 'x')
+        coord_dims = tuple(c for c in ('y', 'x') if c in da.dims)
+        extra_dims = set(da.dims) - set(coord_dims)
+        # Preserve original dimension order
+        orig_dim_order = _get_dim_order(da)
+        ordered_extra_dims = \
+            tuple(d for d in orig_dim_order if d in extra_dims)
+        dim_order = ordered_extra_dims + coord_dims
+
+        # Determine best resampling method from data type
+        if np.issubdtype(da.dtype, np.integer):
+            nodata = 0
+            default_resampling = rasterio.warp.Resampling.nearest
+        else:
+            nodata = np.nan
+            default_resampling = rasterio.warp.Resampling.cubic
+        if 'resampling' not in kwargs:
+            kwargs['resampling'] = default_resampling
+
+        # Get values as numpy array such that last two axes are
+        # y and x
         values = da.transpose(*dim_order).values
-        output = np.zeros(shape, dtype=da.dtype)
+
+        # Flatten multidimensional data to ONE extra dimension
+        if values.ndim > 2:
+            output_shape = values.shape[:-2] + shape
+            values = values.reshape((-1,) + values.shape[-2:])
+            output_shape_flat = (values.shape[0],) + shape
+        else:
+            output_shape = shape
+            output_shape_flat = shape
+
+        output = np.zeros(output_shape_flat, dtype=da.dtype)
         output[:] = np.nan
 
         # Fix data shape for one-dimensional data
@@ -554,12 +603,12 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             src_crs=src_crs,
             dst_transform=dst_transform,
             dst_crs=dst_crs,
-            dst_nodata=np.nan,
+            dst_nodata=nodata,
             **kwargs
         )
 
         # Final reshape in case the input was one-dimensional
-        return output.reshape(shape)
+        return output.reshape(output_shape)
 
     if isinstance(ds, xr.Dataset):
         result = xr.Dataset(coords=dst_coords)
@@ -592,12 +641,12 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         # Reproject the actual data
         #
         for v in ds.data_vars:
-            if set(ds[v].dims) == set(dst_dims):
-                result[v] = (dst_dims, _reproject_da(ds[v], dst_shape))
-            elif set(ds[v].dims) == {'y', 'x'}:
+            vdims = _get_projection_dim_order(ds[v])
+            if set(ds[v].dims) == set(vdims) or set(ds[v].dims) == {'y', 'x'}:
                 shape = (height, width)
-                result[v] = (dst_dims, _reproject_da(ds[v], shape))
+                result[v] = (vdims, _reproject_da(ds[v], shape))
             else:
+                # The variable doesn't contain y and x dimensions.
                 result[v] = (ds[v].dims, ds[v])
 
         #
@@ -610,9 +659,17 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #     result.coords['lat'] = (('y',), lat)
 
     elif isinstance(ds, xr.DataArray):
-        result = xr.DataArray(_reproject_da(ds, dst_shape), dims=dst_dims,
+        shape = (height, width)
+        dst_dims = _get_projection_dim_order(ds)
+        result = xr.DataArray(_reproject_da(ds, shape), dims=dst_dims,
                               coords=dst_coords, name=ds.name)
 
+    # Reorder dimensions to match original.
+    result = result.transpose(*_get_dim_order(ds))
+
+    #
+    # Add metadata
+    #
     result.attrs = ds.attrs
 
     # Serialize transform to tuple and store in metadata
@@ -635,6 +692,8 @@ class Reprojection(Algorithm):
 
     Parameters
     ----------
+    target : xarray.Dataset or xarray.DataArray, optional
+        A reference to which a dataset will be aligned.
     crs : dict or str
         The output coordinate reference system as dictionary or proj-string
     extent : tuple, optional
@@ -643,9 +702,23 @@ class Reprojection(Algorithm):
         Extra keyword arguments for ``rasterio.warp.reproject``.
     """
 
-    def __init__(self, crs, extent=None, res=None, width=None, height=None,
-                 transform=None, **kwargs):
-        if transform is not None and (width is None or height is None):
+    def __init__(self, target=None, crs=None, extent=None, res=None,
+                 width=None, height=None, transform=None, **kwargs):
+        if target is not None:
+            # Parse target information
+            for param in ['crs', 'transform', 'width', 'height', 'extent',
+                          'res']:
+                if locals()[param] is not None:
+                    warnings.warn('`{}` is ignored if `target` is '
+                                  'specified.'.format(param))
+
+            crs = get_crs(target)
+            transform = get_transform(target)
+            width = ncols(target)
+            height = nrows(target)
+            res = extent = None
+
+        elif transform is not None and (width is None or height is None):
             raise ValueError('If `transform` is given, you must also specify '
                              'the `width` and `height` arguments.')
 
@@ -679,6 +752,9 @@ class Reprojection(Algorithm):
         return _reproject(ds, dst_crs=self.crs, dst_transform=self.transform,
                           width=self.width, height=self.height, res=self.res,
                           extent=self.extent, **self.kwargs)
+
+
+reproject = wrap_algorithm(Reprojection, 'reproject')
 
 
 class Resample(Algorithm):
@@ -720,6 +796,9 @@ class Resample(Algorithm):
 
         return _reproject(ds, width=self.width, height=self.height,
                           res=self.res, **self.kwargs)
+
+
+resample = wrap_algorithm(Resample, 'resample')
 
 
 class Alignment(Algorithm):
@@ -767,7 +846,7 @@ class Alignment(Algorithm):
             # Pass chunks={} to ensure the dataset is read as a dask array
             product_names = [os.path.splitext(os.path.split(_)[1])[0]
                              for _ in products]
-            datasets = [open_dataset(path) for path in datasets]
+            datasets = [open_dataset(d, as_complex=False) for d in datasets]
         else:
             product_names = [ds.metadata.attrs['Abstracted_Metadata:PRODUCT']
                              if 'metadata' in ds else 'data{}'.format(i)
@@ -792,6 +871,10 @@ class Alignment(Algorithm):
         for name, ds in zip(product_names, products):
             outfile = os.path.join(path, name + '_aligned.nc')
             if isinstance(ds, str):
-                ds = open_dataset(ds)
+                ds = open_dataset(ds, as_complex=False)
             res = proj.apply(ds)
             to_netcdf(res, outfile)
+            del res
+
+
+align = wrap_algorithm(Alignment, 'align')

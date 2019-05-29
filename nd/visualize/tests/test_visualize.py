@@ -67,7 +67,7 @@ def test_to_rgb_invalid_datatype():
 def test_write_video(tmpdir, fname):
     path = str(tmpdir.join(fname))
     ntime = 10
-    ds = generate_test_dataset(ntime=ntime)
+    ds = generate_test_dataset(dims={'y': 20, 'x': 20, 'time': ntime})
     write_video(ds, path)
     assert os.path.isfile(path)
     video = imageio.mimread(path)
