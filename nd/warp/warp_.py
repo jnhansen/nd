@@ -105,6 +105,8 @@ def get_crs(ds, format='crs'):
     crs = None
     if 'crs' in ds.attrs:
         crs = _parse_crs(ds.attrs['crs'])
+    elif 'coordinate_system_string' in ds.attrs:
+        crs = _parse_crs(ds.attrs['coordinate_system_string'])
     elif isinstance(ds, xr.Dataset) and 'crs' in ds.data_vars:
         for attr in ds['crs'].attrs:
             try:
@@ -560,7 +562,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             default_resampling = rasterio.warp.Resampling.nearest
         else:
             nodata = np.nan
-            default_resampling = rasterio.warp.Resampling.cubic
+            default_resampling = rasterio.warp.Resampling.bilinear
         if 'resampling' not in kwargs:
             kwargs['resampling'] = default_resampling
 
