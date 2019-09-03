@@ -220,9 +220,16 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
 
     # Use coords rather than dims so it also works for DataArray
     if height is None:
-        height = ds.coords['y'].size
+        if width is not None:
+            # Determine height from given width
+            height = width * ds.coords['y'].size / ds.coords['x'].size
+        else:
+            # Both are None: Use original size of data
+            height = ds.coords['y'].size
+            width = ds.coords['x'].size
     if width is None:
-        width = ds.coords['x'].size
+        # Determine width from given height
+        width = height * ds.coords['x'].size / ds.coords['y'].size
 
     _, ext = os.path.splitext(path)
 
