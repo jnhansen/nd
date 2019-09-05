@@ -43,10 +43,12 @@ def test_equivalent_formats():
     datasets = [open_dataset(f) for f in files]
 
 
-def test_write_read_netcdf(tmpdir):
+@pytest.mark.parametrize('cmplx', [True, False])
+def test_write_read_netcdf(tmpdir, cmplx):
     ds = generate_test_dataset()
-    ds = assemble_complex(ds)
+    if cmplx:
+        ds = assemble_complex(ds)
     path = str(tmpdir.join('test_dataset.nc'))
     to_netcdf(ds, path)
-    ds_read = open_dataset(path)
+    ds_read = open_dataset(path, as_complex=cmplx)
     xr_assert_equal(ds, ds_read)

@@ -28,7 +28,7 @@ def to_netcdf(ds, path, *args, **kwargs):
     return write.to_netcdf(path, *args, **kwargs)
 
 
-def open_netcdf(path, as_complex=True, *args, **kwargs):
+def open_netcdf(path, as_complex=False, *args, **kwargs):
     """Read a NetCDF file into an xarray Dataset.
 
     Wrapper function for `xarray.open_dataset` that preserves complex
@@ -38,6 +38,9 @@ def open_netcdf(path, as_complex=True, *args, **kwargs):
     ----------
     path : str
         The path of the NetCDF file to read.
+    as_complex : bool, optional
+        Whether or not to assemble real and imaginary parts into complex
+        (default: False).
     *args : list
         Extra positional arguments passed on to ``xarray.open_dataset``.
     **kwargs : dict

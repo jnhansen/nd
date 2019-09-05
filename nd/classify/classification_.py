@@ -6,10 +6,8 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError('scikit-learn is required for this module.')
 
 import numpy as np
-import geopandas as gpd
-import rasterio.features
 from ..filters import BoxcarFilter
-from ..warp import get_transform, nrows, ncols, get_bounds
+from ..warp import nrows, ncols
 from ..utils import get_vars_for_dims
 
 
@@ -153,10 +151,12 @@ def _clustermean(ds, labels):
     return _means
 
 
-def _build_X(ds):
+def _build_X(ds, feature_dims=[]):
     variables = get_vars_for_dims(ds, ('y', 'x'))
-    data = ds[variables].to_array().transpose('y', 'x', 'variable').values
-    return data.reshape((-1, len(variables)))
+    features = tuple(feature_dims) + ('variable',)
+    data = ds[variables].to_array().stack(feature=features).transpose(
+        'y', 'x', 'feature', transpose_coords=True).values
+    return data.reshape((-1, data.shape[-1]))
 
 
 class Classifier:
@@ -166,10 +166,13 @@ class Classifier:
     clf : sklearn classifier
         An initialized classifier object as provided by scikit-learn.
         Must provide methods ``fit`` and ``predict``.
+    feature_dims : list, optional
+        A list of additional dimensions to use as features.
     """
 
-    def __init__(self, clf):
+    def __init__(self, clf, feature_dims=[]):
         self.clf = clf
+        self.feature_dims = feature_dims
 
     def fit(self, ds, labels):
         """
@@ -180,12 +183,15 @@ class Classifier:
         labels : xarray.DataArray
             The class labels to train the classifier.
         """
-
-        mask = np.array(np.logical_and(
-            ~np.isnan(labels), labels > 0)).reshape(-1)
-        X = _build_X(ds)[mask]
-        y = np.array(labels).reshape(-1)[mask]
-        self.clf.fit(X, y)
+        # Ignore labels that are NaN or 0
+        ymask = ~np.isnan(labels)
+        np.greater(labels, 0, out=ymask, where=ymask)
+        ymask = ymask.reshape(-1)
+        # Ignore values of ds that contain NaN
+        X = _build_X(ds, feature_dims=self.feature_dims)[ymask]
+        y = np.array(labels).reshape(-1)[ymask]
+        Xmask = ~np.isnan(X).any(axis=1)
+        self.clf.fit(X[Xmask], y[Xmask])
 
     def predict(self, ds, func='predict'):
         """
@@ -205,8 +211,11 @@ class Classifier:
 
         if func not in dir(self.clf):
             raise AttributeError('Classifier has no method {}.'.format(func))
-        X = _build_X(ds)
-        labels_flat = self.clf.__getattribute__(func)(X)
+        X = _build_X(ds, feature_dims=self.feature_dims)
+        # Skip prediction for NaN entries:
+        mask = ~np.isnan(X).any(axis=1)
+        labels_flat = np.empty(mask.shape) * np.nan
+        labels_flat[mask] = self.clf.__getattribute__(func)(X[mask])
         shape = (nrows(ds), ncols(ds))
         labels = xr.DataArray(labels_flat.reshape(shape), dims=('y', 'x'),
                               coords=ds.coords)
