@@ -184,8 +184,9 @@ class Classifier:
             The class labels to train the classifier.
         """
         # Ignore labels that are NaN or 0
-        ymask = np.array(np.logical_and(
-            ~np.isnan(labels), labels > 0)).reshape(-1)
+        ymask = ~np.isnan(labels)
+        np.greater(labels, 0, out=ymask, where=ymask)
+        ymask = ymask.reshape(-1)
         # Ignore values of ds that contain NaN
         X = _build_X(ds, feature_dims=self.feature_dims)[ymask]
         y = np.array(labels).reshape(-1)[ymask]
