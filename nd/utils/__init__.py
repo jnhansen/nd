@@ -31,13 +31,16 @@ __all__ = ['str2date',
            ]
 
 
-def str2date(string, fmt=None):
+def str2date(string, fmt=None, tz=False):
     if fmt is None:
         date_object = parsedate(string)
     else:
         date_object = datetime.datetime.strptime(string, fmt)
-    if date_object.tzinfo is None:
-        date_object = date_object.replace(tzinfo=tzutc())
+    if tz:
+        if date_object.tzinfo is None:
+            date_object = date_object.replace(tzinfo=tzutc())
+    elif date_object.tzinfo is not None:
+        date_object = date_object.replace(tzinfo=None)
     return date_object
 
 

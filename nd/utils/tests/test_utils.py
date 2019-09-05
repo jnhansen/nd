@@ -15,11 +15,15 @@ from dateutil.tz import tzutc
     '%Y-%m-%d %H:%M:%S.%f',
     '%Y/%m/%dT%H:%M:%S.%fZ'
 ])
-def test_str2date(fmt):
-    d = datetime(2018, 1, 6, 12, 34, 56, tzinfo=tzutc())
+@pytest.mark.parametrize('tz', [
+    True, False
+])
+def test_str2date(fmt, tz):
+    tzinfo = tzutc() if tz else None
+    d = datetime(2018, 1, 6, 12, 34, 56, tzinfo=tzinfo)
     dstr = d.strftime(fmt)
-    assert_equal(utils.str2date(dstr), d)
-    assert_equal(utils.str2date(dstr, fmt=fmt), d)
+    assert_equal(utils.str2date(dstr, tz=tz), d)
+    assert_equal(utils.str2date(dstr, fmt=fmt, tz=tz), d)
 
 
 def test_dict_product():
