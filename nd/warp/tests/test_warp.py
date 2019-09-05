@@ -445,7 +445,7 @@ def test_reprojection_nan_values():
         if not set(warped[v].dims).issuperset({'y', 'x'}):
             continue
         dim_order = tuple(set(warped[v].dims) - {'y', 'x'}) + ('y', 'x')
-        values = warped[v].transpose(*dim_order).values
+        values = warped[v].transpose(*dim_order, transpose_coords=True).values
         # Check that pixels strictly inside the original bounds are not NaN
         assert np.isnan(values[..., inside_bounds]).sum() == 0
         # Pixel outside of the original bounds should be mostly NaN,
