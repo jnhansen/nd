@@ -568,7 +568,7 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
 
         # Get values as numpy array such that last two axes are
         # y and x
-        values = da.transpose(*dim_order).values
+        values = da.transpose(*dim_order, transpose_coords=True).values
 
         # Flatten multidimensional data to ONE extra dimension
         if values.ndim > 2:
