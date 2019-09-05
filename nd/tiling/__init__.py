@@ -267,7 +267,7 @@ def _combine_along_last_dim(datasets, buffer):
         group = [d.isel(i) for d, i in zip(group, idx)]
 
         # Merge along concat_dim
-        combined = xr.auto_combine(group, concat_dim=concat_dim)
+        combined = xr.combine_nested(group, concat_dim=concat_dim)
         combined.attrs = _combined_attrs(group)
         merged.append(combined)
 
