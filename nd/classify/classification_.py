@@ -154,7 +154,8 @@ def _clustermean(ds, labels):
 def _build_X(ds, feature_dims=[]):
     variables = get_vars_for_dims(ds, ('y', 'x'))
     features = tuple(feature_dims) + ('variable',)
-    data = ds[variables].to_array().stack(feature=features).transpose('y', 'x', 'feature').values
+    data = ds[variables].to_array().stack(feature=features).transpose(
+        'y', 'x', 'feature', transpose_coords=True).values
     return data.reshape((-1, data.shape[-1]))
 
 
