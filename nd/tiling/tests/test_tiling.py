@@ -75,7 +75,8 @@ def test_tile(tmpdir, chunks, buffer):
             assert t.dims[dim] <= val + 2*buffer_dict[dim]
 
     if buffer == 0 and len(chunks) == 1:
-        mf_data = xr.open_mfdataset(tile_files, engine='h5netcdf').compute()
+        mf_data = xr.open_mfdataset(
+            tile_files, engine='h5netcdf', combine='by_coords').compute()
         assert_equal_data(ds, mf_data)
 
     else:
