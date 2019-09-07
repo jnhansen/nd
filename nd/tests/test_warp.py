@@ -2,8 +2,8 @@ import pytest
 from nd.warp import (Reprojection, Resample, Alignment, get_bounds,
                      get_transform, get_crs, get_common_bounds,
                      get_common_extent, get_extent, get_resolution,
-                     get_common_resolution)
-from nd.warp.warp_ import _parse_crs, nrows, ncols, get_dims, _reproject
+                     get_common_resolution, _parse_crs, nrows, ncols,
+                     get_dims, _reproject)
 from nd.io import open_dataset, to_netcdf
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_crs, assert_equal_dict)

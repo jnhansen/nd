@@ -4,8 +4,8 @@ This module may be used to mosaic and tile multiple satellite image products.
 TODO: Contain buffer information in NetCDF metadata?
 
 """
-from ..io import open_netcdf, to_netcdf, add_time
-from .. import utils
+from .io import open_netcdf, to_netcdf, add_time
+from . import utils
 import os
 import glob
 import itertools

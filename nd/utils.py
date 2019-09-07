@@ -15,7 +15,6 @@ PY2 = sys.version_info < (3, 0)
 
 
 __all__ = ['str2date',
-           'xygrid',
            'dict_product',
            'chunks',
            'array_chunks',

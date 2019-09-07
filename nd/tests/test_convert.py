@@ -1,5 +1,5 @@
 import pytest
-from nd.io.convert_ import assemble_complex, disassemble_complex
+from nd.io import assemble_complex, disassemble_complex
 from nd.testing import generate_test_dataset, generate_test_dataarray
 from xarray.testing import assert_identical as xr_assert_identical
 from xarray.testing import assert_equal as xr_assert_equal

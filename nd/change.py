@@ -1,24 +1,31 @@
-"""
-This module contains the change detection algorithm by
-Conradsen et al. (2015).
-"""
-from ..io import disassemble_complex
-from ..filters import BoxcarFilter
-from . import ChangeDetection
-from ..algorithm import wrap_algorithm
+from .algorithm import Algorithm, wrap_algorithm
+from .io import disassemble_complex
+from .filters import BoxcarFilter
+from . import _change
 import numpy as np
 import xarray as xr
-# Cannot install libgsl-dev on ReadTheDocs.
-# So if we are building the documentation ignore the error raised.
-try:
-    from . import _omnibus
-except Exception:
-    import os
-    if os.environ.get('READTHEDOCS') != 'True':
-        raise
 
 
-def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
+__all__ = ['ChangeDetection', 'OmnibusTest', 'omnibus']
+
+
+# --------------------------------
+# ABSTRACT CLASS: CHANGE DETECTION
+# --------------------------------
+
+class ChangeDetection(Algorithm):
+
+    njobs = 1
+
+    def __init__(self, njobs=1):
+        self.njobs = njobs
+
+
+# -----------------------------------
+# ALGORITHM: OMNIBUS CHANGE DETECTION
+# -----------------------------------
+
+def _omnibus_change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
     """
     Implement the change detection algorithm proposed by Conradsen et al.
     (2015).
@@ -55,7 +62,7 @@ def _change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
     values = ds_m[['C11', 'C12__re', 'C12__im', 'C22']].to_array() \
         .transpose('y', 'x', 'time', 'variable').values
 
-    change = _omnibus.change_detection(values, alpha=alpha, n=n, njobs=njobs)
+    change = _change.change_detection(values, alpha=alpha, n=n, njobs=njobs)
 
     coords = ds.coords
     dims = ['y', 'x', 'time']
@@ -97,8 +104,8 @@ class OmnibusTest(ChangeDetection):
         super().__init__(*args, **kwargs)
 
     def apply(self, ds):
-        return _change_detection(ds, alpha=self.alpha, ml=self.ml, n=self.n,
-                                 njobs=self.njobs)
+        return _omnibus_change_detection(ds, alpha=self.alpha, ml=self.ml,
+                                         n=self.n, njobs=self.njobs)
 
 
 omnibus = wrap_algorithm(OmnibusTest, 'omnibus')

@@ -1,7 +1,7 @@
 import pytest
 from nd.testing import generate_test_dataset, generate_test_dataarray
 from nd.utils import get_vars_for_dims
-from nd.warp.coregister_ import Coregistration
+from nd.warp import Coregistration
 from nd.filters import GaussianFilter
 import numpy as np
 import xarray as xr

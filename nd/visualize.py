@@ -15,6 +15,9 @@ try:
 except ImportError:
     pass
 
+__all__ = ['colorize',
+           'to_rgb',
+           'write_video']
 
 CMAPS = {
     'jet': cv2.COLORMAP_JET,
