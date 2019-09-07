@@ -33,7 +33,7 @@ sys.path.insert(0, nd_path)
 # -- Project information -----------------------------------------------------
 
 project = 'nd'
-copyright = '2018, Johannes Hansen'
+copyright = '2019, Johannes Hansen'
 author = 'Johannes Hansen'
 
 # The short X.Y version
