@@ -6,11 +6,11 @@ except Exception:
     pass
 
 from xarray import Dataset, DataArray
+from . import _xarray
 from .io import open_dataset, to_netcdf
 from .visualize import to_rgb, write_video
 from .algorithm import Algorithm
 from .tiling import auto_merge
-from . import _xarray
 
 from . import (change, classify, io, visualize, filters, utils, warp, vector)
 
