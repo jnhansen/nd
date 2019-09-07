@@ -42,20 +42,18 @@ if use_cython:
 cmdclass = {}
 
 extensions = [
-    Extension("nd.change._omnibus", ["nd/change/_omnibus" + ext],
+    Extension("nd._change", ["nd/_change" + ext],
               libraries=omnibus_libraries,
               library_dirs=omnibus_library_dirs,
               include_dirs=omnibus_include_dirs,
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("nd.filters._nlmeans", ["nd/filters/_nlmeans" + ext],
+    Extension("nd._filters", ["nd/_filters" + ext],
               extra_compile_args=['-O3', '-fopenmp'],
               extra_link_args=['-fopenmp'],
               ),
-    Extension("nd.warp._warp", ["nd/warp/_warp" + ext]),
-    # Extension("nd.filters._correlation", ["nd/filters/_correlation" + ext]),
-    # Extension("nd.change._bayes", ["nd/change/_bayes" + ext]),
+    Extension("nd._warp", ["nd/_warp" + ext]),
 ]
 
 if use_cython:

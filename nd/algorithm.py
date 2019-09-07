@@ -19,7 +19,7 @@ class Algorithm(ABC):
 
 def extract_arguments(fn, args, kwargs):
     """
-    Given a function fn, return the leftover *args and **kwargs.
+    Given a function fn, return the leftover `*args` and `**kwargs`.
     """
     def _(*args, **kwargs):
         pass
@@ -37,7 +37,8 @@ def wrap_algorithm(algo, name=None):
     """
     Return the function representation of an Algorithm derived class.
 
-    NOTE: If algo.apply has *args and **kwargs parameters, this doesn't work.
+    NOTE: If algo.apply has ``*args`` and ``**kwargs`` parameters,
+    this doesn't work.
     """
     if not issubclass(algo, Algorithm):
         raise ValueError('Class must be an instance of `nd.Algorithm`.')

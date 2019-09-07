@@ -1,5 +1,4 @@
-from nd.filters import ConvolutionFilter, BoxcarFilter
-from nd.filters.convolve_ import _expand_kernel
+from nd.filters import ConvolutionFilter, BoxcarFilter, _expand_kernel
 from nd.testing import generate_test_dataset
 from nd.io import assemble_complex
 import scipy.ndimage.filters as snf

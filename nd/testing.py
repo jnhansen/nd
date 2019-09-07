@@ -9,7 +9,7 @@ import rasterio.transform
 import rasterio.warp
 from numpy.testing import assert_equal, assert_almost_equal
 from nd.algorithm import Algorithm
-from nd.warp.warp_ import _parse_crs
+from nd.warp import _parse_crs
 
 
 def generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10},
@@ -154,21 +154,31 @@ def assert_equal_crs(crs1, crs2, *args, **kwargs):
 #     return lat, lon
 
 
+def _get_classes_from_module(modname):
+    module = __import__(modname, fromlist="dummy")
+    classes = inspect.getmembers(module, inspect.isclass)
+    return classes
+
+
 def all_algorithms(parent=nd):
     """
     Return a list of all algorithms.
     """
-    all_classes = []
-    path = parent.__path__
-    prefix = parent.__name__ + '.'
+    if hasattr(parent, '__path__'):
+        # The given module is a folder
+        all_classes = []
+        path = parent.__path__
+        prefix = parent.__name__ + '.'
 
-    for importer, modname, ispkg in pkgutil.walk_packages(
-            path=path, prefix=prefix, onerror=lambda x: None):
-        if (".tests." in modname):
-            continue
-        module = __import__(modname, fromlist="dummy")
-        classes = inspect.getmembers(module, inspect.isclass)
-        all_classes.extend(classes)
+        for importer, modname, ispkg in pkgutil.walk_packages(
+                path=path, prefix=prefix, onerror=lambda x: None):
+            if (".tests." in modname):
+                continue
+            all_classes.extend(_get_classes_from_module(modname))
+
+    else:
+        # The given module is a file
+        all_classes = _get_classes_from_module(parent.__name__)
 
     all_classes = set(all_classes)
 

@@ -6,12 +6,13 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError('scikit-learn is required for this module.')
 
 import numpy as np
-from ..filters import BoxcarFilter
-from ..warp import nrows, ncols
-from ..utils import get_vars_for_dims
+from .filters import BoxcarFilter
+from .warp import nrows, ncols
+from .utils import get_vars_for_dims
 
 
-__all__ = ['_cluster', '_cluster_smooth', 'cluster', 'norm_by_cluster']
+__all__ = ['Classifier', '_cluster', '_cluster_smooth', 'cluster',
+           'norm_by_cluster']
 
 
 def _cluster(ds, ml=5, scale=True, variables=None, **kwargs):
