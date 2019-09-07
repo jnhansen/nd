@@ -289,10 +289,10 @@ def auto_merge(datasets, buffer='auto', chunks={}):
         as dask arrays to avoid reading the whole dataset into memory.
     buffer : 'auto' or int or dict, optional
 
-        - If 'auto' (default), attempt to automatically detect the buffer for
+        - If 'auto' (default), attempt to automatically detect the buffer for \
         each dimension.
 
-        - If `int`, it is the number of overlapping pixels stored around each
+        - If `int`, it is the number of overlapping pixels stored around each \
         tile
 
         - If `dict`, this is the amount of buffer per dimension
@@ -301,6 +301,7 @@ def auto_merge(datasets, buffer='auto', chunks={}):
     -------
     xarray.Dataset
         The merged dataset.
+
     """
 
     # Treat `datasets` as a glob expression
