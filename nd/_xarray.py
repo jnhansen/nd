@@ -1,7 +1,8 @@
 import xarray as xr
 from . import warp
 from . import filters
-from .io import assemble_complex, disassemble_complex, to_netcdf
+from . import visualize
+from . import io
 
 
 @xr.register_dataset_accessor('nd')
@@ -12,13 +13,22 @@ class NDAccessor:
 
     # IO methods
     def as_complex(self):
-        return assemble_complex(self._obj)
+        return io.assemble_complex(self._obj)
 
     def as_real(self):
-        return disassemble_complex(self._obj)
+        return io.disassemble_complex(self._obj)
 
     def to_netcdf(self, *args, **kwargs):
-        return to_netcdf(self._obj, *args, **kwargs)
+        return io.to_netcdf(self._obj, *args, **kwargs)
+
+    # Visualization
+    def to_rgb(self, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
+               *args, **kwargs):
+        data = rgb(self._obj)
+        return visualize.to_rgb(data, *args, **kwargs)
+
+    def to_video(self, *args, **kwargs):
+        return visualize.write_video(self._obj, *args, **kwargs)
 
     # Projection methods
     def reproject(self, *args, **kwargs):
