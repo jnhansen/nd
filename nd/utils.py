@@ -394,13 +394,19 @@ def is_complex(ds):
 
     Parameters
     ----------
-    ds : xarray.Dataset
+    ds : xarray.Dataset or xarray.DataArray
 
     Returns
     -------
     bool
         True if `ds` contains any complex variables, False otherwise.
     """
-    return np.any(
-        [np.iscomplexobj(v) for v in ds.data_vars.values()]
-    )
+    if isinstance(ds, xr.DataArray):
+        return np.iscomplexobj(ds)
+    elif isinstance(ds, xr.Dataset):
+        return np.any(
+            [np.iscomplexobj(v) for v in ds.data_vars.values()]
+        )
+    else:
+        raise ValueError('Not an xarray Dataset or DataArray: {}'.format(
+                         repr(ds)))

@@ -4,6 +4,7 @@ This module contains the abstract base class Algorithm.
 from abc import ABC, abstractmethod
 import inspect
 from types import CodeType
+from collections import OrderedDict
 from .utils import parallel
 
 
@@ -24,10 +25,14 @@ def extract_arguments(fn, args, kwargs):
     def _(*args, **kwargs):
         pass
     sig = inspect.signature(fn)
+
+    # Remove 'self' parameter
     if 'self' in sig.parameters:
         sig = sig.replace(parameters=tuple(sig.parameters.values())[1:])
-    parameters = dict(sig.parameters)
-    parameters.update(dict(inspect.signature(_).parameters))
+
+    # Use an OrderedDict to maintain the parameter order in the signature
+    parameters = OrderedDict(sig.parameters)
+    parameters.update(OrderedDict(inspect.signature(_).parameters))
     new_sig = sig.replace(parameters=tuple(parameters.values()))
     bound = new_sig.bind(*args, **kwargs)
     return bound.arguments
