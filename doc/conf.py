@@ -18,7 +18,25 @@ import glob
 from operator import attrgetter
 import inspect
 import subprocess
+from unittest.mock import MagicMock
 
+
+# Mock imports for autodoc
+autodoc_mock_imports = ['sklearn', 'xarray', 'scipy', 'rasterio', 'pandas',
+                        'dask', 'imageio', 'affine', 'cv2', 'dateutil',
+                        'lxml', 'skimage', 'geopandas',
+                        'matplotlib']
+autodoc_warningiserror = False
+
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        return MagicMock()
+
+
+MOCK_MODULES = ['cython_gsl']
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 try:
     import nd
@@ -70,13 +88,6 @@ extensions = [
 #                          '**/*.pyx', '**/*.pxd']
 # apidoc_separate_modules = False
 # apidoc_toc_file = False
-
-# Mock imports for autodoc
-autodoc_mock_imports = ['sklearn', 'xarray', 'scipy', 'rasterio', 'pandas',
-                        'dask', 'imageio', 'affine', 'cv2', 'dateutil',
-                        'lxml', 'skimage', 'geopandas',
-                        'matplotlib', 'cython_gsl']
-autodoc_warningiserror = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
