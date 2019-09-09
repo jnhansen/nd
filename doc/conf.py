@@ -28,7 +28,8 @@ else:
     nd_path = os.path.abspath(
         os.path.join(os.path.dirname(nd.__file__), '..')
     )
-sys.path.insert(0, nd_path)
+# The following line may be causing issues on RTD
+# sys.path.insert(0, nd_path)
 
 # -- Project information -----------------------------------------------------
 
