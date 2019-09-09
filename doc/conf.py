@@ -20,6 +20,14 @@ import inspect
 import subprocess
 
 
+# Mock imports for autodoc
+autodoc_mock_imports = ['sklearn', 'xarray', 'scipy', 'rasterio', 'pandas',
+                        'dask', 'imageio', 'affine', 'cv2', 'dateutil',
+                        'lxml', 'skimage', 'geopandas',
+                        'matplotlib', 'cython_gsl', 'nd._change']
+autodoc_warningiserror = False
+
+
 try:
     import nd
 except ImportError:
@@ -28,7 +36,8 @@ else:
     nd_path = os.path.abspath(
         os.path.join(os.path.dirname(nd.__file__), '..')
     )
-sys.path.insert(0, nd_path)
+# The following line may be causing issues on RTD
+# sys.path.insert(0, nd_path)
 
 # -- Project information -----------------------------------------------------
 
@@ -69,13 +78,6 @@ extensions = [
 #                          '**/*.pyx', '**/*.pxd']
 # apidoc_separate_modules = False
 # apidoc_toc_file = False
-
-# Mock imports for autodoc
-autodoc_mock_imports = ['sklearn', 'xarray', 'scipy', 'rasterio', 'pandas',
-                        'dask', 'imageio', 'affine', 'cv2', 'dateutil',
-                        'lxml', 'skimage', 'geopandas',
-                        'matplotlib']
-autodoc_warningiserror = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

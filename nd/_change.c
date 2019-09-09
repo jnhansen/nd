@@ -6989,7 +6989,7 @@ static float __pyx_fuse_0__pyx_f_2nd_7_change_single_pixel_omnibus(__Pyx_memview
  *     rho = _rho(p, k, n)
  *     omega2 = _omega2(p, k, n, rho)             # <<<<<<<<<<<<<<
  *     z = _z(ts, n)
- *     _P1 = gsl_cdf_chisq_P(z, f)
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)
  */
   __pyx_v_omega2 = __pyx_f_2nd_7_change__omega2(__pyx_v_p, __pyx_v_k, __pyx_v_n, __pyx_v_rho);
 
@@ -6997,31 +6997,31 @@ static float __pyx_fuse_0__pyx_f_2nd_7_change_single_pixel_omnibus(__Pyx_memview
  *     rho = _rho(p, k, n)
  *     omega2 = _omega2(p, k, n, rho)
  *     z = _z(ts, n)             # <<<<<<<<<<<<<<
- *     _P1 = gsl_cdf_chisq_P(z, f)
- *     _P2 = gsl_cdf_chisq_P(z, f+4)
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)
  */
   __pyx_v_z = __pyx_fuse_0__pyx_f_2nd_7_change__z(__pyx_v_ts, __pyx_v_n, 0);
 
   /* "nd/_change.pyx":147
  *     omega2 = _omega2(p, k, n, rho)
  *     z = _z(ts, n)
- *     _P1 = gsl_cdf_chisq_P(z, f)             # <<<<<<<<<<<<<<
- *     _P2 = gsl_cdf_chisq_P(z, f+4)
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)             # <<<<<<<<<<<<<<
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)
  * 
  */
   __pyx_v__P1 = gsl_cdf_chisq_P(__pyx_v_z, __pyx_v_f);
 
   /* "nd/_change.pyx":148
  *     z = _z(ts, n)
- *     _P1 = gsl_cdf_chisq_P(z, f)
- *     _P2 = gsl_cdf_chisq_P(z, f+4)             # <<<<<<<<<<<<<<
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)             # <<<<<<<<<<<<<<
  * 
  *     result = _P1 + omega2 * (_P2 - _P1)
  */
   __pyx_v__P2 = gsl_cdf_chisq_P(__pyx_v_z, (__pyx_v_f + 4.0));
 
   /* "nd/_change.pyx":150
- *     _P2 = gsl_cdf_chisq_P(z, f+4)
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)
  * 
  *     result = _P1 + omega2 * (_P2 - _P1)             # <<<<<<<<<<<<<<
  *     return result
@@ -7194,7 +7194,7 @@ static double __pyx_fuse_1__pyx_f_2nd_7_change_single_pixel_omnibus(__Pyx_memvie
  *     rho = _rho(p, k, n)
  *     omega2 = _omega2(p, k, n, rho)             # <<<<<<<<<<<<<<
  *     z = _z(ts, n)
- *     _P1 = gsl_cdf_chisq_P(z, f)
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)
  */
   __pyx_v_omega2 = __pyx_f_2nd_7_change__omega2(__pyx_v_p, __pyx_v_k, __pyx_v_n, __pyx_v_rho);
 
@@ -7202,31 +7202,31 @@ static double __pyx_fuse_1__pyx_f_2nd_7_change_single_pixel_omnibus(__Pyx_memvie
  *     rho = _rho(p, k, n)
  *     omega2 = _omega2(p, k, n, rho)
  *     z = _z(ts, n)             # <<<<<<<<<<<<<<
- *     _P1 = gsl_cdf_chisq_P(z, f)
- *     _P2 = gsl_cdf_chisq_P(z, f+4)
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)
  */
   __pyx_v_z = __pyx_fuse_1__pyx_f_2nd_7_change__z(__pyx_v_ts, __pyx_v_n, 0);
 
   /* "nd/_change.pyx":147
  *     omega2 = _omega2(p, k, n, rho)
  *     z = _z(ts, n)
- *     _P1 = gsl_cdf_chisq_P(z, f)             # <<<<<<<<<<<<<<
- *     _P2 = gsl_cdf_chisq_P(z, f+4)
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)             # <<<<<<<<<<<<<<
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)
  * 
  */
   __pyx_v__P1 = gsl_cdf_chisq_P(__pyx_v_z, __pyx_v_f);
 
   /* "nd/_change.pyx":148
  *     z = _z(ts, n)
- *     _P1 = gsl_cdf_chisq_P(z, f)
- *     _P2 = gsl_cdf_chisq_P(z, f+4)             # <<<<<<<<<<<<<<
+ *     _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)             # <<<<<<<<<<<<<<
  * 
  *     result = _P1 + omega2 * (_P2 - _P1)
  */
   __pyx_v__P2 = gsl_cdf_chisq_P(__pyx_v_z, (__pyx_v_f + 4.0));
 
   /* "nd/_change.pyx":150
- *     _P2 = gsl_cdf_chisq_P(z, f+4)
+ *     _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)
  * 
  *     result = _P1 + omega2 * (_P2 - _P1)             # <<<<<<<<<<<<<<
  *     return result
