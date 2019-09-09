@@ -75,7 +75,7 @@ extensions = [
 autodoc_mock_imports = ['sklearn', 'xarray', 'scipy', 'rasterio', 'pandas',
                         'dask', 'imageio', 'affine', 'cv2', 'dateutil',
                         'lxml', 'skimage', 'geopandas',
-                        'matplotlib']
+                        'matplotlib', 'cython_gsl']
 autodoc_warningiserror = False
 
 # Add any paths that contain templates here, relative to this directory.
