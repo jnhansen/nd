@@ -35,7 +35,7 @@ class Mock(MagicMock):
         return MagicMock()
 
 
-MOCK_MODULES = ['cython_gsl']
+MOCK_MODULES = ['cython_gsl', 'nd._change']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 try:
