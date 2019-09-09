@@ -18,25 +18,15 @@ import glob
 from operator import attrgetter
 import inspect
 import subprocess
-from unittest.mock import MagicMock
 
 
 # Mock imports for autodoc
 autodoc_mock_imports = ['sklearn', 'xarray', 'scipy', 'rasterio', 'pandas',
                         'dask', 'imageio', 'affine', 'cv2', 'dateutil',
                         'lxml', 'skimage', 'geopandas',
-                        'matplotlib']
+                        'matplotlib', 'cython_gsl', 'nd._change']
 autodoc_warningiserror = False
 
-
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-        return MagicMock()
-
-
-MOCK_MODULES = ['cython_gsl', 'nd._change']
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 try:
     import nd
