@@ -2,6 +2,7 @@ import xarray as xr
 import inspect
 from . import utils
 from . import warp
+from . import change
 from . import filters
 from . import visualize
 from . import io
@@ -68,6 +69,11 @@ class NDAccessor:
     @patch_doc(warp.resample)
     def resample(self, *args, **kwargs):
         return warp.resample(self._obj, *args, **kwargs)
+
+    # Change detection methods
+    @patch_doc(change.omnibus)
+    def change_omnibus(self, *args, **kwargs):
+        return change.omnibus(self._obj, *args, **kwargs)
 
 
 @xr.register_dataset_accessor('filter')
