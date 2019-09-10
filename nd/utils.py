@@ -10,6 +10,10 @@ import datetime
 from dateutil.tz import tzutc
 from dateutil.parser import parse as parsedate
 import itertools
+from collections import OrderedDict
+import re
+from operator import add
+from functools import reduce
 
 PY2 = sys.version_info < (3, 0)
 
@@ -410,3 +414,60 @@ def is_complex(ds):
     else:
         raise ValueError('Not an xarray Dataset or DataArray: {}'.format(
                          repr(ds)))
+
+
+def _wlen(s):
+    """Return number of leading whitespace characters."""
+    return len(s) - len(s.lstrip())
+
+
+def parse_docstring(doc):
+    parsed = OrderedDict()
+    lines = doc.split('\n')
+
+    # Find indentation level and reset to 0
+    # Exclude first and last line
+    indent = min([_wlen(_) for _ in lines[1:-1] if len(_.lstrip()) > 0])
+    lines = [l[indent:] if len(l) > indent else l for l in lines]
+    parsed['indent'] = indent
+
+    # Find sections
+    line_numbers = np.arange(len(lines))
+    rule = re.compile('^ *\-+$')
+    section_starts = list(line_numbers[np.array([
+        rule.match(l) is not None for l in lines])])
+    parsed[None] = lines[:section_starts[0] - 2]
+
+    # Iterate through sections
+    for start, stop in zip(section_starts, section_starts[1:] + [None]):
+        section_name = lines[start - 1].strip()
+        if stop is not None:
+            stop -= 2
+        section = lines[start + 1:stop]
+
+        # Split section contents by parameter
+        param_starts = [i for i, s in enumerate(section) if _wlen(s) == 0]
+        parsed[section_name] = \
+            [section[pstart:pstop] for pstart, pstop in
+             zip(param_starts, param_starts[1:]+[None])]
+
+    return parsed
+
+
+def assemble_docstring(parsed):
+    indent = parsed.pop('indent')
+    pad = ' '*indent
+
+    d = []
+    for k, v in parsed.items():
+        if isinstance(v[0], list):
+            flat_v = reduce(add, v)
+        else:
+            flat_v = v
+
+        if k is not None:
+            d.extend(['', pad + k, pad + '-'*len(k)])
+
+        d.extend([(pad + l).rstrip() for l in flat_v])
+
+    return '\n'.join(d)

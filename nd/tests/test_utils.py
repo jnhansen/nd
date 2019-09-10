@@ -172,3 +172,27 @@ def test_expand_variables():
     da = ds.to_array(dim='new_dim')
     ds_new = utils.expand_variables(da, dim='new_dim')
     xr_assert_identical(ds, ds_new)
+
+
+def test_parse_docstrings():
+    doc = """
+    Preamble
+
+    More information
+
+    Parameters
+    ----------
+    a : int
+    b : bool
+        More information
+
+    Returns
+    -------
+    int
+        The result
+
+    """
+    parsed = utils.parse_docstring(doc)
+    assembled = utils.assemble_docstring(parsed)
+    stripped_doc = '\n'.join([l.rstrip() for l in doc.split('\n')])
+    assert_equal(stripped_doc, assembled)
