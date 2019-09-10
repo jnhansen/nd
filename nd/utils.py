@@ -428,7 +428,7 @@ def parse_docstring(doc):
     # Find indentation level and reset to 0
     # Exclude first and last line
     indent = min([_wlen(_) for _ in lines[1:-1] if len(_.lstrip()) > 0])
-    lines = [l[indent:] if len(l) > indent else l for l in lines]
+    lines = [l[indent:] if _wlen(l) >= indent else l for l in lines]
     parsed['indent'] = indent
 
     # Find sections
