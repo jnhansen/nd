@@ -104,7 +104,10 @@ def test_accessor_nd_to_netcdf(tmpdir, generator):
     io.to_netcdf(ds, path_1)
     ds.nd.to_netcdf(path_2)
 
-    assert_equal_files(path_1, path_2)
+    assert_equal(
+        io.open_dataset(path_1),
+        io.open_dataset(path_2)
+    )
 
 
 # -------------------------------
