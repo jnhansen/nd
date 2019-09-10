@@ -1,5 +1,6 @@
 import xarray as xr
 import inspect
+from . import utils
 from . import warp
 from . import filters
 from . import visualize
@@ -12,7 +13,10 @@ def patch_doc(source):
     """
     def _patch(func):
         # Override docstring
-        func.__doc__ = source.__doc__
+        doc = utils.parse_docstring(source.__doc__)
+        if 'Parameters' in doc:
+            doc['Parameters'] = doc['Parameters'][1:]
+        func.__doc__ = utils.assemble_docstring(doc)
 
         # Override signature.
         # The first paramete is always the xarray object itself
