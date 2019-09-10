@@ -439,7 +439,6 @@ def parse_docstring(doc):
     rule = re.compile('^ *\-+$')
     section_starts = list(line_numbers[np.array([
         rule.match(l) is not None for l in lines])])
-    print(section_starts)
 
     if len(section_starts) == 0:
         parsed[None] = lines
