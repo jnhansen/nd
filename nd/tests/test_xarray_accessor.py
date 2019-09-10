@@ -1,11 +1,14 @@
 import pytest
 import numpy as np
+import inspect
+from collections import OrderedDict
 from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_files)
 from nd import warp, filters
 from nd import to_rgb, write_video
+from nd._xarray import patch_doc
 
 
 @pytest.mark.parametrize('generator', [
@@ -95,4 +98,31 @@ def test_accessor_filter_gaussian(generator):
     xr_assert_equal(
         filters.gaussian(ds, **kwargs),
         ds.filter.gaussian(**kwargs)
+    )
+
+
+# ---------------------------
+# Test accessor documentation
+# ---------------------------
+
+def test_patch_doc():
+    def src_fn(data, a, b, c, d={}):
+        """Source docstring"""
+        pass
+
+    @patch_doc(src_fn)
+    def fn(self):
+        pass
+
+    # Check that docstring matches
+    assert_equal(src_fn.__doc__, fn.__doc__)
+
+    # Check that signature matches
+    # (apart from first parameter)
+    params_src = OrderedDict(inspect.signature(src_fn).parameters)
+    params_fn = OrderedDict(inspect.signature(fn).parameters)
+    params_src.popitem(last=False)
+    params_fn.popitem(last=False)
+    assert_equal(
+        params_src, params_fn
     )
