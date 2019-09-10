@@ -726,7 +726,16 @@ class Reprojection(Algorithm):
     crs : dict or str
         The output coordinate reference system as dictionary or proj-string
     extent : tuple, optional
-        The output extent. By default this is determined from the input data.
+        The output extent. By default this is inferred from the input data.
+    res : tuple, optional
+        The output resolution. By default this is inferred from the input data.
+    width : tuple, optional
+        The output width. By default this is inferred from the input data.
+    height : tuple, optional
+        The output height. By default this is inferred from the input data.
+    transform : tuple, optional
+        The output coordinate transform. By default this is inferred from the
+        input data.
     **kwargs : dict, optional
         Extra keyword arguments for ``rasterio.warp.reproject``.
     """
