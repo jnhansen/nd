@@ -427,8 +427,11 @@ def parse_docstring(doc):
 
     # Find indentation level and reset to 0
     # Exclude first and last line
-    indent = min([_wlen(_) for _ in lines[1:-1] if len(_.lstrip()) > 0])
-    lines = [l[indent:] if len(l) > indent else l for l in lines]
+    if len(lines) < 3:
+        indent = 0
+    else:
+        indent = min([_wlen(_) for _ in lines[1:-1] if len(_.lstrip()) > 0])
+    lines = [l[indent:] if _wlen(l) >= indent else l for l in lines]
     parsed['indent'] = indent
 
     # Find sections
@@ -436,20 +439,24 @@ def parse_docstring(doc):
     rule = re.compile('^ *\-+$')
     section_starts = list(line_numbers[np.array([
         rule.match(l) is not None for l in lines])])
-    parsed[None] = lines[:section_starts[0] - 2]
 
-    # Iterate through sections
-    for start, stop in zip(section_starts, section_starts[1:] + [None]):
-        section_name = lines[start - 1].strip()
-        if stop is not None:
-            stop -= 2
-        section = lines[start + 1:stop]
+    if len(section_starts) == 0:
+        parsed[None] = lines
+    else:
+        parsed[None] = lines[:section_starts[0] - 2]
 
-        # Split section contents by parameter
-        param_starts = [i for i, s in enumerate(section) if _wlen(s) == 0]
-        parsed[section_name] = \
-            [section[pstart:pstop] for pstart, pstop in
-             zip(param_starts, param_starts[1:]+[None])]
+        # Iterate through sections
+        for start, stop in zip(section_starts, section_starts[1:] + [None]):
+            section_name = lines[start - 1].strip()
+            if stop is not None:
+                stop -= 2
+            section = lines[start + 1:stop]
+
+            # Split section contents by parameter
+            param_starts = [i for i, s in enumerate(section) if _wlen(s) == 0]
+            parsed[section_name] = \
+                [section[pstart:pstop] for pstart, pstop in
+                 zip(param_starts, param_starts[1:]+[None])]
 
     return parsed
 
