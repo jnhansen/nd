@@ -268,6 +268,12 @@ def test_get_crs(name, kwargs):
     assert_equal_crs(get_crs(ds), kwargs['crs'])
 
 
+def test_get_crs_none():
+    ds = generate_test_dataset()
+    ds.attrs = {}
+    assert get_crs(ds) is None
+
+
 @pytest.mark.parametrize('fmt,result', [
     ('proj', '+init=epsg:4326'),
     ('dict', {'init': 'epsg:4326'}),
