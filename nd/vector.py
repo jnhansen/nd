@@ -72,7 +72,7 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
 
     if columns is not None:
         # Avoid duplicate columns if 'geometry' or date_field have been
-        # expclitly specified
+        # explicitly specified
         shp = shp[list(set(columns + ['geometry', date_field]))]
 
     # Add temporal coordinates
