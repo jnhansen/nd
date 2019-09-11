@@ -1,10 +1,24 @@
-from nd.visualize import to_rgb, write_video, colorize
+from nd.visualize import to_rgb, write_video, colorize, calculate_shape
 from numpy.testing import assert_equal
 from nd.testing import generate_test_dataset
 import numpy as np
 import pytest
 import imageio
 import os
+
+
+@pytest.mark.parametrize('shape,orig_shape,expected', [
+    (None, (40, 60), (40, 60)),
+    ((None, None), (40, 60), (40, 60)),
+    ((None, 120), (40, 60), (80, 120)),
+    ((60, None), (40, 60), (60, 90)),
+    ((110, 110), (40, 60), (110, 110)),
+])
+def test_calculate_shape(shape, orig_shape, expected):
+    assert_equal(
+        calculate_shape(shape, orig_shape),
+        expected
+    )
 
 
 @pytest.mark.parametrize('output', [None, 'test.jpg'])

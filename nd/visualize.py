@@ -30,6 +30,42 @@ def _cmap_from_str(cmap):
         return cmap
 
 
+def calculate_shape(new_shape, orig_shape):
+    """Calculate a new image shape given the desired width and/or height.
+
+    Parameters
+    ----------
+    new_shape : tuple
+        The desired height and/or width of the image. Each may be None.
+    orig_shape : tuple
+        The shape of the original image. Will be used to calculate the
+        width and height in case one or both are None.
+
+    Returns
+    -------
+    tuple
+        The output shape
+
+    """
+    if new_shape is None:
+        return orig_shape
+
+    height, width = new_shape
+    if height is None:
+        if width is not None:
+            # Determine height from given width
+            height = width * orig_shape[0] / orig_shape[1]
+        else:
+            # Both are None: Use original shape
+            height = orig_shape[0]
+            width = orig_shape[1]
+    elif width is None:
+        # Determine width from given height
+        width = height * orig_shape[1] / orig_shape[0]
+
+    return (int(height), int(width))
+
+
 def colorize(labels, N=None, nan_vals=[], cmap='jet'):
     """
     Apply a color map to a map of integer labels.
@@ -58,7 +94,7 @@ def colorize(labels, N=None, nan_vals=[], cmap='jet'):
 
 
 def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
-           categorical=False, mask=None, size=None, cmap=None):
+           categorical=False, mask=None, shape=None, cmap=None):
     """Turn some data into a numpy array representing an RGB image.
 
     Parameters
@@ -74,6 +110,15 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
         lowest percentile to plot (default: 2). Ignored if vmin is passed.
     pmax : float
         highest percentile to plot (default: 98). Ignored if vmax is passed.
+    categorical : bool, optional
+        Whether the data is categorical. If True, return a randomly colorized
+        image according to the data value (default: False).
+    mask : np.ndarray, optional
+        If specified, parts of the image outside of the mask will be black.
+    shape : tuple, optional
+        The output height and width (either or both may be None)
+    cmap : opencv colormap, optional
+        The colormap used to colorize grayscale data
 
     Returns
     -------
@@ -95,7 +140,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
                              "Found dimensions {}".format(d.dims))
 
     values = [np.asarray(d) for d in data]
-    shape = data[0].shape + (n_channels,)
+    shape_rgb = data[0].shape + (n_channels,)
 
     if vmin is not None:
         if isinstance(vmin, (int, float)):
@@ -108,7 +153,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
         colored = colorize(values[0], nan_vals=[0])
 
     else:
-        im = np.empty(shape)
+        im = np.empty(shape_rgb)
 
         for i in range(n_channels):
             channel = values[i]
@@ -140,14 +185,8 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
     if mask is not None:
         colored[~mask] = 0
 
-    if size is not None:
-        if size[0] is None:
-            size = (int(colored.shape[0] * size[1] / colored.shape[1]),
-                    size[1])
-        elif size[1] is None:
-            size = (size[0],
-                    int(colored.shape[1] * size[0] / colored.shape[0]))
-        colored = cv2.resize(colored, (size[1], size[0]))
+    shape = calculate_shape(shape, colored.shape[:2])
+    colored = cv2.resize(colored, shape)
 
     if output is None:
         return cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
@@ -197,17 +236,9 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
             return d
 
     # Use coords rather than dims so it also works for DataArray
-    if height is None:
-        if width is not None:
-            # Determine height from given width
-            height = width * ds.coords['y'].size / ds.coords['x'].size
-        else:
-            # Both are None: Use original size of data
-            height = ds.coords['y'].size
-            width = ds.coords['x'].size
-    if width is None:
-        # Determine width from given height
-        width = height * ds.coords['x'].size / ds.coords['y'].size
+    height, width = calculate_shape(
+        (height, width), (ds.coords['y'].size, ds.coords['x'].size)
+    )
 
     _, ext = os.path.splitext(path)
 
