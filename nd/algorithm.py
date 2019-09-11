@@ -1,7 +1,7 @@
 """
 This module contains the abstract base class Algorithm.
 """
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, ABCMeta
 import inspect
 from types import CodeType
 from collections import OrderedDict
@@ -9,6 +9,7 @@ from . import utils
 
 
 class Algorithm(ABC):
+    __metaclass__ = ABCMeta
 
     @abstractmethod
     def apply(self, ds):
@@ -35,6 +36,7 @@ def extract_arguments(fn, args, kwargs):
     parameters.update(OrderedDict(inspect.signature(_).parameters))
     new_sig = sig.replace(parameters=tuple(parameters.values()))
     bound = new_sig.bind(*args, **kwargs)
+    bound.apply_defaults()
     return bound.arguments
 
 
