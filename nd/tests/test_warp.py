@@ -488,6 +488,32 @@ def test_reproject_insufficient_information():
             _ = _reproject(ds, **kwargs)
 
 
+def test_reproject_one_dimensional_vars():
+    ds = generate_test_dataset(crs=epsg4326)
+    ds['xvar'] = (('x',), ds.x.values * 10)
+    ds['yvar'] = (('y',), ds.y.values * 10)
+    ds['timevar'] = (('time',), np.random.rand(ds.dims['time']))
+
+    warped = Reprojection(
+        crs=sinusoidal, resampling=rasterio.warp.Resampling.bilinear
+    ).apply(ds)
+
+    xr_assert_equal(
+        warped['timevar'], ds['timevar'])
+
+    # Check that xvar and yvar are still proportional to longitude
+    # and latitude
+    for v, coord in [
+        ('xvar', 'lon'), ('yvar', 'lat')
+    ]:
+        ratios = warped[v].values / warped[coord].values
+        print(v, coord)
+        print(np.nanmin(ratios), np.nanmax(ratios), np.nanstd(ratios))
+        # There is quite a bit of error, for now accept relatively
+        # high error.
+        assert np.nanstd(ratios) < 1.5
+
+
 def test_reprojection_nan_values():
     src_crs = epsg4326
     dst_crs = sinusoidal
