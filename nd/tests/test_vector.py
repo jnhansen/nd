@@ -1,5 +1,68 @@
-from nd.vector import rasterize
+import pytest
+from nd.testing import (generate_test_dataset, generate_test_geodataframe,
+                        assert_equal_crs)
+from nd import vector
+from nd import warp
+from numpy.testing import assert_equal
+from geopandas.testing import assert_geodataframe_equal
+import geopandas as gpd
+import numpy as np
 
 
-def test_rasterize():
-    pass
+def test_rasterize_no_side_effects():
+    ds = generate_test_dataset()
+    df = generate_test_geodataframe()
+    df_copy = df.copy()
+    _ = vector.rasterize(df, ds)
+    # Check that the original GeoDataFrame doesn't change as part of the
+    # rasterization
+    assert_geodataframe_equal(
+        df, df_copy
+    )
+
+
+def test_rasterize(tmpdir):
+    path = str(tmpdir.join('polygons.shp'))
+    ds = generate_test_dataset()
+    df = generate_test_geodataframe()
+    schema = gpd.io.file.infer_schema(df)
+    schema['properties']['date'] = 'date'
+    df.to_file(path, schema=schema)
+
+    # Rasterize
+    raster = vector.rasterize(path, ds)
+
+    # Check that the raster contains all fields as variables
+    assert set(raster.data_vars).union({'geometry'}) == set(df.columns)
+
+    # Check dtypes
+    assert np.issubdtype(raster.float.dtype, np.floating)
+    assert np.issubdtype(raster.integer.dtype, np.signedinteger)
+    assert np.issubdtype(raster.category.dtype, np.signedinteger)
+
+    # Check that extent, projection etc. are identical to the reference raster
+    assert_equal(
+        warp.get_bounds(raster),
+        warp.get_bounds(ds)
+    )
+    assert_equal_crs(
+        warp.get_crs(raster),
+        warp.get_crs(ds)
+    )
+    assert_equal(
+        warp.get_transform(raster),
+        warp.get_transform(ds)
+    )
+
+
+def test_rasterize_date_field():
+    ds = generate_test_dataset()
+    df = generate_test_geodataframe()
+    raster = vector.rasterize(df, ds, date_field='date')
+
+    assert len(np.unique(df['date'])) == raster.dims['time']
+
+    assert_equal(
+        np.unique(df['date']).astype('datetime64[s]'),
+        raster.time.values.astype('datetime64[s]')
+    )

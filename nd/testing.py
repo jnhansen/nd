@@ -7,6 +7,8 @@ import inspect
 import nd
 import rasterio.transform
 import rasterio.warp
+import shapely
+import geopandas as gpd
 from numpy.testing import assert_equal, assert_almost_equal
 from nd.algorithm import Algorithm
 from nd.warp import _parse_crs
@@ -187,3 +189,114 @@ def all_algorithms(parent=nd):
                       c[0] != 'Algorithm')]
 
     return algorithms
+
+
+# ----------------------
+# Vector testing methods
+# ----------------------
+
+def random_polygon(x, y, n_vertices, radius=1, irregularity=0.2, sigma=0.3) :
+    """
+    Generate a random polygon around given center.
+    Inspired by https://stackoverflow.com/a/25276331/6156397
+
+    Parameters
+    ----------
+    x, y : float
+        Coordinates of polygon center
+    n_vertices : int
+        Number of polygon vertices
+    radius : float, optional
+        Average radius of polygon (default: 1)
+    irregularity : float, optional
+        Irregularity of spacing between the vertices (0..1)
+        (default: 0.2)
+    sigma : float, optional
+        Standard deviation of radius, as fraction of radius (0..1)
+        (default: 0.3)
+
+    """
+
+    irregularity = np.clip(irregularity, 0, 1) * 2*np.pi / n_vertices
+    sigma = np.clip(sigma, 0, 1) * radius
+
+    # Generate random angle increments for each vertex
+    lower = (2*np.pi / n_vertices) - irregularity
+    upper = (2*np.pi / n_vertices) + irregularity
+    angle_steps = np.random.rand(n_vertices) * (upper-lower) + lower
+
+    # Normalize the angle steps to fit exactly in a circle
+    angle_steps = angle_steps * (2*np.pi) / angle_steps.sum()
+
+    # Generate the points accordingly and create polygon
+    angles = np.cumsum(angle_steps) + np.random.rand() * 2*np.pi
+    radii = np.clip(sigma * np.random.randn(n_vertices) + radius, 0, 2*radius)
+    vertices_x = radii * np.cos(angles) + x
+    vertices_y = radii * np.sin(angles) + y
+    polygon = shapely.geometry.Polygon(
+        zip(vertices_x, vertices_y)
+    )
+    return polygon
+
+
+def generate_test_polygons(n_polygon=20,
+                           extent=(-10.0, 50.0, 0.0, 60.0),
+                           radius=1,
+                           crs='+init=epsg:4326',
+                           random_seed=None,
+                           overlap=False):
+    np.random.seed(random_seed)
+    poly = []
+    union = None
+    while len(poly) < n_polygon:
+        # Generate single polygon
+        x = np.random.rand() * (extent[2] - extent[0]) + extent[0]
+        y = np.random.rand() * (extent[3] - extent[1]) + extent[1]
+        n = np.random.randint(3, 6)
+        r = np.random.rand() * 1 + radius
+        polygon = random_polygon(x, y, n, radius=r)
+
+        if union is None:
+            union = polygon
+        else:
+            # All sorts of topological errors can happen here,
+            # just skip and move on
+            try:
+                if not overlap:
+                    polygon = polygon.difference(union)
+
+                    # If the result is a MultiPolygon,
+                    # select only the largest part
+                    if isinstance(polygon, shapely.geometry.MultiPolygon):
+                        polygon = max(list(polygon), key=lambda p: p.area)
+
+                    if not isinstance(polygon, shapely.geometry.Polygon) \
+                            or not polygon.is_valid:
+                        continue
+                union = union.union(polygon)
+
+            except shapely.errors.TopologicalError:
+                continue
+
+        poly.append(polygon)
+
+    return poly
+
+
+def generate_test_geodataframe(n_polygon=20,
+                               extent=(-10.0, 50.0, 0.0, 60.0),
+                               radius=1,
+                               crs='+init=epsg:4326',
+                               random_seed=None,
+                               overlap=False):
+    category_list = ['apple', 'pear', 'orange', 'banana']
+    date_list = pd.date_range(start='01-2018', end='01-2019', freq='M').date
+    poly = generate_test_polygons(n_polygon, radius=radius, overlap=overlap)
+    df = gpd.GeoDataFrame({
+        'category': np.random.choice(category_list, n_polygon),
+        'float': np.random.rand(n_polygon),
+        'integer': np.random.randint(0, 100, n_polygon),
+        'date': np.random.choice(date_list, n_polygon),
+        'geometry': poly
+    })
+    return df
