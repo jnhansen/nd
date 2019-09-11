@@ -450,6 +450,20 @@ def _add_latlon(ds, n=50):
     ds.coords['lon'] = (('y', 'x'), lon_sparse)
 
 
+def _expand_var_to_xy(da, coords):
+    if 'x' in da.dims and 'y' in da.dims:
+        return da
+    elif 'x' in da.dims:
+        new_dim = 'y'
+    elif 'y' in da.dims:
+        new_dim = 'x'
+    else:
+        raise ValueError("Cannot expand the DataArray to new dimensions x, y")
+    expanded = xr.concat([da] * len(coords[new_dim]), dim=new_dim)
+    expanded.coords[new_dim] = coords[new_dim]
+    return expanded
+
+
 def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
                res=None, extent=None, **kwargs):
     """Reproject a Dataset or DataArray.
@@ -668,16 +682,22 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #
         for v in ds.data_vars:
             vdims = _get_projection_dim_order(ds[v])
+            common = set(vdims).intersection(ds[v].dims)
+            shape = (height, width)
             if set(ds[v].dims) == set(vdims) or set(ds[v].dims) == {'y', 'x'}:
-                shape = (height, width)
                 result[v] = (vdims, _reproject_da(ds[v], shape))
+                # Reorder dimensions of each variable to match original.
+                result[v] = result[v].transpose(*_get_dim_order(ds[v]),
+                                                transpose_coords=True)
+            elif common == {'x'} or common == {'y'}:
+                # Does the data contain either x or y dimension?
+                # Expand to grid and then reproject as two dimensional.
+                result[v] = (vdims, _reproject_da(
+                    _expand_var_to_xy(ds[v], ds.coords), shape
+                ))
             else:
-                # The variable doesn't contain y and x dimensions.
+                # The variable doesn't contain either y or x dimension.
                 result[v] = (ds[v].dims, ds[v])
-
-            # Reorder dimensions of each variable to match original.
-            result[v] = result[v].transpose(*_get_dim_order(ds[v]),
-                                            transpose_coords=True)
 
         #
         # Create lat and lon coordinates

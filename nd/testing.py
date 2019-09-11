@@ -9,7 +9,7 @@ import rasterio.transform
 import rasterio.warp
 import shapely
 import geopandas as gpd
-from numpy.testing import assert_equal, assert_almost_equal
+from numpy.testing import assert_almost_equal
 from nd.algorithm import Algorithm
 from nd.warp import _parse_crs
 import hashlib
@@ -137,6 +137,8 @@ def assert_equal_data(ds1, ds2):
 
 
 def assert_equal_crs(crs1, crs2, *args, **kwargs):
+    if crs1 is None and crs2 is None:
+        return
     xs = np.arange(10, dtype=np.float64)
     ys = np.arange(10, dtype=np.float64)
     newx, newy = rasterio.warp.transform(crs1, crs2, xs, ys)
@@ -213,7 +215,7 @@ def assert_equal_files(*files):
 # Vector testing methods
 # ----------------------
 
-def random_polygon(x, y, n_vertices, radius=1, irregularity=0.2, sigma=0.3) :
+def random_polygon(x, y, n_vertices, radius=1, irregularity=0.2, sigma=0.3):
     """
     Generate a random polygon around given center.
     Inspired by https://stackoverflow.com/a/25276331/6156397
