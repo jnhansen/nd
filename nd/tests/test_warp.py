@@ -475,6 +475,19 @@ def test_reproject(generator):
         assert_equal_crs(get_crs(proj), dst_crs)
 
 
+def test_reproject_insufficient_information():
+    src_crs = epsg4326
+    ds = generate_test_dataset(crs=src_crs)
+    dst_transform = Affine(0.1, 0, -10, 0, 0.1, 49)
+
+    insufficient_kwargs = [
+        dict(dst_transform=dst_transform),
+    ]
+    for kwargs in insufficient_kwargs:
+        with assert_raises(ValueError):
+            _ = _reproject(ds, **kwargs)
+
+
 def test_reprojection_nan_values():
     src_crs = epsg4326
     dst_crs = sinusoidal
