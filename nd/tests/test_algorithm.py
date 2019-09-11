@@ -2,7 +2,7 @@ import pytest
 from nd.algorithm import (Algorithm, extract_arguments, wrap_algorithm)
 from nd.testing import (generate_test_dataset, generate_test_dataarray)
 from xarray.testing import assert_equal as xr_assert_equal
-from numpy.testing import assert_raises, assert_raises_regex, assert_equal
+from numpy.testing import assert_raises_regex, assert_equal
 from collections import OrderedDict
 import inspect
 
@@ -38,7 +38,7 @@ def test_wrap_algorithm(generator):
     assert(wrapper.__name__ == 'wrapper_name')
     assert_equal(
         wrapper.__doc__,
-        'Wrapper for :class:`nd.tests.test_algorithm.DummyAlgorithm`.\n'
+        'Wrapper for :class:`nd.tests.test_algorithm.DummyAlgorithm`.\n\n'
         + DummyAlgorithm.__doc__)
     assert_equal(
         list(OrderedDict(inspect.signature(wrapper).parameters).keys()),
