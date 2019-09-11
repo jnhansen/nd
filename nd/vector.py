@@ -39,6 +39,9 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
     # read and discard waste columns
     if isinstance(shp, str):
         shp = gpd.read_file(shp, bbox=bbox)
+    else:
+        # Work on a copy
+        shp = shp.copy()
 
     # Prepare output dataset
     layer = xr.Dataset(coords={
