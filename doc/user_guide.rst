@@ -12,6 +12,7 @@ User Guide
    setup
    getting_started
    read_and_write
+   xarray
    projections
    visualize
    change/index

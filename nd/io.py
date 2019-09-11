@@ -204,9 +204,9 @@ def open_dataset(path, *args, **kwargs):
 def to_netcdf(ds, path, *args, **kwargs):
     """Write an xarray Dataset to disk.
 
-    In addition to xarray.to_netcdf, this function allows to store complex
+    In addition to ``xarray.to_netcdf``, this function allows to store complex
     valued data by converting it to a a pair of reals. This process is
-    reverted when reading the file via `from_netcdf`.
+    reverted when reading the file via ``from_netcdf``.
 
     Parameters
     ----------
@@ -214,6 +214,10 @@ def to_netcdf(ds, path, *args, **kwargs):
         The dataset to be stored to disk.
     path : str
         The path of the target NetCDF file.
+    *args : list
+        Extra positional arguments for ``xr.Dataset.to_netcdf``.
+    **kwargs : dict
+        Extra keyword arguments for ``xr.Dataset.to_netcdf``.
     """
 
     write = disassemble_complex(ds)
@@ -230,7 +234,7 @@ def to_netcdf(ds, path, *args, **kwargs):
 def open_netcdf(path, as_complex=False, *args, **kwargs):
     """Read a NetCDF file into an xarray Dataset.
 
-    Wrapper function for `xarray.open_dataset` that preserves complex
+    Wrapper function for ``xarray.open_dataset`` that preserves complex
     valued data.
 
     Parameters
