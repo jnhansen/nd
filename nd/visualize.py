@@ -9,11 +9,7 @@ import imageio
 import cv2
 import xarray as xr
 import numpy as np
-import matplotlib.pyplot as plt
-try:
-    from mpl_toolkits.basemap import Basemap
-except ImportError:
-    pass
+
 
 __all__ = ['colorize',
            'to_rgb',
@@ -157,32 +153,6 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
         return cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
     else:
         cv2.imwrite(output, colored)
-
-
-def plot_image(src, name, N=1):
-    """
-    A simple convenience function for plotting a GDAL dataset as an image.
-
-    Parameters
-    ----------
-    src : osgeo.gdal.Dataset or np.ndarray
-        The input data.
-    name : str
-        The filename including extension.
-    N : int, opt
-        The number
-    """
-    try:
-        data = src.ReadAsArray()
-    except AttributeError:
-        data = src
-
-    # RESAMPLE
-    data_ = data[::N, ::N]
-
-    plt.figure(figsize=(20, 20))
-    plt.imshow(data_, vmin=0, vmax=255)
-    plt.savefig(name)
 
 
 def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
