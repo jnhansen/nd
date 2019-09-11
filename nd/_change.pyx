@@ -6,7 +6,7 @@ from scipy.stats import chi2
 from libc.math cimport abs, log, isnan
 # from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from cython cimport floating
-from cython_gsl cimport gsl_ran_chisq_pdf, gsl_cdf_chisq_P, gsl_cdf_chisq_Q
+cimport cython_gsl
 
 
 ctypedef np.float64_t DOUBLE
@@ -144,8 +144,8 @@ cpdef floating single_pixel_omnibus(floating [:, :] ts, unsigned int n) nogil:
     rho = _rho(p, k, n)
     omega2 = _omega2(p, k, n, rho)
     z = _z(ts, n)
-    _P1 = gsl_cdf_chisq_P(z, f)
-    _P2 = gsl_cdf_chisq_P(z, f+4)
+    _P1 = cython_gsl.gsl_cdf_chisq_P(z, f)
+    _P2 = cython_gsl.gsl_cdf_chisq_P(z, f+4)
 
     result = _P1 + omega2 * (_P2 - _P1)
     return result

@@ -13,6 +13,7 @@ from .utils import get_vars_for_dims, expand_variables, is_complex
 from .io import disassemble_complex, assemble_complex
 from ._filters import _pixelwise_nlmeans_3d
 import numpy as np
+import xarray as xr
 import scipy.ndimage.filters as snf
 
 
@@ -131,43 +132,56 @@ class Filter(Algorithm):
         if convert_complex:
             disassemble_complex(ds, inplace=True)
 
-        # Find all variables that match the given dimensions
-        variables = get_vars_for_dims(ds, self.dims)
-        other_variables = get_vars_for_dims(ds, self.dims, invert=True)
-
         #
         # Apply the actual filter
         #
-        if self.per_variable:
-            # Apply independently for each variable.
+        if isinstance(ds, xr.DataArray):
+            # The data is a DataArray -->
+            # Apply filter directly.
             result = ds.copy(deep=True)
-            for v in variables:
-                vdims = result[v].dims
-                axes = tuple([vdims.index(d) for d in self.dims])
-                # Prepare data and output as numpy arrays
-                self._filter(ds[v].values, axes,
-                             output=result[v].values)
+            vdims = result.dims
+            axes = tuple([vdims.index(d) for d in self.dims])
+            self._filter(ds.values, axes, output=result.values)
 
         else:
-            # The variables are an additional dimension.
-            ordered_dims = ordered_dims + ('variable',)
+            # The data is a Dataset.
+            # Find all variables that match the given dimensions
+            variables = get_vars_for_dims(ds, self.dims)
+            other_variables = get_vars_for_dims(ds, self.dims, invert=True)
 
-            # convert to DataArray
-            da_ordered = ds[variables].to_array().transpose(*ordered_dims)
-            da_filtered = da_ordered.copy(deep=True)
-            axes = tuple([da_ordered.dims.index(d) for d in self.dims])
+            if self.per_variable:
+                # The data is a Dataset -->
+                # Apply filter independently for each variable.
+                result = ds.copy(deep=True)
+                for v in variables:
+                    vdims = result[v].dims
+                    axes = tuple([vdims.index(d) for d in self.dims])
+                    # Prepare data and output as numpy arrays
+                    self._filter(ds[v].values, axes,
+                                 output=result[v].values)
 
-            # Prepare data and output as numpy arrays
-            self._filter(da_ordered.values, axes, output=da_filtered.values)
+            else:
+                # The data is a Dataset -->
+                # The variables are an additional dimension.
+                ordered_dims = ordered_dims + ('variable',)
 
-            # Reassemble Dataset
-            result = expand_variables(da_filtered)
-            # Make sure all variable dimensions are in the original order
-            for v in result.data_vars:
-                result[v] = result[v].transpose(*ds[v].dims)
+                # convert to DataArray
+                da_ordered = ds[variables].to_array().transpose(*ordered_dims)
+                da_filtered = da_ordered.copy(deep=True)
+                axes = tuple([da_ordered.dims.index(d) for d in self.dims])
 
-            for v in other_variables:
-                result[v] = ds[v]
+                # Prepare data and output as numpy arrays
+                self._filter(da_ordered.values, axes,
+                             output=da_filtered.values)
+
+                # Reassemble Dataset
+                result = expand_variables(da_filtered)
+                # Make sure all variable dimensions are in the original order
+                for v in result.data_vars:
+                    result[v] = result[v].transpose(*ds[v].dims)
+
+                for v in other_variables:
+                    result[v] = ds[v]
 
         # Reassemble complex variabbles if previously disassembled
         if convert_complex:

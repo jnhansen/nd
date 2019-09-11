@@ -93,6 +93,11 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
     else:
         raise ValueError("`data` must be a DataArray or list of DataArrays")
 
+    for d in data:
+        if len(d.shape) > 2:
+            raise ValueError("The RGB channels must be two-dimensional. "
+                             "Found dimensions {}".format(d.dims))
+
     values = [np.asarray(d) for d in data]
     shape = data[0].shape + (n_channels,)
 

@@ -12,6 +12,8 @@ import geopandas as gpd
 from numpy.testing import assert_equal, assert_almost_equal
 from nd.algorithm import Algorithm
 from nd.warp import _parse_crs
+import hashlib
+import os
 
 
 def generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10},
@@ -189,6 +191,22 @@ def all_algorithms(parent=nd):
                       c[0] != 'Algorithm')]
 
     return algorithms
+
+
+def _md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def assert_equal_files(*files):
+    for f in files:
+        assert os.path.isfile(f)
+    checksums = [_md5(f) for f in files]
+    for c in checksums[1:]:
+        assert c == checksums[0]
 
 
 # ----------------------

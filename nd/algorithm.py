@@ -4,7 +4,8 @@ This module contains the abstract base class Algorithm.
 from abc import ABC, abstractmethod
 import inspect
 from types import CodeType
-from .utils import parallel
+from collections import OrderedDict
+from . import utils
 
 
 class Algorithm(ABC):
@@ -14,7 +15,7 @@ class Algorithm(ABC):
         return
 
     def parallel_apply(self, ds, dim, jobs=None):
-        return parallel(self.apply, dim=dim, chunks=jobs)
+        return utils.parallel(self.apply, dim=dim, chunks=jobs)
 
 
 def extract_arguments(fn, args, kwargs):
@@ -24,10 +25,14 @@ def extract_arguments(fn, args, kwargs):
     def _(*args, **kwargs):
         pass
     sig = inspect.signature(fn)
+
+    # Remove 'self' parameter
     if 'self' in sig.parameters:
         sig = sig.replace(parameters=tuple(sig.parameters.values())[1:])
-    parameters = dict(sig.parameters)
-    parameters.update(dict(inspect.signature(_).parameters))
+
+    # Use an OrderedDict to maintain the parameter order in the signature
+    parameters = OrderedDict(sig.parameters)
+    parameters.update(OrderedDict(inspect.signature(_).parameters))
     new_sig = sig.replace(parameters=tuple(parameters.values()))
     bound = new_sig.bind(*args, **kwargs)
     return bound.arguments
@@ -84,8 +89,16 @@ def wrap_algorithm(algo, name=None):
 
     # Override docstring
     link = ':class:`{}.{}`'.format(algo.__module__, algo.__name__)
-    _wrapper.__doc__ = """Wrapper for {}.
-    """.format(link) + algo.__doc__
+    doc = utils.parse_docstring(algo.__doc__)
+    doc[None].insert(0, "Wrapper for {}.".format(link))
+    doc[None].insert(1, "")
+    if algo.apply.__doc__ is not None:
+        apply_doc = utils.parse_docstring(algo.apply.__doc__)
+        if 'Parameters' in apply_doc:
+            doc['Parameters'] = apply_doc['Parameters'] + doc['Parameters']
+        if 'Returns' in apply_doc:
+            doc['Returns'] = apply_doc['Returns']
+    _wrapper.__doc__ = utils.assemble_docstring(doc)
 
     # Override signature
     sig_init = inspect.signature(algo.__init__)

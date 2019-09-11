@@ -675,6 +675,10 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
                 # The variable doesn't contain y and x dimensions.
                 result[v] = (ds[v].dims, ds[v])
 
+            # Reorder dimensions of each variable to match original.
+            result[v] = result[v].transpose(*_get_dim_order(ds[v]),
+                                            transpose_coords=True)
+
         #
         # Create lat and lon coordinates
         #
@@ -690,8 +694,8 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         result = xr.DataArray(_reproject_da(ds, shape), dims=dst_dims,
                               coords=dst_coords, name=ds.name)
 
-    # Reorder dimensions to match original.
-    result = result.transpose(*_get_dim_order(ds))
+        # Reorder dimensions to match original.
+        result = result.transpose(*_get_dim_order(ds), transpose_coords=True)
 
     #
     # Add metadata
@@ -723,7 +727,16 @@ class Reprojection(Algorithm):
     crs : dict or str
         The output coordinate reference system as dictionary or proj-string
     extent : tuple, optional
-        The output extent. By default this is determined from the input data.
+        The output extent. By default this is inferred from the input data.
+    res : tuple, optional
+        The output resolution. By default this is inferred from the input data.
+    width : tuple, optional
+        The output width. By default this is inferred from the input data.
+    height : tuple, optional
+        The output height. By default this is inferred from the input data.
+    transform : tuple, optional
+        The output coordinate transform. By default this is inferred from the
+        input data.
     **kwargs : dict, optional
         Extra keyword arguments for ``rasterio.warp.reproject``.
     """
