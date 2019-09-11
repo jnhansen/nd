@@ -39,12 +39,20 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
     # read and discard waste columns
     if isinstance(shp, str):
         shp = gpd.read_file(shp, bbox=bbox)
+    else:
+        # Work on a copy
+        shp = shp.copy()
 
     # Prepare output dataset
-    layer = xr.Dataset(coords={
-        'y': ds.coords['y'],
-        'x': ds.coords['x']
-    })
+    layer = xr.Dataset(
+        coords={
+            'y': ds.coords['y'],
+            'x': ds.coords['x']
+        },
+        attrs={
+            'transform': tuple(transf[:6]),
+            'crs': warp.get_crs(ds)
+        })
 
     exclude_columns = ['geometry', date_field]
 
@@ -64,7 +72,7 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
 
     if columns is not None:
         # Avoid duplicate columns if 'geometry' or date_field have been
-        # expclitly specified
+        # explicitly specified
         shp = shp[list(set(columns + ['geometry', date_field]))]
 
     # Add temporal coordinates
