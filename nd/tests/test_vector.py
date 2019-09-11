@@ -55,6 +55,29 @@ def test_rasterize(tmpdir):
     )
 
 
+@pytest.mark.parametrize('columns', [
+    ['integer'],
+    ['integer', 'date'],
+    ['float', 'category'],
+    ['integer', 'geometry'],
+])
+@pytest.mark.parametrize('date_field', ['date', None])
+def test_rasterize_columns(columns, date_field):
+    ds = generate_test_dataset()
+    df = generate_test_geodataframe()
+    raster = vector.rasterize(df, ds, columns=columns,
+                              date_field=date_field)
+    if date_field is None:
+        expected_vars = set(columns) - {'geometry'}
+    else:
+        expected_vars = set(columns) - {'geometry', 'date'}
+
+    assert_equal(
+        set(raster.data_vars),
+        expected_vars
+    )
+
+
 def test_rasterize_date_field():
     ds = generate_test_dataset()
     df = generate_test_geodataframe()
