@@ -152,7 +152,7 @@ def _clustermean(ds, labels):
 
 
 def _build_X(ds, feature_dims=[]):
-    data_dims = tuple([d for d in ds.coords if d not in feature_dims])
+    data_dims = _get_data_dims(ds, feature_dims=feature_dims)
     variables = utils.get_vars_for_dims(ds, data_dims)
     features = tuple(feature_dims) + ('variable',)
     data = ds[variables].to_array().stack(feature=features).transpose(
@@ -161,13 +161,14 @@ def _build_X(ds, feature_dims=[]):
 
 
 def _get_data_dims(ds, feature_dims=[]):
-    data_dims = tuple([d for d in ds.coords if d not in feature_dims])
+    data_dims = tuple([d for d in ds.coords if d in ds.dims
+                       and d not in feature_dims])
     return data_dims
 
 
 def _get_data_shape(ds, feature_dims=[]):
     data_dims = _get_data_dims(ds, feature_dims=feature_dims)
-    shape = tuple([len(ds.coords[d]) for d in data_dims])
+    shape = tuple([ds.sizes[d] for d in data_dims])
     return shape
 
 
