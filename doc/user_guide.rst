@@ -15,5 +15,6 @@ User Guide
    xarray
    projections
    visualize
+   classify
    change/index
    filters/index
