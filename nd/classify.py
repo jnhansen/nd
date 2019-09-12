@@ -1,14 +1,13 @@
-import xarray as xr
 try:
     from sklearn.cluster import MiniBatchKMeans
     from sklearn import preprocessing
 except (ImportError, ModuleNotFoundError):
     raise ImportError('scikit-learn is required for this module.')
 
+import xarray as xr
 import numpy as np
 from .filters import BoxcarFilter
-from .warp import nrows, ncols
-from .utils import get_vars_for_dims
+from . import utils
 
 
 __all__ = ['Classifier', '_cluster', '_cluster_smooth', 'cluster',
@@ -153,11 +152,52 @@ def _clustermean(ds, labels):
 
 
 def _build_X(ds, feature_dims=[]):
-    variables = get_vars_for_dims(ds, ('y', 'x'))
+    data_dims = tuple([d for d in ds.coords if d not in feature_dims])
+    variables = utils.get_vars_for_dims(ds, data_dims)
     features = tuple(feature_dims) + ('variable',)
     data = ds[variables].to_array().stack(feature=features).transpose(
-        'y', 'x', 'feature', transpose_coords=True).values
+        *data_dims, 'feature', transpose_coords=True).values
     return data.reshape((-1, data.shape[-1]))
+
+
+def _get_data_dims(ds, feature_dims=[]):
+    data_dims = tuple([d for d in ds.coords if d not in feature_dims])
+    return data_dims
+
+
+def _get_data_shape(ds, feature_dims=[]):
+    data_dims = _get_data_dims(ds, feature_dims=feature_dims)
+    shape = tuple([len(ds.coords[d]) for d in data_dims])
+    return shape
+
+
+def _broadcast_array(arr, shape):
+    matching = list(shape)
+    new_shape = [1] * len(shape)
+    for dim in arr.shape:
+        i = matching.index(dim)
+        new_shape[i] = dim
+        matching[i] = None
+    return np.broadcast_to(arr.reshape(new_shape), shape)
+
+
+def _broadcast_labels(labels, ds, feature_dims=[]):
+    shape = _get_data_shape(ds, feature_dims=feature_dims)
+    if isinstance(labels, np.ndarray):
+        # Broadcast for np.ndarray
+        return _broadcast_array(labels, shape)
+
+    elif isinstance(labels, xr.DataArray):
+        # Broadcast for xarray.DataArray
+        data_dims = _get_data_dims(ds, feature_dims=feature_dims)
+        # Determine dimensions to be broadast:
+        bc_dims = set(data_dims) - set(labels.dims) - \
+            set(feature_dims)
+        for dim in bc_dims:
+            labels = xr.concat([labels] * ds.sizes[dim], dim=dim)
+            labels.coords[dim] = ds.coords[dim]
+        labels = labels.transpose(*data_dims)
+        return labels
 
 
 class Classifier:
@@ -169,6 +209,12 @@ class Classifier:
         Must provide methods ``fit`` and ``predict``.
     feature_dims : list, optional
         A list of additional dimensions to use as features.
+        For example, if the dataset has a 'time' dimension and 'time' is in
+        ``feature_dims``, every time step will be treated as an independent
+        variable for classification purposes.
+        Otherwise, all time steps will be treated as additional data
+        dimensions just like 'x' and 'y'.
+
     """
 
     def __init__(self, clf, feature_dims=[]):
@@ -184,15 +230,31 @@ class Classifier:
         labels : xarray.DataArray
             The class labels to train the classifier.
         """
+        if isinstance(labels, xr.Dataset):
+            raise ValueError("`labels` should be an xarray.DataArray or "
+                             "numpy array of the same dimensions "
+                             "as the dataset.")
+        elif isinstance(labels, (xr.DataArray, np.ndarray)):
+            # Squeeze extra dimensions
+            labels = labels.squeeze()
+
+        # Broadcast labels to match data dimensions
+        shape = _get_data_shape(ds, feature_dims=self.feature_dims)
+        if shape != labels.shape:
+            labels = _broadcast_labels(
+                labels, ds, feature_dims=self.feature_dims)
+
         # Ignore labels that are NaN or 0
-        ymask = ~np.isnan(labels)
+        ymask = ~np.isnan(np.array(labels))
         np.greater(labels, 0, out=ymask, where=ymask)
         ymask = ymask.reshape(-1)
+
         # Ignore values of ds that contain NaN
         X = _build_X(ds, feature_dims=self.feature_dims)[ymask]
         y = np.array(labels).reshape(-1)[ymask]
         Xmask = ~np.isnan(X).any(axis=1)
         self.clf.fit(X[Xmask], y[Xmask])
+        return self
 
     def predict(self, ds, func='predict'):
         """
@@ -217,7 +279,14 @@ class Classifier:
         mask = ~np.isnan(X).any(axis=1)
         labels_flat = np.empty(mask.shape) * np.nan
         labels_flat[mask] = self.clf.__getattribute__(func)(X[mask])
-        shape = (nrows(ds), ncols(ds))
-        labels = xr.DataArray(labels_flat.reshape(shape), dims=('y', 'x'),
-                              coords=ds.coords)
+        data_dims = _get_data_dims(ds, feature_dims=self.feature_dims)
+        data_shape = _get_data_shape(ds, feature_dims=self.feature_dims)
+        data_coords = {dim: c for dim, c in ds.coords.items()
+                       if dim in data_dims}
+        labels = xr.DataArray(labels_flat.reshape(data_shape),
+                              dims=data_dims, coords=data_coords)
         return labels
+
+    def fit_predict(self, ds, labels):
+        self.fit(ds, labels)
+        return self.predict(ds)
