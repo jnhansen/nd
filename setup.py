@@ -90,6 +90,7 @@ include_dirs.append(numpy.get_include())
 include_dirs.append(cython_gsl.get_include())
 
 setup(
+    use_scm_version=True,
     cmdclass=cmdclass,
     ext_modules=extensions,
     include_dirs=include_dirs,
