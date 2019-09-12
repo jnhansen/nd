@@ -8,6 +8,7 @@ import xarray as xr
 import numpy as np
 from .filters import BoxcarFilter
 from . import utils
+from collections import OrderedDict
 
 
 __all__ = ['Classifier', '_cluster', '_cluster_smooth', 'cluster',
@@ -282,8 +283,9 @@ class Classifier:
         labels_flat[mask] = self.clf.__getattribute__(func)(X[mask])
         data_dims = _get_data_dims(ds, feature_dims=self.feature_dims)
         data_shape = _get_data_shape(ds, feature_dims=self.feature_dims)
-        data_coords = {dim: c for dim, c in ds.coords.items()
-                       if dim in data_dims}
+        data_coords = OrderedDict(
+            (dim, c) for dim, c in ds.coords.items() if dim in data_dims
+        )
         labels = xr.DataArray(labels_flat.reshape(data_shape),
                               dims=data_dims, coords=data_coords)
         return labels

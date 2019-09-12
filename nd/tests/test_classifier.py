@@ -9,6 +9,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
+from collections import OrderedDict
 
 
 def create_mock_classes(dims):
@@ -36,7 +37,7 @@ def create_mock_classes(dims):
     RandomForestClassifier(n_estimators=20),
 ])
 def test_classifier(clf):
-    dims = dict(y=50, x=50)
+    dims = OrderedDict([('y', 50), ('x', 50)])
     ds, labels_true = create_mock_classes(dims)
 
     # Select 10% for training
@@ -52,8 +53,8 @@ def test_classifier(clf):
 
 
 @pytest.mark.parametrize('dims', [
-    dict(y=50, x=50, time=10),
-    dict(y=30, x=20, time=5)
+    OrderedDict([('y', 50), ('x', 50), ('time', 10)]),
+    OrderedDict([('y', 30), ('x', 20), ('time', 5)])
 ])
 @pytest.mark.parametrize('feature_dims', [
     [], ['time']
@@ -81,7 +82,7 @@ def test_broadcast(dims, feature_dims):
     [], ['time']
 ])
 def test_build_X(feature_dims):
-    dims = dict(y=50, x=50, time=10)
+    dims = OrderedDict([('y', 50), ('x', 50), ('time', 10)])
     ds, labels = create_mock_classes(dims)
     X = classify._build_X(ds, feature_dims=feature_dims)
     nrows = np.prod([N for d, N in dims.items() if d not in feature_dims])
@@ -94,8 +95,8 @@ def test_build_X(feature_dims):
     [], ['time']
 ])
 @pytest.mark.parametrize('dims', [
-    dict(y=50, x=50, time=10),
-    dict(y=30, x=20, time=5)
+    OrderedDict([('y', 50), ('x', 50), ('time', 10)]),
+    OrderedDict([('y', 30), ('x', 20), ('time', 5)])
 ])
 def test_classifier_feature_dims(dims, feature_dims):
     ds, labels = create_mock_classes(dims)
