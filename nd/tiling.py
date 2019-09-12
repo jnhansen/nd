@@ -318,9 +318,6 @@ def auto_merge(datasets, buffer='auto', chunks={}):
                                              engine='h5netcdf'))
                     for path in datasets]
 
-    if buffer == 'auto':
-        buf_cache = {}
-
     merged = datasets
     while len(merged) > 1:
         merged = _combine_along_last_dim(merged, buffer)
