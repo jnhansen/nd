@@ -15,10 +15,14 @@ from .io import open_dataset, to_netcdf
 from .visualize import to_rgb, write_video
 from .algorithm import Algorithm
 from .tiling import auto_merge
-from . import (change, classify, io, visualize, filters, utils, warp, vector)
+
+# Import the following modules by default.
+# Modules that need to be imported individually:
+#  - nd.classify
+from . import (change, io, visualize, filters, utils, warp, vector)
 from . import _xarray
 
-__all__ = ['change', 'classify', 'io', 'visualize', 'filters', 'utils', 'warp',
+__all__ = ['change', 'io', 'visualize', 'filters', 'utils', 'warp',
            'vector',
            # Non-modules:
            'Algorithm',

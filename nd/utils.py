@@ -18,7 +18,9 @@ from functools import reduce
 PY2 = sys.version_info < (3, 0)
 
 
-__all__ = ['str2date',
+__all__ = ['get_shape',
+           'get_dims',
+           'str2date',
            'dict_product',
            'chunks',
            'array_chunks',
@@ -32,6 +34,16 @@ __all__ = ['str2date',
            'expand_variables',
            'is_complex'
            ]
+
+
+def get_shape(ds):
+    # The coords are in the right order, while dims and sizes are not
+    return tuple([ds.sizes[c] for c in ds.coords if c in ds.dims])
+
+
+def get_dims(ds):
+    # The coords are in the right order, while dims and sizes are not
+    return tuple([c for c in ds.coords if c in ds.dims])
 
 
 def str2date(string, fmt=None, tz=False):

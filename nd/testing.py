@@ -14,18 +14,20 @@ from nd.algorithm import Algorithm
 from nd.warp import _parse_crs
 import hashlib
 import os
+from collections import OrderedDict
 
 
-def generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10},
-                          var=['C11', 'C12__im', 'C12__re', 'C22'],
-                          mean=0, sigma=1,
-                          extent=(-10.0, 50.0, 0.0, 60.0),
-                          random_seed=42,
-                          crs='+init=epsg:4326'):
+def generate_test_dataset(
+        dims=OrderedDict([('y', 20), ('x', 20), ('time', 10)]),
+        var=['C11', 'C12__im', 'C12__re', 'C22'],
+        mean=0, sigma=1,
+        extent=(-10.0, 50.0, 0.0, 60.0),
+        random_seed=42,
+        crs='+init=epsg:4326'):
 
     np.random.seed(random_seed)
 
-    coords = {}
+    coords = OrderedDict()
     for name, size in dims.items():
         if name == 'y':
             coords[name] = np.linspace(extent[1], extent[3], size)
@@ -51,15 +53,16 @@ def generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10},
     return ds
 
 
-def generate_test_dataarray(dims={'y': 20, 'x': 20, 'time': 10},
-                            name='variable',
-                            mean=0, sigma=1,
-                            extent=(-10.0, 50.0, 0.0, 60.0),
-                            random_seed=42,
-                            crs='+init=epsg:4326'):
+def generate_test_dataarray(
+        dims=OrderedDict([('y', 20), ('x', 20), ('time', 10)]),
+        name='variable',
+        mean=0, sigma=1,
+        extent=(-10.0, 50.0, 0.0, 60.0),
+        random_seed=42,
+        crs='+init=epsg:4326'):
     np.random.seed(random_seed)
 
-    coords = {}
+    coords = OrderedDict()
     if 'y' in dims:
         coords['y'] = np.linspace(extent[1], extent[3], dims['y'])
     if 'x' in dims:
