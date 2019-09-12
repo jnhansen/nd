@@ -49,7 +49,7 @@ to match the integer classes::
 
     >>> clf = Classifier(RandomForestClassifier(n_estimators=10))
     >>> pred = clf.fit(ds, labels).predict(ds)
-    >>> pred.mean('time').plot()
+    >>> pred.isel(time=0).plot()
 
 .. image:: images/prediction_time_0.png
     :width: 500px
