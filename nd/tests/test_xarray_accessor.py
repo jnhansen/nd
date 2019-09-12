@@ -6,10 +6,55 @@ from collections import OrderedDict
 from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
-                        assert_equal_files)
+                        assert_equal_files, assert_equal_crs)
 from nd import warp, filters, io, change
 from nd import to_rgb, write_video
 from nd._xarray import patch_doc
+from rasterio.crs import CRS
+
+
+# ---------------
+# Test properties
+# ---------------
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_crs(generator):
+    crs = CRS.from_epsg(4326)
+    ds = generator(crs=crs)
+    assert_equal_crs(crs, ds.nd.crs)
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_bounds(generator):
+    extent = (10, 30, 15, 35)
+    ds = generator(extent=extent)
+    assert_equal(extent, ds.nd.bounds)
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_resolution(generator):
+    ds = generator()
+    res = warp.get_resolution(ds)
+    assert_equal(res, ds.nd.resolution)
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_transform(generator):
+    ds = generator()
+    transf = warp.get_transform(ds)
+    assert_equal(transf, ds.nd.transform)
 
 
 # -------------------------
