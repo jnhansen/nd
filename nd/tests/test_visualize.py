@@ -1,10 +1,24 @@
-from nd.visualize import to_rgb, write_video, colorize
+from nd.visualize import to_rgb, write_video, colorize, calculate_shape
 from numpy.testing import assert_equal
 from nd.testing import generate_test_dataset
 import numpy as np
 import pytest
 import imageio
 import os
+
+
+@pytest.mark.parametrize('shape,orig_shape,expected', [
+    (None, (40, 60), (40, 60)),
+    ((None, None), (40, 60), (40, 60)),
+    ((None, 120), (40, 60), (80, 120)),
+    ((60, None), (40, 60), (60, 90)),
+    ((110, 110), (40, 60), (110, 110)),
+])
+def test_calculate_shape(shape, orig_shape, expected):
+    assert_equal(
+        calculate_shape(shape, orig_shape),
+        expected
+    )
 
 
 @pytest.mark.parametrize('output', [None, 'test.jpg'])
@@ -74,13 +88,21 @@ def test_write_video(tmpdir, fname):
     assert len(video) == ntime
 
 
-def test_colorize():
-    nlabels = 10
+@pytest.mark.parametrize('N', [10, None])
+@pytest.mark.parametrize('nan_vals', [
+    [], [3, 4, 5]
+])
+def test_colorize(N, nan_vals):
+    nlabels = N if N is not None else 10
     labels = np.random.randint(0, nlabels, 400).reshape((20, 20))
-    colored = colorize(labels, N=nlabels)
+    colored = colorize(labels, N=N, nan_vals=nan_vals)
     assert colored.shape == (20, 20, 3)
     for i in range(nlabels):
         # check that pixels of the same label have the same color
         mask = (labels == i)
         ncolors = len(np.unique(colored[mask], axis=0))
         assert ncolors == 1
+
+    # Check that nan values are black
+    for nv in nan_vals:
+        assert (colored[labels == nv] == 0).all()
