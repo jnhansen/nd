@@ -119,3 +119,13 @@ def test_classifier_feature_dims(dims, feature_dims):
         utils.get_dims(pred),
         classify._get_data_dims(ds, feature_dims=feature_dims)
     )
+
+
+def test_fit_predict():
+    dims = OrderedDict([('y', 50), ('x', 50), ('time', 10)])
+    ds, labels = create_mock_classes(dims)
+    c = classify.Classifier(RandomForestClassifier(n_estimators=20))
+    xr_assert_equal(
+        c.fit(ds, labels).predict(ds),
+        c.fit_predict(ds, labels)
+    )
