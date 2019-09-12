@@ -37,6 +37,15 @@ class NDAccessor:
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
 
+    # Properties
+    @property
+    def shape(self):
+        return utils.get_shape(self._obj)
+
+    @property
+    def dims(self):
+        return utils.get_dims(self._obj)
+
     # IO methods
     @patch_doc(io.assemble_complex)
     def as_complex(self):
