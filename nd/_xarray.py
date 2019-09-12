@@ -46,6 +46,22 @@ class NDAccessor:
     def dims(self):
         return utils.get_dims(self._obj)
 
+    @property
+    def crs(self):
+        return warp.get_crs(self._obj)
+
+    @property
+    def bounds(self):
+        return warp.get_bounds(self._obj)
+
+    @property
+    def resolution(self):
+        return warp.get_resolution(self._obj)
+
+    @property
+    def transform(self):
+        return warp.get_transform(self._obj)
+
     # IO methods
     @patch_doc(io.assemble_complex)
     def as_complex(self):
