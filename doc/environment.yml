@@ -4,3 +4,7 @@ channels:
 dependencies:
   - gsl
   - numpy
+  - xarray
+  - pandas
+  - dask
+  - matplotlib
