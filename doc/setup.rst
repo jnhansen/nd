@@ -12,7 +12,15 @@ The easiest way to install ``nd`` is via ``pip`` from the github source:
 
 ::
 
-    pip install numpy cythongsl
+    pip install numpy
     pip install git+https://github.com/jnhansen/nd
 
 
+Rebuilding the C extensions from Cython
+---------------------------------------
+
+In case you want to rebuild the C extensions from the
+``.pyx`` files, you need to install the additional dependencies
+``cython`` and ``cythongsl``. With those are installed,
+``pip install`` will automatically regenerate the C files
+prior to compilation.
