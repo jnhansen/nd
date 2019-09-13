@@ -13,11 +13,14 @@ try:
     from Cython.Distutils import build_ext
     from Cython.Build import cythonize
     from Cython.Compiler import Options
-    Options.emit_code_comments = False
+    compiler_directives = Options.get_directive_defaults()
 except ImportError:
     USE_CYTHON = False
 else:
     USE_CYTHON = True
+    compiler_directives = {}
+
+compiler_directives["emit_code_comments"] = False
 
 ext = '.pyx' if USE_CYTHON else '.c'
 
@@ -77,7 +80,8 @@ extensions = [
 ]
 
 if USE_CYTHON:
-    extensions = cythonize(extensions)
+    extensions = cythonize(
+        extensions, compiler_directives=compiler_directives)
     cmdclass = {'build_ext': build_ext}
 
 include_dirs = [
