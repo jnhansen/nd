@@ -13,12 +13,12 @@ try:
     from Cython.Distutils import build_ext
     from Cython.Build import cythonize
     from Cython.Compiler import Options
-    compiler_directives = Options.get_directive_defaults()
 except ImportError:
     USE_CYTHON = False
-else:
-    USE_CYTHON = True
     compiler_directives = {}
+else:
+    compiler_directives = Options.get_directive_defaults()
+    USE_CYTHON = True
 
 compiler_directives["emit_code_comments"] = False
 
