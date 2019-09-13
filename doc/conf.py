@@ -21,10 +21,23 @@ import subprocess
 
 
 # Mock imports for autodoc
-autodoc_mock_imports = ['sklearn', 'xarray', 'scipy', 'rasterio', 'pandas',
-                        'dask', 'imageio', 'affine', 'cv2', 'dateutil',
-                        'lxml', 'skimage', 'geopandas',
-                        'matplotlib', 'cython_gsl', 'nd._change']
+autodoc_mock_imports = ['sklearn',
+                        'xarray',
+                        'scipy',
+                        'rasterio',
+                        'pandas',
+                        'dask',
+                        'imageio',
+                        'affine',
+                        'cv2',
+                        'dateutil',
+                        'lxml',
+                        'skimage',
+                        'geopandas',
+                        'shapely',
+                        'matplotlib',
+                        'cython_gsl',
+                        'nd._change']
 autodoc_warningiserror = False
 
 
