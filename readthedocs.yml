@@ -9,7 +9,7 @@ build:
   image: latest
 
 conda:
-  enironment: doc/environment.yml
+  environment: doc/environment.yml
 
 python:
   version: 3.7
