@@ -5,4 +5,3 @@ dependencies:
   - gsl
   - numpy
   - sphinx
-  - cythongsl
