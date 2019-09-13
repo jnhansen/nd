@@ -1,2 +1,6 @@
 sphinxcontrib-apidoc
 numpy
+pandas
+xarray
+dask
+matplotlib
