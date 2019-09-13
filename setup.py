@@ -88,19 +88,21 @@ include_dirs = [
     numpy.get_include(),
     get_gsl_include_dir()
 ]
-install_requires = []
+
+install_requires = [
+    "numpy",
+    "xarray",
+    "dask[dataframe]",
+    "pandas",
+    "python-dateutil",
+    "matplotlib",
+]
 
 if not mock_install:
     install_requires.extend([
-        "numpy",
         "scipy",
-        "xarray",
-        "dask[dataframe]",
         "lxml",
         "rasterio>=1.0.13",
-        "pandas",
-        "python-dateutil",
-        "matplotlib",
         "affine",
         "opencv-python",
         # "NetCDF4"
