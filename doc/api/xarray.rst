@@ -8,3 +8,8 @@ Module contents
     :members:
     :undoc-members:
     :show-inheritance:
+
+.. autoclass:: nd._xarray.FilterAccessor
+    :members:
+    :undoc-members:
+    :show-inheritance:
