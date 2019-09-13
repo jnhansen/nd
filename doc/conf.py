@@ -37,6 +37,8 @@ autodoc_mock_imports = ['sklearn',
                         'shapely',
                         'matplotlib',
                         'cython_gsl',
+                        'nd._filters',
+                        'nd._warp',
                         'nd._change']
 autodoc_warningiserror = False
 
