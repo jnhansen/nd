@@ -14,6 +14,14 @@ Internally, all data is passed around as ``xarray`` Datasets and all provided me
 
 An ``xarray.Dataset`` is essentially a Python representation of the NetCDF file format and as such easily reads/writes NetCDF files.
 
+## Installation
+
+```
+pip install nd
+```
+
+Note that ``nd`` requires the ``libgsl-dev`` C library to be installed.
+
 
 ## What does this library add?
 
@@ -42,3 +50,8 @@ Since ``xarray`` is our library of choice for representing geospatial raster dat
 NetCDF (specifically NetCDF-4) is a highly efficient file format that was built on top of HDF5. It is capable of random access which ties in with indexing and slicing in ``numpy``.
 Because slices of a large dataset can be accessed independently, it becomes feasible to handle larger-than-memory file sizes. NetCDF-4 also supports data compression using ``zlib``. Random access capability for compressed data is maintained through data chunking.
 Furthermore, NetCDF is designed to be fully self-descriptive. Crucially, it has a concept of named dimensions and coordinates, can store units and arbitrary metadata.
+
+
+## Feature requests and bug reports
+
+For feature requests and bug reports please [submit an issue](https://github.com/jnhansen/nd/issues) on the Github repository.
