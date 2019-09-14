@@ -8,11 +8,13 @@ Installing nd
 
 You may also want to install the GDAL library, but ``rasterio`` comes with a stripped down version of GDAL so for most use cases this should not be necessary.
 
-The easiest way to install ``nd`` is via ``pip`` from the github source:
-
-::
+The easiest way to install ``nd`` is via ``pip`` from PyPI::
 
     pip install numpy
+    pip install nd
+
+You can also install the latest version from Github::
+
     pip install git+https://github.com/jnhansen/nd
 
 

@@ -14,6 +14,14 @@ Internally, all data is passed around as ``xarray`` Datasets and all provided me
 
 An ``xarray.Dataset`` is essentially a Python representation of the NetCDF file format and as such easily reads/writes NetCDF files.
 
+## Installation
+
+```
+pip install nd
+```
+
+Note that ``nd`` requires the ``libgsl-dev`` C library to be installed.
+
 
 ## What does this library add?
 
