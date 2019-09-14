@@ -4,8 +4,9 @@
 **/*.pyc
 **/*.so
 .vscode
-.ipynb_checkpoints
 .eggs
+.ipynb_checkpoints
+.pytest_cache
 .coverage
 dist
 build

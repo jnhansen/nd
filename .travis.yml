@@ -1,18 +1,18 @@
 sudo: required
 cache:
   directories:
-  - ~/.cache/pip
+  - "~/.cache/pip"
 dist: trusty
 language: python
 addons:
   apt:
     packages:
-      - libhdf5-serial-dev
-      - netcdf-bin
-      - libnetcdf-dev
-      - gsl-bin
-      - libgsl0-dev
-      - libgdal1-dev
+    - libhdf5-serial-dev
+    - netcdf-bin
+    - libnetcdf-dev
+    - gsl-bin
+    - libgsl0-dev
+    - libgdal1-dev
 before_install:
 - sudo apt-get update -q
 - nc-config --version
@@ -25,18 +25,18 @@ matrix:
     dist: xenial
     sudo: true
 install:
-- wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-  -O miniconda.sh
+- wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
 - hash -r
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 - conda info -a
-- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION cython numpy scikit-learn pytest pytest-cov coverage scikit-image
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scikit-learn
+  pytest pytest-cov coverage scikit-image
 - source activate test-environment
 - conda install ffmpeg pyproj -c conda-forge
-- pip install cythongsl codecov
+- pip install codecov
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal
 - export C_INCLUDE_PATH=/usr/include/gdal
 - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
@@ -46,3 +46,13 @@ script:
 - pytest --cov
 after_success:
 - codecov
+deploy:
+  skip_cleanup: true
+  provider: pypi
+  user: jnhansen
+  password:
+    secure: nhquKprMQ6mf/4/YLP//PWFVOnnSYXKuaDmI1qQ8JjN8fhesoAEam1aKViqneTMhE6u1TpE2EBZ+kO8ghxxKQHYBnhs6Mp0waBH2Dnx8mOqPsuDc7+vZ3ztbgXrpbpVgR4cTplQJ355S4rcOBBDRhtP+gUC2wxOmFisBkQiwVk7gRjj+WHWPiAh6KO4HV9ZpDbf9GXy8wq9+9pl3xG+B44+W0PthaP4yqhjeJDDVDWlpApsB/gf9RQfnqoGohBrtHumry77L0NToK3edL7qTINqvwOaJH81+4/E/rvmMTehadaV+Y87HEqVP4bKMrSLX75ku3blbjAqP29cCz3hAt39sQdUBm6kmQpf2MLerMjaYlhtZQMTyCTJL/fPQnVYPycaUOU12vGNl4no2yzdy5C7KHfBP4huQm0ngiA29YC8BvEJ9ka9/joX353F5Jq4NZk9cq9GbBY6zvH2FBNWgUESD1KijJiRdXkCm3MqxR2AMYWaT1hm1+6soEb6GAN9qsf6rgj14/wdnUTloIFQsBew55iDCZC4k2cT6CkD9djTdjOF4oxQAtmlqWoISi12r8YEnVyRfyO3Zm8iGjBAenQtOesCHnLpXSFPQAnjz0xehFI0o0MXYsIJTA6YBJZu92/tHJ0lm5OZa8hD2WniF7bGGwuf8QR27cumjFFfXXio=
+  distributions: sdist
+  on:
+    python: 3.6
+    tags: true

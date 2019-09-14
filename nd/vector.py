@@ -4,7 +4,6 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-from sklearn.preprocessing import LabelEncoder
 import rasterio.features
 import geopandas as gpd
 import datetime
@@ -92,13 +91,11 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
         if data.dtype in [np.object, np.str]:
             if encode_labels:
                 # Encode categorical labels to integer
+                data, legend = data.factorize()
                 # Add 1 to reserve 0 for background
-                enc = LabelEncoder()
-                enc.fit(data.astype(str))
-                data = enc.transform(data.astype(str)) + 1
+                data += 1
                 # Create lookup table for storing in metadata
-                meta['legend'] = list(enumerate(
-                    np.insert(enc.classes_, 0, None)))
+                meta['legend'] = list(enumerate([None] + list(legend)))
 
         # Prepare an empty DataArray
         layer[c] = (coords, np.empty(shape, dtype=data.dtype))
