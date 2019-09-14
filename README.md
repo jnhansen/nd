@@ -54,4 +54,4 @@ Furthermore, NetCDF is designed to be fully self-descriptive. Crucially, it has 
 
 ## Feature requests and bug reports
 
-For feature requests and bug reports please [submit an issue](https://github.com/jnhansen/nd/issues) on the Github repository.
+For feature requests and bug reports please [submit an issue](https://github.com/jnhansen/nd/issues/new/choose) on the Github repository.
