@@ -328,6 +328,16 @@ def test_get_resolution_from_metadata():
         warp._get_resolution_from_metadata(ds),
         warp.get_resolution(ds)
     )
+    del ds.attrs['transform']
+    assert_equal(
+        warp._get_resolution_from_metadata(ds),
+        warp.get_resolution(ds)
+    )
+    del ds.attrs['res']
+    assert_equal(
+        warp._get_resolution_from_metadata(ds),
+        None
+    )
 
 
 def test_get_bounds_from_metadata():
@@ -335,6 +345,16 @@ def test_get_bounds_from_metadata():
     assert_equal(
         warp._get_bounds_from_metadata(ds),
         warp.get_bounds(ds)
+    )
+    del ds.attrs['transform']
+    assert_equal(
+        warp._get_bounds_from_metadata(ds),
+        warp.get_bounds(ds)
+    )
+    del ds.attrs['bounds']
+    assert_equal(
+        warp._get_bounds_from_metadata(ds),
+        None
     )
 
 

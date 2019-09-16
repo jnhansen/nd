@@ -45,6 +45,8 @@ def generate_test_dataset(
         *extent, width=dims['x']-1, height=dims['y']-1)
     ds.attrs['crs'] = _parse_crs(crs).to_string()
     ds.attrs['transform'] = transform[:6]
+    ds.attrs['res'] = (abs(transform.a), abs(transform.e))
+    ds.attrs['bounds'] = extent
     if isinstance(mean, (int, float)):
         mean = [mean] * len(var)
     for v, m in zip(var, mean):
