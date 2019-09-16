@@ -30,7 +30,7 @@ def generate_test_dataset(
     coords = OrderedDict()
     for name, size in dims.items():
         if name == 'y':
-            coords[name] = np.linspace(extent[1], extent[3], size)
+            coords[name] = np.linspace(extent[3], extent[1], size)
         elif name == 'x':
             coords[name] = np.linspace(extent[0], extent[2], size)
         elif name == 'time':
@@ -64,7 +64,7 @@ def generate_test_dataarray(
 
     coords = OrderedDict()
     if 'y' in dims:
-        coords['y'] = np.linspace(extent[1], extent[3], dims['y'])
+        coords['y'] = np.linspace(extent[3], extent[1], dims['y'])
     if 'x' in dims:
         coords['x'] = np.linspace(extent[0], extent[2], dims['x'])
     if 'time' in dims:

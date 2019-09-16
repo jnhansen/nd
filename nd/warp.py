@@ -153,6 +153,10 @@ def get_crs(ds, format='crs'):
         return crs.wkt
 
 
+# ------------------------------------------
+# Get geospatial parameters from coordinates
+# ------------------------------------------
+
 def get_transform(ds):
     """Extract the geographic transform from a dataset.
 
@@ -167,20 +171,7 @@ def get_transform(ds):
         The affine transform
     """
 
-    if 'transform' in ds.attrs:
-        ds_trans = ds.attrs['transform']
-        if isinstance(ds_trans, Affine):
-            return ds_trans
-        else:
-            return Affine(*ds_trans)
-
-    elif isinstance(ds, xr.Dataset) and \
-            'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
-        transf_str = ds.data_vars['crs'].attrs['i2m']
-        a = list(map(float, transf_str.split(',')))
-        return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
-
-    else:
+    if 'x' in ds.coords and 'y' in ds.coords:
         x = ds.coords['x'].values
         y = ds.coords['y'].values
         resx = (x[-1] - x[0]) / (len(x) - 1)
@@ -188,6 +179,9 @@ def get_transform(ds):
         xoff = x[0]
         yoff = y[0]
         return Affine(resx, 0, xoff, 0, resy, yoff)
+
+    else:
+        return _get_transform_from_metadata(ds)
 
 
 def get_resolution(ds):
@@ -210,14 +204,9 @@ def get_resolution(ds):
         resx = abs(x[-1] - x[0]) / (len(x) - 1)
         resy = abs(y[-1] - y[0]) / (len(y) - 1)
         return (resx, resy)
-    else:
-        transform = get_transform(ds)
-        if transform is not None:
-            return (abs(transform.a), abs(transform.e))
-        elif 'res' in ds.attrs:
-            return ds.attrs['res']
 
-    return None
+    else:
+        return _get_resolution_from_metadata(ds)
 
 
 def get_bounds(ds):
@@ -235,30 +224,16 @@ def get_bounds(ds):
         (left, bottom, right, top).
     """
 
-    trans = get_transform(ds)
-    if trans is not None:
-        if isinstance(ds, xr.Dataset):
-            dims = ds.dims
-        elif isinstance(ds, xr.DataArray):
-            dims = dict(zip(ds.dims, ds.shape))
-        n_rows = dims['y']
-        n_cols = dims['x']
-        corners = (np.array([0, 0, n_cols-1, n_cols-1]),
-                   np.array([0, n_rows-1, 0, n_rows-1]))
-        corner_x, corner_y = trans * corners
+    if 'x' in ds.coords and 'y' in ds.coords:
         return BoundingBox(
-            left=corner_x.min(),
-            bottom=corner_y.min(),
-            right=corner_x.max(),
-            top=corner_y.max()
+            left=ds['x'].values.min(),
+            bottom=ds['y'].values.min(),
+            right=ds['x'].values.max(),
+            top=ds['y'].values.max()
         )
+
     else:
-        return BoundingBox(
-            left=ds['x'].min(),
-            bottom=ds['y'].min(),
-            right=ds['x'].max(),
-            top=ds['y'].max()
-        )
+        return _get_bounds_from_metadata(ds)
 
 
 def get_extent(ds):
@@ -302,6 +277,55 @@ def get_extent(ds):
         src_crs, dst_crs, **proj_bounds._asdict()
     )
     return BoundingBox(*bounds)
+
+
+# ---------------------------------------
+# Get geospatial parameters from metadata
+# ---------------------------------------
+
+def _get_transform_from_metadata(ds):
+    if 'transform' in ds.attrs:
+        ds_trans = ds.attrs['transform']
+        if isinstance(ds_trans, Affine):
+            return ds_trans
+        else:
+            return Affine(*ds_trans)
+
+    elif isinstance(ds, xr.Dataset) and \
+            'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
+        transf_str = ds.data_vars['crs'].attrs['i2m']
+        a = list(map(float, transf_str.split(',')))
+        return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
+
+    return None
+
+
+def _get_bounds_from_metadata(ds):
+    transform = _get_transform_from_metadata(ds)
+    if transform is not None:
+        ny = ds.sizes['y']
+        nx = ds.sizes['x']
+        corners = (np.array([0, 0, nx-1, nx-1]),
+                   np.array([0, ny-1, 0, ny-1]))
+        corner_x, corner_y = transform * corners
+        return BoundingBox(
+            left=corner_x.min(),
+            bottom=corner_y.min(),
+            right=corner_x.max(),
+            top=corner_y.max()
+        )
+    elif 'bounds' in ds.attrs:
+        return ds.attrs['bounds']
+    return None
+
+
+def _get_resolution_from_metadata(ds):
+    transform = _get_transform_from_metadata(ds)
+    if transform is not None:
+        return (abs(transform.a), abs(transform.e))
+    elif 'res' in ds.attrs:
+        return ds.attrs['res']
+    return None
 
 
 def get_common_bounds(datasets):
