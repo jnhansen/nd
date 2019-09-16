@@ -65,6 +65,31 @@ change because the forest cover changes over the course of the time period::
     :align: center
 
 
+Clustering
+----------
+
+Clustering can be done using the same ``Classifier`` object because
+clustering classes in ``scikit-learn`` provide the same interface as classifiers.
+Clustering is an unsupervised approach, so the ``labels`` argument will be omitted.
+
+In the following example, we are using :meth:`nd.classify.class_mean()` to replace every
+pixel with the mean of its cluster for visualization::
+
+    >>> from sklearn.cluster import MiniBatchKMeans
+    >>> from nd.classify import class_mean
+    >>> clf = Classifier(MiniBatchKMeans(n_clusters=3))
+    >>> pred = clf.fit_predict(ds.isel(time=0))
+    >>> means = class_mean(ds.isel(time=0), pred)
+    >>> means.C11.plot()
+
+.. image:: images/clustering.png
+    :width: 500px
+    :align: center
+
+It is advisable to use a clustering algorithm that scales well, such as ``MiniBatchKMeans``.
+Alternatively, one can fit the clusterer to a smaller subset of the data by applying a mask.
+
+
 Feature and data dimensions
 ---------------------------
 
