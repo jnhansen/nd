@@ -34,7 +34,7 @@ For example:
 
  * ``nd`` allows to reproject an entire multivariate and multi-temporal dataset between different coordinate systems by wrapping ``rasterio`` methods.
 
- * ``nd`` provides a wrapper for ``scikit-learn`` estimators to easily apply classification algorithms to raster data [in progress].
+ * ``nd`` provides a wrapper for ``scikit-learn`` estimators to easily apply classification algorithms to raster data.
 
 Additionally, ``nd`` contains a growing library of algorithms that are especially useful for spatio-temporal datacubes, for example:
 
