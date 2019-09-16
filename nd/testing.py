@@ -82,6 +82,26 @@ def generate_test_dataarray(
     return da
 
 
+def create_mock_classes(dims):
+    shape = (dims['y'], dims['x'])
+    ds = generate_test_dataset(
+        dims=dims,
+        mean=[1, 0, 0, 1], sigma=0.1)
+    ds2 = generate_test_dataset(
+        dims=dims,
+        mean=[10, 0, 0, 10], sigma=0.1)
+    mask = np.zeros(shape, dtype=bool)
+    mask = xr.DataArray(np.zeros(shape, dtype=bool),
+                        dims=('y', 'x'),
+                        coords=dict(y=ds.y, x=ds.x))
+
+    # Make half of the data belong to each class
+    mask[:, :dims['x']//2] = True
+    ds = ds.where(mask, ds2)
+    labels_true = (mask * 2).where(mask, 1)
+    return ds, labels_true
+
+
 def equal_list_of_dicts(obj1, obj2, exclude=[]):
     """Check whether two lists of dictionaries are equal, independent of the
     order within the list.

@@ -47,4 +47,5 @@ Contents
    :caption: Content
 
    user_guide
+   changelog
    reference

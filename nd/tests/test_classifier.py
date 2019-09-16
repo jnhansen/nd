@@ -1,34 +1,17 @@
 import pytest
 import numpy as np
-import xarray as xr
 from nd import utils
 from nd import classify
-from nd.testing import generate_test_dataset
+from nd.testing import create_mock_classes
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-from numpy.testing import assert_equal
+from skimage.segmentation import find_boundaries
+from sklearn.exceptions import NotFittedError
+from sklearn.cluster import MiniBatchKMeans
+from numpy.testing import assert_equal, assert_raises_regex, assert_allclose
 from xarray.testing import assert_equal as xr_assert_equal
 from collections import OrderedDict
-
-
-def create_mock_classes(dims):
-    shape = (dims['y'], dims['x'])
-    ds = generate_test_dataset(
-        dims=dims,
-        mean=[1, 0, 0, 1], sigma=0.1)
-    ds2 = generate_test_dataset(
-        dims=dims,
-        mean=[10, 0, 0, 10], sigma=0.1)
-    mask = np.zeros(shape, dtype=bool)
-    mask = xr.DataArray(np.zeros(shape, dtype=bool),
-                        dims=('y', 'x'),
-                        coords=dict(y=ds.y, x=ds.x))
-    # Make half of the data belong to each class
-    mask[:, :dims['x']//2] = True
-    ds = ds.where(mask, ds2)
-    labels_true = (mask * 2).where(mask, 1)
-    return ds, labels_true
 
 
 @pytest.mark.parametrize('clf', [
@@ -129,3 +112,69 @@ def test_fit_predict():
         c.fit(ds, labels).predict(ds),
         c.fit_predict(ds, labels)
     )
+
+
+def test_predict_before_fit():
+    dims = OrderedDict([('y', 100), ('x', 100)])
+    ds, true_labels = create_mock_classes(dims)
+    c = classify.Classifier(RandomForestClassifier())
+    with assert_raises_regex(NotFittedError, 'not fitted yet'):
+        c.predict(ds)
+
+
+def test_scaling():
+    dims = OrderedDict([('y', 100), ('x', 100)])
+    ds, true_labels = create_mock_classes(dims)
+
+    # Check that scaling doesn't affect the prediction
+    # for a simple classification task
+
+    clf_noscale = classify.Classifier(
+        MiniBatchKMeans(n_clusters=2), scale=False).fit(ds)
+    clf_scale = classify.Classifier(
+        MiniBatchKMeans(n_clusters=2), scale=True).fit(ds)
+
+    assert_equal(
+        find_boundaries(clf_noscale.predict(ds)),
+        find_boundaries(clf_scale.predict(ds))
+    )
+
+    # Check that scaler has been properly fitted
+    assert_allclose(
+        clf_scale._scaler.mean_,
+        ds.mean().to_array().values
+    )
+    assert_allclose(
+        clf_scale._scaler.scale_,
+        ds.std().to_array().values
+    )
+
+    # Scaled cluster center mean should be about zero
+    assert np.all(
+        np.abs(clf_scale.clf.cluster_centers_.mean(axis=0)) < 1e-2
+    )
+
+
+# ----------
+# Clustering
+# ----------
+
+def test_cluster():
+    dims = OrderedDict([('y', 100), ('x', 100)])
+    ds, true_labels = create_mock_classes(dims)
+    clf = classify.Classifier(MiniBatchKMeans(n_clusters=2))
+    clustered = clf.fit_predict(ds)
+
+    # Check that the clusters are identical to the true labels
+    assert_equal(
+        find_boundaries(true_labels),
+        find_boundaries(clustered)
+    )
+
+
+def test_class_mean():
+    dims = OrderedDict([('y', 100), ('x', 100)])
+    ds, true_labels = create_mock_classes(dims)
+    means = classify.class_mean(ds, true_labels)
+    for l in np.unique(true_labels):
+        assert means.where(true_labels == l).std() == 0
