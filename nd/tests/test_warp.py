@@ -5,7 +5,7 @@ from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_crs)
 import numpy as np
 from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
-                           assert_raises_regex)
+                           assert_raises_regex, assert_allclose)
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
 import os
@@ -14,6 +14,7 @@ from rasterio.coords import BoundingBox
 from rasterio.errors import CRSError
 import rasterio.warp
 from affine import Affine
+from collections import OrderedDict
 
 
 # Prepare test data
@@ -464,6 +465,36 @@ def test_get_dims(generator):
     dims = {'x': 5, 'y': 10, 'time': 15}
     ds = generator(dims=dims)
     assert_equal(warp.get_dims(ds), dims)
+
+
+@pytest.mark.parametrize('extra,dims', [
+    (('y',), OrderedDict([('x', 20)])),
+    (('x',), OrderedDict([('y', 30)])),
+    ((), OrderedDict([('y', 30), ('x', 20)])),
+    ((), OrderedDict([('y', 30), ('x', 20), ('time', 5)]))
+])
+def test_expand_var_to_xy(extra, dims):
+    ref = generate_test_dataarray(
+        dims=OrderedDict([('y', 30), ('x', 20), ('time', 5)])
+    )
+    da = generate_test_dataarray(dims=dims)
+    expanded = warp._expand_var_to_xy(da, ref.coords)
+
+    # Check that the variance along added dimensions is zero
+    assert np.all(
+        expanded.var(extra) < 1e-16
+    )
+
+    # Check that the new DataArray contains x and y coordinates
+    xr_assert_equal(
+        expanded.coords['x'], ref.coords['x'])
+    xr_assert_equal(
+        expanded.coords['y'], ref.coords['y'])
+
+    # Check that the DataArray is unchanged if x and y were already
+    # dimensions
+    if 'x' in dims and 'y' in dims:
+        xr_assert_equal(da, expanded)
 
 
 def test_reproject_no_hidden_effects():

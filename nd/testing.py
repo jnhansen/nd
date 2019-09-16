@@ -41,12 +41,13 @@ def generate_test_dataset(
 
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
     ds = xr.Dataset(coords=coords, attrs=meta)
-    transform = rasterio.transform.from_bounds(
-        *extent, width=dims['x']-1, height=dims['y']-1)
-    ds.attrs['crs'] = _parse_crs(crs).to_string()
-    ds.attrs['transform'] = transform[:6]
-    ds.attrs['res'] = (abs(transform.a), abs(transform.e))
-    ds.attrs['bounds'] = extent
+    if 'x' in dims and 'y' in dims:
+        transform = rasterio.transform.from_bounds(
+            *extent, width=dims['x']-1, height=dims['y']-1)
+        ds.attrs['crs'] = _parse_crs(crs).to_string()
+        ds.attrs['transform'] = transform[:6]
+        ds.attrs['res'] = (abs(transform.a), abs(transform.e))
+        ds.attrs['bounds'] = extent
     if isinstance(mean, (int, float)):
         mean = [mean] * len(var)
     for v, m in zip(var, mean):
@@ -74,10 +75,11 @@ def generate_test_dataarray(
                                        periods=dims['time'])
 
     meta = {'attr1': 1, 'attr2': 2, 'attr3': 3}
-    transform = rasterio.transform.from_bounds(
-        *extent, width=dims['x']-1, height=dims['y']-1)
-    meta['crs'] = _parse_crs(crs).to_string()
-    meta['transform'] = transform[:6]
+    if 'x' in dims and 'y' in dims:
+        transform = rasterio.transform.from_bounds(
+            *extent, width=dims['x']-1, height=dims['y']-1)
+        meta['crs'] = _parse_crs(crs).to_string()
+        meta['transform'] = transform[:6]
     data = np.random.normal(mean, sigma, tuple(dims.values()))
     da = xr.DataArray(data, coords=coords, dims=list(dims.keys()),
                       name=name, attrs=meta)
