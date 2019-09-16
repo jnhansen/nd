@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from skimage.segmentation import find_boundaries
 from sklearn.exceptions import NotFittedError
 from sklearn.cluster import MiniBatchKMeans
-from numpy.testing import assert_equal, assert_raises_regex
+from numpy.testing import assert_equal, assert_raises_regex, assert_allclose
 from xarray.testing import assert_equal as xr_assert_equal
 from collections import OrderedDict
 
@@ -115,7 +115,7 @@ def test_fit_predict():
 
 
 def test_predict_before_fit():
-    dims = dict(y=100, x=100)
+    dims = OrderedDict([('y', 100), ('x', 100)])
     ds, true_labels = create_mock_classes(dims)
     c = classify.Classifier(RandomForestClassifier())
     with assert_raises_regex(NotFittedError, 'not fitted yet'):
@@ -123,7 +123,36 @@ def test_predict_before_fit():
 
 
 def test_scaling():
-    ...
+    dims = OrderedDict([('y', 100), ('x', 100)])
+    ds, true_labels = create_mock_classes(dims)
+
+    # Check that scaling doesn't affect the prediction
+    # for a simple classification task
+
+    clf_noscale = classify.Classifier(
+        MiniBatchKMeans(n_clusters=2), scale=False).fit(ds)
+    clf_scale = classify.Classifier(
+        MiniBatchKMeans(n_clusters=2), scale=True).fit(ds)
+
+    assert_equal(
+        find_boundaries(clf_noscale.predict(ds)),
+        find_boundaries(clf_scale.predict(ds))
+    )
+
+    # Check that scaler has been properly fitted
+    assert_allclose(
+        clf_scale._scaler.mean_,
+        ds.mean().to_array().values
+    )
+    assert_allclose(
+        clf_scale._scaler.scale_,
+        ds.std().to_array().values
+    )
+
+    # Scaled cluster center mean should be about zero
+    assert np.all(
+        np.abs(clf_scale.clf.cluster_centers_.mean(axis=0)) < 1e-2
+    )
 
 
 # ----------
@@ -131,7 +160,7 @@ def test_scaling():
 # ----------
 
 def test_cluster():
-    dims = dict(y=100, x=100)
+    dims = OrderedDict([('y', 100), ('x', 100)])
     ds, true_labels = create_mock_classes(dims)
     clf = classify.Classifier(MiniBatchKMeans(n_clusters=2))
     clustered = clf.fit_predict(ds)
@@ -144,7 +173,7 @@ def test_cluster():
 
 
 def test_class_mean():
-    dims = dict(y=100, x=100)
+    dims = OrderedDict([('y', 100), ('x', 100)])
     ds, true_labels = create_mock_classes(dims)
     means = classify.class_mean(ds, true_labels)
     for l in np.unique(true_labels):
