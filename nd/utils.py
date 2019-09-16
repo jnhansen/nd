@@ -228,7 +228,7 @@ def xr_merge(ds_list, dim, buffer=0):
     -------
     xarray.Dataset
     """
-    if buffer > 0:
+    if buffer > 0 and len(ds_list) > 1:
         idx_first = slice(None, -buffer)
         idx_middle = slice(buffer, -buffer)
         idx_end = slice(buffer, None)
