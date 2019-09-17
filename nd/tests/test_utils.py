@@ -1,10 +1,12 @@
 import pytest
 import numpy as np
-from numpy.testing import assert_equal
+from numpy.testing import assert_equal, assert_raises, assert_raises_regex
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
 from nd import utils
-from nd.testing import equal_list_of_dicts, generate_test_dataset
+from nd.io import assemble_complex, disassemble_complex
+from nd.testing import (equal_list_of_dicts, generate_test_dataset,
+                        generate_test_dataarray)
 import time
 from datetime import datetime
 from dateutil.tz import tzutc
@@ -56,11 +58,34 @@ def test_array_chunks():
         assert_equal(arr, merged)
 
 
+def test_array_chunks_return_indices():
+    arr = np.random.rand(30, 30, 30)
+    for axis in range(arr.ndim):
+        for idx, chunk in utils.array_chunks(
+                arr, 8, axis=axis, return_indices=True):
+            assert_equal(chunk, arr[idx])
+
+
+def test_array_chunks_invalid_axis():
+    arr = np.random.rand(50, 50)
+    with assert_raises_regex(ValueError, 'out of range'):
+        _ = list(utils.array_chunks(arr, 5, axis=2))
+
+
 def test_block_split():
     arr = np.random.rand(30, 30, 30)
     nblocks = (1, 2, 3)
     blocks = utils.block_split(arr, nblocks)
     assert len(blocks) == np.prod(nblocks)
+
+
+@pytest.mark.parametrize('nblocks', [
+    (2,), (2, 2, 2)
+])
+def test_block_split_invalid_blocks(nblocks):
+    arr = np.arange(16).reshape((4, 4))
+    with assert_raises(ValueError):
+        _ = utils.block_split(arr, nblocks)
 
 
 def test_block_merge():
@@ -73,6 +98,21 @@ def test_block_merge():
     ]
     merged = utils.block_merge(blocks, (2, 2))
     assert_equal(merged, arr)
+
+
+@pytest.mark.parametrize('nblocks', [
+    (2,), (2, 2, 2)
+])
+def test_block_merge_invalid_blocks(nblocks):
+    arr = np.arange(16).reshape((4, 4))
+    blocks = [
+        arr[0:2, 0:2],
+        arr[0:2, 2:4],
+        arr[2:4, 0:2],
+        arr[2:4, 2:4]
+    ]
+    with assert_raises(ValueError):
+        _ = utils.block_merge(blocks, nblocks)
 
 
 @pytest.mark.parametrize('nblocks', [
@@ -94,6 +134,17 @@ def _parallel_fn(ds):
     return ds + 1
 
 
+@pytest.mark.parametrize('dim', ['x', 'y', 'time'])
+@pytest.mark.parametrize('chunks', [1, 2, 3])
+@pytest.mark.parametrize('buffer', [0, 1, 5])
+def test_xr_split_and_merge(dim, chunks, buffer):
+    dims = dict(x=50, y=50, time=50)
+    ds = generate_test_dataset(dims=dims)
+    parts = list(utils.xr_split(ds, dim=dim, chunks=chunks, buffer=buffer))
+    merged = utils.xr_merge(parts, dim=dim, buffer=buffer)
+    xr_assert_equal(ds, merged)
+
+
 def test_parallel():
     ds = generate_test_dataset()
     t = time.time()
@@ -111,6 +162,34 @@ def test_parallel():
         pytest.skip("Execution time is only faster if there are "
                     "multiple cores")
     assert serial_time > parallel_time
+
+
+def test_parallel_invalid_dim():
+    dims = dict(x=50, y=50, time=50)
+    ds = generate_test_dataset(dims=dims)
+
+    def _fn(ds):
+        return (ds - ds.mean('time')) / ds.std('time')
+
+    with assert_raises_regex(
+            ValueError, "The dataset has no dimension 'invalid'"):
+        _ = utils.parallel(_fn, chunks=4, dim='invalid')(ds)
+
+
+def test_parallel_merge():
+    dims = dict(x=50, y=50, time=50)
+    ds = generate_test_dataset(dims=dims)
+
+    def _fn(ds):
+        return (ds - ds.mean('time')) / ds.std('time')
+
+    result = _fn(ds)
+    result_1 = utils.parallel(_fn, 'x')(ds)
+    result_2 = utils.xr_merge(
+        utils.parallel(_fn, 'x', merge=False)(ds), dim='x')
+
+    xr_assert_equal(result, result_1)
+    xr_assert_equal(result_1, result_2)
 
 
 def test_select_list():
@@ -196,3 +275,18 @@ def test_parse_docstrings():
     assembled = utils.assemble_docstring(parsed)
     stripped_doc = '\n'.join([l.rstrip() for l in doc.split('\n')])
     assert_equal(stripped_doc, assembled)
+
+
+def test_is_complex():
+    ds = assemble_complex(generate_test_dataset())
+    # Check Dataset
+    assert utils.is_complex(ds)
+    assert not utils.is_complex(disassemble_complex(ds))
+    # Check DataArray
+    assert utils.is_complex(ds.C12)
+    assert not utils.is_complex(ds.C11)
+
+
+def test_is_complex_invalid_input():
+    with assert_raises_regex(ValueError, 'Not an xarray Dataset or DataArray'):
+        utils.is_complex('a string')

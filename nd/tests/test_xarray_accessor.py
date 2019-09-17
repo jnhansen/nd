@@ -7,7 +7,7 @@ from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_files, assert_equal_crs)
-from nd import warp, filters, io, change
+from nd import warp, filters, io, change, utils
 from nd import to_rgb, write_video
 from nd._xarray import patch_doc
 from rasterio.crs import CRS
@@ -16,6 +16,26 @@ from rasterio.crs import CRS
 # ---------------
 # Test properties
 # ---------------
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_shape(generator):
+    ds = generator()
+    shape = utils.get_shape(ds)
+    assert_equal(shape, ds.nd.shape)
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_dims(generator):
+    ds = generator()
+    dims = utils.get_dims(ds)
+    assert_equal(dims, ds.nd.dims)
+
 
 @pytest.mark.parametrize('generator', [
     generate_test_dataset,

@@ -644,22 +644,6 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         output = np.zeros(output_shape_flat, dtype=da.dtype)
         output[:] = np.nan
 
-        # Fix data shape for one-dimensional data
-        if da.ndim == 1:
-            #
-            # NOTE: The stretch factor is necessary because the input data
-            # must extend at least half an original resolution cell in the
-            # independent dimension.
-            #
-            if da.dims == ('x',):
-                stretch_x = int((~src_transform * dst_transform).a / 2 + 1)
-                values = np.vstack([values] * stretch_x)
-                output.shape = (1,) + output.shape
-            elif da.dims == ('y',):
-                stretch_y = int((~src_transform * dst_transform).e / 2 + 1)
-                values = np.vstack([values] * stretch_y).T
-                output.shape = output.shape + (1,)
-
         rasterio.warp.reproject(
             values,
             output,

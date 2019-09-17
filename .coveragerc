@@ -3,3 +3,4 @@ source=nd
 include=*/nd/*
 omit=
     */test_*.py
+    nd/testing.py
