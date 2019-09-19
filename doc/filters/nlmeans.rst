@@ -8,7 +8,7 @@ Non-Local Means is a denoising filter that computes filtered pixel values as a w
 
 Example::
 
-   from geo.filters import NLMeansFilter
+   from nd.filters import NLMeansFilter
    nlm = NLMeansFilter(dims=('y', 'x', 'time'), r=(3, 3, 1),
                        sigma=1, h=1, f=1)
    ds_filtered = nlm.apply(ds)
