@@ -398,8 +398,12 @@ def auto_merge(datasets, buffer=True, chunks={}, meta_variables=[],
     # Set metadata
     merged.attrs = _get_common_attrs(datasets)
 
-    # Close opened files
-    for d in datasets:
-        d.close()
+    # Encode categorical meta variables
+    for meta in meta_variables:
+        # Non-numerical dtype?
+        if not np.issubdtype(merged[meta].dtype, np.number):
+            values, legend = merged[meta].to_series().factorize()
+            merged[meta] = ('time', values.astype(int))
+            merged[meta].attrs['legend'] = list(enumerate(legend))
 
     return merged
