@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import xarray as xr
 from nd.testing import generate_test_dataset, assert_equal_data
-from nd.utils import dict_product
+from nd import utils
 from nd.io import open_dataset
 from nd import tiling
 from xarray.testing import assert_equal as xr_assert_equal
@@ -20,22 +20,37 @@ ds = generate_test_dataset(dims={'y': ny, 'x': nx, 'time': ntime})
 slices = dict(y=[slice(None, 10), slice(10, None)],
               x=[slice(None, 10), slice(10, None)],
               time=[slice(None, 5), slice(5, None)])
-parts = [ds.isel(**sl) for sl in dict_product(slices)]
+parts = [ds.isel(**sl) for sl in utils.dict_product(slices)]
 
 # Generate tiles along y, x, and time dimension with
 # buffer along y and x.
 buffered_slices = dict(y=[slice(None, 12), slice(8, None)],
                        x=[slice(None, 11), slice(9, None)],
                        time=[slice(None, 5), slice(5, None)])
-buffered_parts = [ds.isel(**sl) for sl in dict_product(buffered_slices)]
+buffered_parts = [ds.isel(**sl) for sl in utils.dict_product(buffered_slices)]
 
 
-def test_auto_merge():
-    xr_assert_equal(ds, tiling.auto_merge(parts))
+@pytest.mark.parametrize('use_xarray', [True, False])
+def test_auto_merge(use_xarray):
+    xr_assert_equal(
+        ds, tiling.auto_merge(parts, use_xarray_combine=use_xarray))
 
 
-def test_auto_merge_with_buffer():
-    xr_assert_equal(ds, tiling.auto_merge(buffered_parts))
+@pytest.mark.parametrize('use_xarray', [True, False])
+def test_auto_merge_with_buffer(use_xarray):
+    xr_assert_equal(
+        ds, tiling.auto_merge(buffered_parts, use_xarray_combine=use_xarray))
+
+
+def test_auto_merge_metadata():
+    ds_meta = generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10})
+    chunks = list(utils.xr_split(ds_meta, 'time', 5))
+    for i, c in enumerate(chunks):
+        c.attrs['part_number'] = i
+    ds_meta['part_number'] = ('time', np.repeat(np.arange(5), 2))
+
+    xr_assert_equal(
+        ds_meta, tiling.auto_merge(chunks, meta_variables=['part_number']))
 
 
 @pytest.mark.parametrize('buffer', [

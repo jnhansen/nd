@@ -4,7 +4,7 @@
 Omnibus Test Change Detection
 =============================
 
-.. currentmodule:: geo.change
+.. currentmodule:: nd.change
 
 Conradsen et al. (2016) present a change detection algorithm for time series of complex valued SAR data based on the complex Wishart distribution for the covariance matrices.
 :math:`S_{rt}` denotes the complex scattering amplitude where :math:`r,t \in \{h,v\}` are the receive and transmit polarization, respectively (horizontal or vertical). Reciprocity is assumed, i.e. :math:`S_{hv} = S_{vh}`. Then the backscatter at a single pixel is fully represented by the complex target vector

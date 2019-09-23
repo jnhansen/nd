@@ -9,6 +9,7 @@ from . import utils
 import os
 import glob
 import itertools
+from functools import partial
 import numpy as np
 import xarray as xr
 from dask import delayed
@@ -178,14 +179,106 @@ def map_over_tiles(files, fn, args=(), kwargs={}, path=None, suffix='',
         return result
 
 
-def _combined_attrs(datasets):
-    attrs = {}
-    for ds in datasets:
-        attrs.update(ds.attrs)
-    return attrs
+def sort_key(ds, dims):
+    """To be used as key when sorting datasets."""
+    keys = []
+    for d in dims:
+        vals = ds[d].values
+        if len(vals) < 2 or vals[-1] >= vals[0]:
+            # ascending order
+            keys.append(vals[0])
+            keys.append(vals[-1])
+        else:
+            # descending order
+            keys.append(-vals[0])
+            keys.append(-vals[-1])
+    return tuple(keys)
 
 
-def _combine_along_last_dim(datasets, buffer):
+# def _detect_buffer(datasets):
+#     dims = utils.get_dims(datasets[0])
+#     buffer = {}
+#     for dim in dims:
+#         _sorted = sorted(datasets, key=lambda ds: sort_key(ds, [dim]))
+#         buffer[dim] = min([
+#             len(a[dim] == b[dim]) for a, b in zip(_sorted[:-1], _sorted[1:])
+#         ]) // 2
+#     return buffer
+
+
+def sort_into_array(datasets, dims=None):
+    """
+    Create an array corresponding to the way the datasets are tiled.
+    """
+    dims = utils.get_dims(datasets[0])
+    initials = {}
+    for dim in dims:
+        initials[dim] = np.unique([d[dim].values[0] for d in datasets])
+    shape = tuple(len(initials[dim]) for dim in dims)
+    grid = np.empty(shape, dtype=object)
+
+    def _idx(ds):
+        result = []
+        for dim in dims:
+            vals = ds[dim].values
+            if len(vals) < 2 or vals[-1] >= vals[0]:
+                # ascending order
+                order = 1
+            else:
+                # descending order
+                order = -1
+
+            result.append(
+                np.argmax(initials[dim][::order] == ds[dim].values[0])
+            )
+
+        return tuple(result)
+
+    for d in datasets:
+        grid[_idx(d)] = d
+
+    return grid
+
+
+def debuffer(datasets, flat=True):
+    """
+    Remove buffer from tiled datasets.
+
+    Parameters
+    ----------
+    datasets : list of xr.Dataset
+        The overlapping tiles.
+    flat : bool, optional
+        If ``True``, return a flat list. Otherwise, return a numpy array
+        representing the correct order of the tiles (default: True).
+    """
+
+    def _remove_buffer(data, dim):
+        # data is already sorted by `dim`
+        overlap = [len(a[dim] == b[dim])
+                   for a, b in zip(data[:-1], data[1:])]
+        buf_start = [o // 2 for o in overlap]
+        buf_stop = [-(o-b) if b > 0 else None
+                    for b, o in zip(buf_start, overlap)]
+        debuf = [d.isel({dim: slice(start, stop)}) for d, start, stop
+                 in zip(data, [None] + buf_start, buf_stop + [None])]
+        # Force conversion to ndarray *without* converting the
+        # xarray Datasets:
+        return np.asarray(debuf + [None])[:-1]
+
+    dims = utils.get_dims(datasets[0])
+    grid = sort_into_array(datasets)
+    for axis, dim in enumerate(dims):
+        func = partial(_remove_buffer, dim=dim)
+        grid = np.apply_along_axis(func, axis, grid)
+
+    if flat:
+        return list(grid.flatten())
+    else:
+        return grid
+
+
+def _combine_along_last_dim(datasets):
     merged = []
 
     # Determine the dimension along which the dataset is split
@@ -197,20 +290,6 @@ def _combine_along_last_dim(datasets, buffer):
 
     # Group along the remaining dimensions and concatenate within each
     # group.
-    def sort_key(ds, dims):
-        keys = []
-        for d in dims:
-            vals = ds[d].values
-            if len(vals) < 2 or vals[-1] >= vals[0]:
-                # ascending order
-                keys.append(vals[0])
-                keys.append(vals[-1])
-            else:
-                # descending order
-                keys.append(-vals[0])
-                keys.append(-vals[-1])
-        return tuple(keys)
-
     sorted_ds = sorted(datasets, key=lambda ds: sort_key(ds, split_dims))
     for _, group in itertools.groupby(
             sorted_ds,
@@ -218,66 +297,46 @@ def _combine_along_last_dim(datasets, buffer):
             ):
         group = list(group)
 
-        #
-        # Compute slices based on the buffer
-        #
-
-        # Auto-detect buffer?
-        if buffer == 'auto':
-            values = [d[concat_dim].values for d in group]
-
-            # overlap with previous
-            prev_diffs = [np.abs(values[i] - values[i-1][-1])
-                          for i in range(1, len(values))]
-
-            # The +1 is necessary because this is the stop index of a slice
-            # cast to float because it may be a timedelta
-            prev_idx = [int(np.argmin(diff)) + 1
-                        if float(np.min(diff)) == 0 else 0
-                        for diff in prev_diffs]
-            prev_idx = [None] + [int(np.ceil(i/2)) for i in prev_idx]
-
-            # overlap with next
-            next_diffs = [np.abs(values[i] - values[i+1][0])
-                          for i in range(0, len(values)-1)]
-            next_idx = [int(np.argmin(diff))
-                        for diff in next_diffs]
-
-            next_idx = [int(np.ceil((i + len(v)) / 2))
-                        for i, v in zip(next_idx, values)] + [None]
-
-            slices = [slice(*args) for args in zip(prev_idx, next_idx)]
-
-        else:
-            if isinstance(buffer, int):
-                _buf = buffer
-
-            elif isinstance(buffer, dict):
-                _buf = buffer[concat_dim] if concat_dim in buffer else 0
-
-            else:
-                _buf = 0
-
-            slices = [slice(None, -_buf)] + \
-                     [slice(_buf, -_buf)] * (len(group) - 2) + \
-                     [slice(_buf, None)]
-
-        # Apply buffered slices
-        idx = [{concat_dim: s} for s in slices]
-        group = [d.isel(i) for d, i in zip(group, idx)]
-
         # Merge along concat_dim
         combined = xr.combine_nested(group, concat_dim=concat_dim)
-        combined.attrs = _combined_attrs(group)
         merged.append(combined)
 
     return merged
 
 
-def auto_merge(datasets, buffer='auto', chunks={}):
+def _get_common_attrs(datasets):
+    """
+    Return a metadata dictionary containing all attributes that are the
+    same in every dataset.
+
+    Parameters
+    ----------
+    datasets : iterable of xr.Dataset or xr.DataAarray
+        The datasets whose ``attrs`` properties will be compared.
+
+    Returns
+    -------
+    dict
+        The common metadata attributes.
+    """
+
+    attrs = {}
+    not_equal = []
+    for d in datasets:
+        for key, val in d.attrs.items():
+            if key not in attrs:
+                attrs[key] = val
+            elif not np.array_equal(val, attrs[key]):
+                not_equal.append(key)
+    attrs = {k: v for k, v in attrs.items() if k not in not_equal}
+    return attrs
+
+
+def auto_merge(datasets, buffer=True, chunks={}, meta_variables=[],
+               use_xarray_combine=True):
     """
     Automatically merge a split xarray Dataset. This is designed to behave like
-    `xarray.open_mfdataset`, except it supports concatenation along multiple
+    ``xarray.open_mfdataset``, except it supports concatenation along multiple
     dimensions.
 
     Parameters
@@ -287,15 +346,15 @@ def auto_merge(datasets, buffer='auto', chunks={}):
         xarray.open_mfdataset, or a list of xarray datasets. If a list of
         datasets is passed, you should make sure that they are represented
         as dask arrays to avoid reading the whole dataset into memory.
-    buffer : 'auto' or int or dict, optional
-
-        - If 'auto' (default), attempt to automatically detect the buffer for \
-        each dimension.
-
-        - If `int`, it is the number of overlapping pixels stored around each \
-        tile
-
-        - If `dict`, this is the amount of buffer per dimension
+    buffer : bool, optional
+        If True, attempt to automatically remove any buffer from the tiles
+        (default: True).
+    meta_variables : list, optional
+        A list of metadata items to concatenate as variables.
+    use_xarray_combine : bool, optional
+        Use xr.combine_by_coords to combine the datasets (default: True).
+        Only available from ``xarray>=0.12.2``. Will fallback to a custom
+        implementation if ``False`` or unavailable.
 
     Returns
     -------
@@ -318,12 +377,33 @@ def auto_merge(datasets, buffer='auto', chunks={}):
                                              engine='h5netcdf'))
                     for path in datasets]
 
-    merged = datasets
-    while len(merged) > 1:
-        merged = _combine_along_last_dim(merged, buffer)
+    for meta in meta_variables:
+        for d in datasets:
+            d[meta] = d.attrs.get(meta)
 
-    # Close opened files
-    for d in datasets:
-        d.close()
+    if buffer:
+        datasets = debuffer(datasets, flat=True)
 
-    return merged[0]
+    try:
+        # combine_by_coords() was introduced in xarray 0.12.2
+        if not use_xarray_combine:
+            raise AttributeError('Requested use of custom implementation.')
+        merged = xr.combine_by_coords(datasets)
+    except AttributeError:
+        merged = datasets
+        while len(merged) > 1:
+            merged = _combine_along_last_dim(merged)
+        merged = merged[0]
+
+    # Set metadata
+    merged.attrs = _get_common_attrs(datasets)
+
+    # Encode categorical meta variables
+    for meta in meta_variables:
+        # Non-numerical dtype?
+        if not np.issubdtype(merged[meta].dtype, np.number):
+            values, legend = merged[meta].to_series().factorize()
+            merged[meta] = ('time', values.astype(int))
+            merged[meta].attrs['legend'] = list(enumerate(legend))
+
+    return merged
