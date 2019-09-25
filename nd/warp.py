@@ -6,6 +6,7 @@ import rasterio.warp
 import warnings
 import shapely.geometry
 import shapely.ops
+from functools import partial
 import pyproj
 from rasterio.coords import BoundingBox
 from rasterio.crs import CRS
@@ -309,9 +310,9 @@ def get_geometry(ds, crs={'init': 'epsg:4326'}):
     """
 
     src_geometry = shapely.geometry.box(*get_bounds(ds))
-    project = pyproj.Transformer.from_proj(
-        get_crs(ds), _parse_crs(crs))
-    geometry = shapely.ops.transform(project.transform, src_geometry)
+    project = partial(
+        pyproj.transform, get_crs(ds), _parse_crs(crs))
+    geometry = shapely.ops.transform(project, src_geometry)
     return geometry
 
 

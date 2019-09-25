@@ -18,6 +18,7 @@ from collections import OrderedDict
 import shapely.geometry
 import shapely.ops
 import pyproj
+from functools import partial
 
 
 # Prepare test data
@@ -390,9 +391,9 @@ def test_get_geometry(generator, bounds, crs):
     ds = generator(extent=bounds)
     geom = warp.get_geometry(ds, crs=crs)
     box = shapely.geometry.box(*bounds)
-    project = pyproj.Transformer.from_proj(
-        warp.get_crs(ds), crs)
-    expected = shapely.ops.transform(project.transform, box)
+    project = partial(
+        pyproj.transform, warp.get_crs(ds), crs)
+    expected = shapely.ops.transform(project, box)
     assert_equal(geom, expected)
 
 
