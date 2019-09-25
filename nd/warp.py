@@ -4,6 +4,9 @@ import numpy as np
 import xarray as xr
 import rasterio.warp
 import warnings
+import shapely.geometry
+import shapely.ops
+import pyproj
 from rasterio.coords import BoundingBox
 from rasterio.crs import CRS
 from rasterio.errors import CRSError
@@ -29,6 +32,7 @@ __all__ = ['Reprojection',
            'get_crs',
            'get_transform',
            'get_resolution',
+           'get_geometry',
            'get_bounds',
            'get_extent',
            'nrows',
@@ -279,6 +283,32 @@ def get_extent(ds):
         src_crs, dst_crs, **proj_bounds._asdict()
     )
     return BoundingBox(*bounds)
+
+
+def get_geometry(ds, crs={'init': 'epsg:4326'}):
+    """Get the shapely geometry of the dataset bounding box
+    in any coordinate system (EPSG:4326 by default).
+
+    Parameters
+    ----------
+    ds : xr.Dataset or xr.DataArray
+        The dataset whose geometry to return.
+    crs : dict, optional
+        The desired CRS as keywords arguments to be passed to
+        :class:`pyproj.Proj`.
+
+    Returns
+    -------
+    shapely.geometry.Polygon
+        The bounds of the dataset in the desired coordinate system.
+
+    """
+
+    src_geometry = shapely.geometry.box(*get_bounds(ds))
+    project = pyproj.Transformer.from_proj(
+        get_crs(ds), pyproj.Proj(**crs))
+    geometry = shapely.ops.transform(project.transform, src_geometry)
+    return geometry
 
 
 # ---------------------------------------
