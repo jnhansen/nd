@@ -383,18 +383,24 @@ def test_get_bounds_dataarray():
     (-10.0, 50.0, 0.0, 60.0),
     (3.0, 55.0, 5.0, 58.0)
 ])
-@pytest.mark.parametrize('crs', [
+@pytest.mark.parametrize('src_crs', [
+    epsg4326, sinusoidal
+])
+@pytest.mark.parametrize('dst_crs', [
     CRS({'init': 'epsg:4326'}),
     CRS({'init': 'epsg:3395'})
 ])
-def test_get_geometry(generator, bounds, crs):
-    ds = generator(extent=bounds)
-    geom = warp.get_geometry(ds, crs=crs)
-    box = shapely.geometry.box(*bounds)
+def test_get_geometry(generator, bounds, src_crs, dst_crs):
+    ds = generator(extent=bounds, crs=src_crs)
+    box = shapely.geometry.box(*warp.get_bounds(ds))
+    assert_equal(
+        warp.get_geometry(ds, crs=src_crs), box)
+
+    geom = warp.get_geometry(ds, crs=dst_crs)
     project = partial(
         pyproj.transform,
-        warp._to_pyproj(warp.get_crs(ds)),
-        warp._to_pyproj(crs))
+        warp._to_pyproj(src_crs),
+        warp._to_pyproj(dst_crs))
     expected = shapely.ops.transform(project, box)
     assert_equal(geom, expected)
 
