@@ -404,6 +404,7 @@ def auto_merge(datasets, buffer=True, chunks={}, meta_variables=[],
         if not np.issubdtype(merged[meta].dtype, np.number):
             values, legend = merged[meta].to_series().factorize()
             merged[meta] = ('time', values.astype(int))
-            merged[meta].attrs['legend'] = list(enumerate(legend))
+            merged[meta].attrs['legend'] = \
+                tuple([tuple(i, v) for i, v in enumerate(legend)])
 
     return merged
