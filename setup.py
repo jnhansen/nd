@@ -110,7 +110,7 @@ if not mock_install:
         "h5netcdf",
         "imageio",
         "imageio-ffmpeg",
-        "pyproj",
+        "pyproj>=2.0",
         "geopandas",
         "scikit-image",
     ])
