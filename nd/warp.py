@@ -290,6 +290,11 @@ def get_extent(ds):
     return BoundingBox(*bounds)
 
 
+def _to_pyproj(crs):
+    """Convert a rasterio.crs.CRS to pyproj.Proj"""
+    return pyproj.Proj(**crs)
+
+
 def get_geometry(ds, crs={'init': 'epsg:4326'}):
     """Get the shapely geometry of the dataset bounding box
     in any coordinate system (EPSG:4326 by default).
@@ -311,7 +316,9 @@ def get_geometry(ds, crs={'init': 'epsg:4326'}):
 
     src_geometry = shapely.geometry.box(*get_bounds(ds))
     project = partial(
-        pyproj.transform, get_crs(ds), _parse_crs(crs))
+        pyproj.transform,
+        _to_pyproj(get_crs(ds)),
+        _to_pyproj(_parse_crs(crs)))
     geometry = shapely.ops.transform(project, src_geometry)
     return geometry
 

@@ -392,7 +392,9 @@ def test_get_geometry(generator, bounds, crs):
     geom = warp.get_geometry(ds, crs=crs)
     box = shapely.geometry.box(*bounds)
     project = partial(
-        pyproj.transform, warp.get_crs(ds), crs)
+        pyproj.transform,
+        warp._to_pyproj(warp.get_crs(ds)),
+        warp._to_pyproj(crs))
     expected = shapely.ops.transform(project, box)
     assert_equal(geom, expected)
 
