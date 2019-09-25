@@ -84,6 +84,7 @@ def _parse_crs(crs):
     ------
     CRSError
         Raises an error if the input cannot be parsed.
+
     """
 
     #
@@ -103,6 +104,8 @@ def _parse_crs(crs):
         parsed = CRS(crs)
     elif isinstance(crs, int):
         parsed = CRS.from_epsg(crs)
+    elif isinstance(crs, pyproj.Proj):
+        parsed = CRS.from_proj4(crs.proj4_init)
 
     if parsed is None or not parsed.is_valid:
         raise CRSError('Could not parse CRS: {}'.format(crs))
@@ -130,6 +133,7 @@ def get_crs(ds, format='crs'):
     -------
     CRS, str, or dict
         The CRS.
+
     """
 
     crs = None
@@ -306,7 +310,7 @@ def get_geometry(ds, crs={'init': 'epsg:4326'}):
 
     src_geometry = shapely.geometry.box(*get_bounds(ds))
     project = pyproj.Transformer.from_proj(
-        get_crs(ds), pyproj.Proj(**crs))
+        get_crs(ds), _parse_crs(crs))
     geometry = shapely.ops.transform(project.transform, src_geometry)
     return geometry
 
