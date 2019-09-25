@@ -5,7 +5,7 @@ from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_crs)
 import numpy as np
 from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
-                           assert_raises_regex, assert_allclose)
+                           assert_raises_regex)
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
 import os
@@ -15,6 +15,10 @@ from rasterio.errors import CRSError
 import rasterio.warp
 from affine import Affine
 from collections import OrderedDict
+import shapely.geometry
+import shapely.ops
+import pyproj
+from functools import partial
 
 
 # Prepare test data
@@ -369,6 +373,36 @@ def test_get_bounds_dataarray():
     bounds = (-10.0, 50.0, 0.0, 60.0)
     da = generate_test_dataarray(extent=bounds)
     assert_equal(bounds, warp.get_bounds(da))
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+@pytest.mark.parametrize('bounds', [
+    (-10.0, 50.0, 0.0, 60.0),
+    (3.0, 55.0, 5.0, 58.0)
+])
+@pytest.mark.parametrize('src_crs', [
+    epsg4326, sinusoidal
+])
+@pytest.mark.parametrize('dst_crs', [
+    CRS({'init': 'epsg:4326'}),
+    CRS({'init': 'epsg:3395'})
+])
+def test_get_geometry(generator, bounds, src_crs, dst_crs):
+    ds = generator(extent=bounds, crs=src_crs)
+    box = shapely.geometry.box(*warp.get_bounds(ds))
+    assert_equal(
+        warp.get_geometry(ds, crs=src_crs), box)
+
+    geom = warp.get_geometry(ds, crs=dst_crs)
+    project = partial(
+        pyproj.transform,
+        warp._to_pyproj(src_crs),
+        warp._to_pyproj(dst_crs))
+    expected = shapely.ops.transform(project, box)
+    assert_equal(geom, expected)
 
 
 def test_get_extent_dataset():
