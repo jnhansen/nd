@@ -51,7 +51,7 @@ Creating a map
     >>> plot_map(ds, buffer=6, imscale=11)
 
 .. image:: images/map.png
-    :width: 300px
+    :width: 600px
     :align: center
 
 
