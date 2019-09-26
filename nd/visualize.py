@@ -417,14 +417,7 @@ def _get_scalebar_length(ax):
     return scale
 
 
-def _get_optimal_zoom(ax):
-    extent = ax.get_extent()
-    length = (extent[1] - extent[0]) / 1e3
-    zoom = int(np.sqrt(2.5e4/length))
-    return zoom
-
-
-def plot_map(ds, buffer=None, background='_default',
+def plot_map(ds, buffer=None, background='_default', imscale=6,
              gridlines=True, coastlines=True, scalebar=True):
     """
     Show the boundary of the dataset on a visually appealing map.
@@ -470,7 +463,8 @@ def plot_map(ds, buffer=None, background='_default',
     buffered = shapely.affinity.scale(
         geometry_data, xfact=buffer, yfact=buffer)
     project = pyproj.Transformer.from_proj(
-            ds.nd.crs, pyproj.Proj(init='epsg:4326'))
+            warp._to_pyproj(ds.nd.crs),
+            pyproj.Proj(init='epsg:4326'))
     b = shapely.ops.transform(project.transform, buffered).bounds
     extent = [b[0], b[2], b[1], b[3]]
     bb = Bbox.from_extents(extent)
@@ -482,7 +476,6 @@ def plot_map(ds, buffer=None, background='_default',
 
     # Create figure
     # -------------
-    plt.figure(figsize=(32, 12))
     ax = plt.axes(xlim=(b[0], b[2]), ylim=(b[1], b[3]), projection=map_crs,
                   aspect='equal', clip_box=bb)
     ax.set_global()
@@ -493,7 +486,7 @@ def plot_map(ds, buffer=None, background='_default',
     # ---------------------------
 
     if background is not None:
-        ax.add_image(background, _get_optimal_zoom(ax))
+        ax.add_image(background, imscale)
 
     if coastlines:
         color = 'black' if background is None else 'white'
