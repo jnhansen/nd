@@ -30,6 +30,7 @@ autodoc_mock_imports = [
     # 'cython_gsl',
     'shapely',
     'shapely.geometry',
+    'pyproj',
     'cartopy',
     'sklearn',
     'scipy',
