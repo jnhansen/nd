@@ -86,6 +86,10 @@ class NDAccessor:
     def to_video(self, *args, **kwargs):
         return visualize.write_video(self._obj, *args, **kwargs)
 
+    @patch_doc(visualize.plot_map)
+    def plot_map(self, *args, **kwargs):
+        return visualize.plot_map(self._obj, *args, **kwargs)
+
     # Projection methods
     @patch_doc(warp.reproject)
     def reproject(self, *args, **kwargs):
