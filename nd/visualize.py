@@ -432,6 +432,8 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
     background : :class:`cartopy.io.img_tiles` image tiles, optional
         The basemap to plot in the background (default: Stamen terrain).
         If None, do not plot a background map.
+    imscale : int, optional
+        The zoom level of the background image (default: 6).
     gridlines : bool, optional
         Whether to plot gridlines (default: True).
     coastlines : bool, optional
