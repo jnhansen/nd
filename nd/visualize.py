@@ -435,7 +435,7 @@ def _get_optimal_zoom(ax):
     return zoom
 
 
-def plot_map(ds, buffer=None, background=cimgt.Stamen('terrain-background'),
+def plot_map(ds, buffer=None, background='_default',
              gridlines=True, coastlines=True, scalebar=True):
     """
     Show the boundary of the dataset on a visually appealing map.
@@ -458,6 +458,13 @@ def plot_map(ds, buffer=None, background=cimgt.Stamen('terrain-background'),
         Whether to add a scale bar (default: True).
 
     """
+
+    if background == '_default':
+        try:
+            background = cimgt.Stamen('terrain-background')
+        except AttributeError:
+            # cartopy < 0.17.0
+            background = cimgt.StamenTerrain()
 
     # Get polygon shape
     # -----------------
