@@ -187,14 +187,11 @@ def test_plot_map(tmpdir):
     buffer = 2
     ds = generate_test_dataset(extent=extent)
     num_plots_before = plt.gcf().number
-    visualize.plot_map(ds, buffer=buffer, background=None, scalebar=True)
-    ax = plt.gca()
+    ax = visualize.plot_map(ds, buffer=buffer, background=None, scalebar=True)
     fig = plt.gcf()
     num_plots_after = fig.number
     # Check that a plot has been created
     assert num_plots_after - num_plots_before == 1
-
-    plt.savefig(str(tmpdir / 'figure.pdf'))
 
     # Check that extent contains full boundary with buffer
     buffered = shapely.affinity.scale(
