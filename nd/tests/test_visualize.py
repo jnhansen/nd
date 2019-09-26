@@ -8,6 +8,7 @@ import imageio
 import os
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+import cartopy.io.img_tiles as cimgt
 import shapely.affinity
 
 
@@ -102,7 +103,7 @@ def test_colorize(N, nan_vals):
     colored = visualize.colorize(labels, N=N, nan_vals=nan_vals)
     assert colored.shape == (20, 20, 3)
     for i in range(nlabels):
-        # check that pixels of the same label have the same color
+        # Check that pixels of the same label have the same color
         mask = (labels == i)
         ncolors = len(np.unique(colored[mask], axis=0))
         assert ncolors == 1
@@ -142,7 +143,7 @@ def test_gridlines_with_labels(tmpdir, extent):
         return value, suffix
 
     def check_lon_suffix(lon, suffix):
-        sign = np.sign(round(lon, 1))
+        sign = np.sign(round(lon))
         if sign == 0:
             assert suffix == ''
         elif sign == 1:
@@ -151,7 +152,7 @@ def test_gridlines_with_labels(tmpdir, extent):
             assert suffix == 'W'
 
     def check_lat_suffix(lat, suffix):
-        sign = np.sign(round(lat, 1))
+        sign = np.sign(round(lat))
         if sign == 0:
             assert suffix == ''
         elif sign == 1:
@@ -183,15 +184,10 @@ def test_gridlines_with_labels(tmpdir, extent):
 
 
 def test_plot_map(tmpdir):
-    extent = [-5, 2, -2, 3]
+    extent = [-5, -2, 2, 3]
     buffer = 2
     ds = generate_test_dataset(extent=extent)
-    num_plots_before = plt.gcf().number
     ax = visualize.plot_map(ds, buffer=buffer, background=None, scalebar=True)
-    fig = plt.gcf()
-    num_plots_after = fig.number
-    # Check that a plot has been created
-    assert num_plots_after - num_plots_before == 1
 
     # Check that extent contains full boundary with buffer
     buffered = shapely.affinity.scale(
@@ -200,14 +196,25 @@ def test_plot_map(tmpdir):
 
     # For some reason, the order of x and y is reversed
     # in the axis extent...
-    ax_ymin, ax_ymax, ax_xmin, ax_xmax = ax.get_extent(crs=ccrs.PlateCarree())
+    ax_xmin, ax_xmax, ax_ymin, ax_ymax = ax.get_extent(crs=ccrs.PlateCarree())
     xtol = 0.1 * (xmax - xmin)
     ytol = 0.1 * (ymax - ymin)
-    assert ax_xmin <= xmin
+    numtol = 1e-3
+    assert ax_xmin <= xmin + numtol
     assert ax_xmin > xmin - xtol
-    assert ax_xmax >= xmax
+    assert ax_xmax >= xmax - numtol
     assert ax_xmax < xmax + xtol
-    assert ax_ymin <= ymin
+    assert ax_ymin <= ymin + numtol
     assert ax_ymin > ymin - ytol
-    assert ax_ymax >= ymax
+    assert ax_ymax >= ymax - numtol
     assert ax_ymax < ymax + ytol
+
+
+def test_plot_map_with_background(tmpdir):
+    extent = [-10.0, 50.0, 0.0, 56.0]
+    ds = generate_test_dataset(extent=extent)
+    plt.figure(figsize=(8, 8))
+    ax = visualize.plot_map(ds, buffer=1, background='_default', imscale=1)
+    # Need to trigger rendering to get image
+    plt.savefig(str(tmpdir / 'figure.pdf'))
+    assert len(ax.get_images()) == 1
