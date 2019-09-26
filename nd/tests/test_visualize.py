@@ -1,6 +1,6 @@
 from nd import visualize
 from nd import warp
-from numpy.testing import assert_equal, assert_almost_equal
+from numpy.testing import assert_equal
 from nd.testing import generate_test_dataset
 import numpy as np
 import pytest
