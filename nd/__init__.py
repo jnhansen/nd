@@ -9,6 +9,7 @@ except Exception:
 # Assertion failed: (0), function query, file AbstractSTRtree.cpp
 # which may occur if shapely is imported *after* fiona
 import shapely.geometry
+import shapely.affinity
 
 from xarray import Dataset, DataArray
 from .io import open_dataset, to_netcdf

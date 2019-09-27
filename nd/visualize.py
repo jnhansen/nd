@@ -1,19 +1,32 @@
 """
 Quickly visualize datasets.
 
-TODO: Update to work with xarray Dataset rather than GDAL.
-
 """
 import os
 import imageio
 import cv2
 import xarray as xr
 import numpy as np
+try:
+    import cartopy
+    import cartopy.crs as ccrs
+    import cartopy.geodesic as cgeo
+    import cartopy.io.img_tiles as cimgt
+    from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+except ImportError:
+    cartopy = None
+import matplotlib.pyplot as plt
+from matplotlib.transforms import Bbox
+import pyproj
+import shapely.geometry
+import shapely.affinity
+from . import warp
 
 
 __all__ = ['colorize',
            'to_rgb',
-           'write_video']
+           'write_video',
+           'plot_map']
 
 CMAPS = {
     'jet': cv2.COLORMAP_JET,
@@ -267,3 +280,466 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
                             fontColor,
                             lineType)
             writer.append_data(frame)
+
+
+# -------
+# Mapping
+# -------
+
+def gridlines_with_labels(ax, top=True, bottom=True, left=True,
+                          right=True, **kwargs):
+    """
+    Like :meth:`cartopy.mpl.geoaxes.GeoAxes.gridlines`, but will draw
+    gridline labels for arbitrary projections.
+
+    Parameters
+    ----------
+    ax : :class:`cartopy.mpl.geoaxes.GeoAxes`
+        The :class:`GeoAxes` object to which to add the gridlines.
+    top, bottom, left, right : bool, optional
+        Whether or not to add gridline labels at the corresponding side
+        of the plot (default: all True).
+    kwargs : dict, optional
+        Extra keyword arguments to be passed to :meth:`ax.gridlines`.
+
+    Returns
+    -------
+    :class:`cartopy.mpl.gridliner.Gridliner`
+        The :class:`Gridliner` object resulting from ``ax.gridlines()``.
+
+    """
+
+    if cartopy is None:
+        raise ImportError("Module `cartopy` is required to "
+                          "use this method.")
+
+    # Add gridlines
+    gridliner = ax.gridlines(**kwargs)
+
+    ax.tick_params(length=0)
+
+    # Get projected extent
+    xmin, xmax, ymin, ymax = ax.get_extent()
+
+    # Determine tick positions
+    sides = {}
+    N = 500
+    if bottom:
+        sides['bottom'] = np.stack([np.linspace(xmin, xmax, N),
+                                    np.ones(N) * ymin])
+    if top:
+        sides['top'] = np.stack([np.linspace(xmin, xmax, N),
+                                np.ones(N) * ymax])
+    if left:
+        sides['left'] = np.stack([np.ones(N) * xmin,
+                                  np.linspace(ymin, ymax, N)])
+    if right:
+        sides['right'] = np.stack([np.ones(N) * xmax,
+                                   np.linspace(ymin, ymax, N)])
+
+    # Get latitude and longitude coordinates of axes boundary at each side
+    # in discrete steps
+    gridline_coords = {}
+    for side, values in sides.items():
+        gridline_coords[side] = ccrs.PlateCarree().transform_points(
+            ax.projection, values[0], values[1])
+
+    lon_lim, lat_lim = gridliner._axes_domain(
+        background_patch=ax.background_patch)
+    ticklocs = {
+        'x': gridliner.xlocator.tick_values(lon_lim[0], lon_lim[1]),
+        'y': gridliner.ylocator.tick_values(lat_lim[0], lat_lim[1])
+    }
+
+    # Compute the positions on the outer boundary where
+    coords = {}
+    for name, g in gridline_coords.items():
+        if name in ('bottom', 'top'):
+            compare, axis = 'x', 0
+        else:
+            compare, axis = 'y', 1
+        coords[name] = np.array([
+            sides[name][:, np.argmin(np.abs(
+                gridline_coords[name][:, axis] - c))]
+            for c in ticklocs[compare]
+        ])
+
+    # Create overlay axes for top and right tick labels
+    ax_topright = ax.figure.add_axes(ax.get_position(), frameon=False)
+    ax_topright.tick_params(
+        left=False, labelleft=False,
+        right=True, labelright=True,
+        bottom=False, labelbottom=False,
+        top=True, labeltop=True,
+        length=0
+    )
+    ax_topright.set_xlim(ax.get_xlim())
+    ax_topright.set_ylim(ax.get_ylim())
+
+    for side, tick_coords in coords.items():
+        if side in ('bottom', 'top'):
+            axis, idx = 'x', 0
+        else:
+            axis, idx = 'y', 1
+
+        _ax = ax if side in ('bottom', 'left') else ax_topright
+
+        ticks = tick_coords[:, idx]
+
+        valid = np.logical_and(
+            ticklocs[axis] >= gridline_coords[side][0, idx],
+            ticklocs[axis] <= gridline_coords[side][-1, idx])
+
+        if side in ('bottom', 'top'):
+            _ax.set_xticks(ticks[valid])
+            _ax.set_xticklabels([LONGITUDE_FORMATTER.format_data(t)
+                                 for t in ticklocs[axis][valid]])
+        else:
+            _ax.set_yticks(ticks[valid])
+            _ax.set_yticklabels([LATITUDE_FORMATTER.format_data(t)
+                                 for t in ticklocs[axis][valid]])
+
+    return gridliner
+
+
+def _get_orthographic_projection(ds):
+    center_lon, center_lat = \
+        warp.get_geometry(ds).centroid.coords[0]
+    crs = ccrs.Orthographic(center_lon, center_lat)
+    return crs
+
+
+def _get_scalebar_length(ax):
+    extent = ax.get_extent()
+    length = (extent[1] - extent[0]) / 1e3
+    s = np.array([1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000])
+    scale = max(s[s < length/5])
+    return scale
+
+
+def plot_map(ds, buffer=None, background='_default', imscale=6,
+             gridlines=True, coastlines=True, scalebar=True):
+    """
+    Show the boundary of the dataset on a visually appealing map.
+
+    Parameters
+    ----------
+    ds : xr.Dataset or xr.DataArray
+        The dataset whose bounds to plot on the map.
+    buffer : float, optional
+        Margin around the bounds polygon to plot, relative to the polygon
+        dimension. By default, add around 20% on each side.
+    background : :class:`cartopy.io.img_tiles` image tiles, optional
+        The basemap to plot in the background (default: Stamen terrain).
+        If None, do not plot a background map.
+    imscale : int, optional
+        The zoom level of the background image (default: 6).
+    gridlines : bool, optional
+        Whether to plot gridlines (default: True).
+    coastlines : bool, optional
+        Whether to plot coastlines (default: True).
+    scalebar : bool, optional
+        Whether to add a scale bar (default: True).
+
+    Returns
+    -------
+    :class:`cartopy.mpl.geoaxes.GeoAxes`
+        The corresponding GeoAxes object.
+
+    """
+
+    if background == '_default':
+        try:
+            background = cimgt.Stamen('terrain-background')
+        except AttributeError:
+            # cartopy < 0.17.0
+            background = cimgt.StamenTerrain()
+
+    # Get polygon shape
+    # -----------------
+    geometry_data = shapely.geometry.box(*ds.nd.bounds)
+    if buffer is None:
+        buffer = 1.2
+    else:
+        buffer += 1.0
+    buffered = shapely.affinity.scale(
+        geometry_data, xfact=buffer, yfact=buffer)
+    project = pyproj.Transformer.from_proj(
+            warp._to_pyproj(ds.nd.crs),
+            pyproj.Proj(init='epsg:4326'))
+    b = shapely.ops.transform(project.transform, buffered).bounds
+    extent = [b[0], b[2], b[1], b[3]]
+    bb = Bbox.from_extents(extent)
+
+    # Define Orthographic map projection
+    # (centered at the polygon)
+    # ----------------------------------
+    map_crs = _get_orthographic_projection(ds)
+
+    # Create figure
+    # -------------
+    ax = plt.axes(xlim=(b[0], b[2]), ylim=(b[1], b[3]), projection=map_crs,
+                  aspect='equal', clip_box=bb)
+    ax.set_global()
+    ax.set_extent(extent, crs=ccrs.PlateCarree())
+    ax.apply_aspect()
+
+    # Add additional map features
+    # ---------------------------
+
+    if background is not None:
+        ax.add_image(background, imscale)
+
+    if coastlines:
+        color = 'black' if background is None else 'white'
+        ax.coastlines(resolution='10m', color=color)
+
+    if scalebar:
+        # Determine optimal length
+        scale = _get_scalebar_length(ax)
+        scale_bar(ax, (0.05, 0.05), scale, linewidth=5, ha='center')
+
+    # Add polygon
+    # -----------
+    geometry_map = warp.get_geometry(ds, crs=map_crs.proj4_params)
+    ax.add_geometries([geometry_map], crs=map_crs,
+                      facecolor='r', edgecolor='k', alpha=0.2)
+
+    if gridlines:
+        color = '0.5' if background is None else 'white'
+        gridlines_with_labels(ax, color=color)
+
+    return ax
+
+
+# -------------------------------------------------------------
+# CARTOPY SCALE BAR
+# Taken from StackOverflow https://stackoverflow.com/a/50674451
+# -------------------------------------------------------------
+
+def _axes_to_lonlat(ax, coords):
+    """(lon, lat) from axes coordinates."""
+    display = ax.transAxes.transform(coords)
+    data = ax.transData.inverted().transform(display)
+    lonlat = ccrs.PlateCarree().transform_point(*data, ax.projection)
+
+    return lonlat
+
+
+def _upper_bound(start, direction, distance, dist_func):
+    """A point farther than distance from start, in the given direction.
+
+    It doesn't matter which coordinate system start is given in, as long
+    as dist_func takes points in that coordinate system.
+
+    Parameters
+    ----------
+    start : tuple
+        Starting point for the line.
+    direction : np.ndarray, shape (2, 1)
+        A direction vector.
+    distance : float
+        Positive distance to go past.
+    dist_func : callable
+        A two-argument function which returns distance.
+
+    Returns
+    -------
+    np.ndarray, shape (2, 1)
+        Coordinates of a point.
+
+    """
+
+    if distance <= 0:
+        raise ValueError(
+            "Minimum distance is not positive: {}".format(distance))
+
+    if np.linalg.norm(direction) == 0:
+        raise ValueError("Direction vector must not be zero.")
+
+    # Exponential search until the distance between start and end is
+    # greater than the given limit.
+    length = 0.1
+    end = start + length * direction
+
+    while dist_func(start, end) < distance:
+        length *= 2
+        end = start + length * direction
+
+    return end
+
+
+def _distance_along_line(start, end, distance, dist_func, tol):
+    """Point at a distance from start on the segment from start to end.
+
+    It doesn't matter which coordinate system start is given in, as long
+    as dist_func takes points in that coordinate system.
+
+    Parameters
+    ----------
+    start : tuple
+        Starting point for the line.
+    end : tuple
+        Outer bound on point's location.
+    distance : float
+        Positive distance to travel.
+    dist_func : callable
+        Two-argument function which returns distance.
+    tol : float
+        Relative error in distance to allow.
+
+    Returns
+    -------
+    np.ndarray, shape (2, 1)
+        Coordinates of a point.
+
+    """
+
+    initial_distance = dist_func(start, end)
+    if initial_distance < distance:
+        raise ValueError("End is closer to start ({}) than "
+                         "given distance ({}).".format(
+                             initial_distance, distance
+                         ))
+
+    if tol <= 0:
+        raise ValueError("Tolerance is not positive: {}".format(tol))
+
+    # Binary search for a point at the given distance.
+    left = start
+    right = end
+
+    while not np.isclose(dist_func(start, right), distance, rtol=tol):
+        midpoint = (left + right) / 2
+
+        # If midpoint is too close, search in second half.
+        if dist_func(start, midpoint) < distance:
+            left = midpoint
+        # Otherwise the midpoint is too far, so search in first half.
+        else:
+            right = midpoint
+
+    return right
+
+
+def _point_along_line(ax, start, distance, angle=0, tol=0.01):
+    """Point at a given distance from start at a given angle.
+
+    Parameters
+    ----------
+    ax : :class:`cartopy.mpl.geoaxes.GeoAxes`
+        Cartopy axes.
+    start : tuple
+        Starting point for the line in axes coordinates.
+    distance : float
+        Positive physical distance to travel.
+    angle : float, optional
+        Anti-clockwise angle for the bar, in radians. Default: 0
+    tol : float, optional
+        Relative error in distance to allow. Default: 0.01
+
+    Returns
+    -------
+    np.ndarray, shape (2, 1)
+        Coordinates of a point
+
+    """
+
+    # Direction vector of the line in axes coordinates.
+    direction = np.array([np.cos(angle), np.sin(angle)])
+
+    geodesic = cgeo.Geodesic()
+
+    # Physical distance between points.
+    def dist_func(a_axes, b_axes):
+        a_phys = _axes_to_lonlat(ax, a_axes)
+        b_phys = _axes_to_lonlat(ax, b_axes)
+
+        # Geodesic().inverse returns a NumPy MemoryView like [[distance,
+        # start azimuth, end azimuth]].
+        return geodesic.inverse(a_phys, b_phys).base[0, 0]
+
+    end = _upper_bound(start, direction, distance, dist_func)
+
+    return _distance_along_line(start, end, distance, dist_func, tol)
+
+
+def scale_bar(ax, location, length, metres_per_unit=1000, unit_name='km',
+              tol=0.01, angle=0, color='black', linewidth=3, text_offset=0.005,
+              ha='center', va='bottom', plot_kwargs=None, text_kwargs=None,
+              **kwargs):
+    """Add a scale bar to Cartopy axes.
+
+    For angles between 0 and 90 the text and line may be plotted at
+    slightly different angles for unknown reasons. To work around this,
+    override the 'rotation' keyword argument with text_kwargs.
+
+    Parameters
+    ----------
+    ax : :class:`cartopy.mpl.geoaxes.GeoAxes`
+        Cartopy axes.
+    location : tuple
+        Position of left-side of bar in axes coordinates.
+    length : float
+        Geodesic length of the scale bar.
+    metres_per_unit : int, optional
+        Number of metres in the given unit. (Default: 1000)
+    unit_name : str, optional
+        Name of the given unit. (Default: 'km')
+    tol : float, optional
+        Allowed relative error in length of bar. (Default: 0.01)
+    angle : float, optional
+        Anti-clockwise rotation of the bar.
+    color : str, optional
+        Color of the bar and text. (Default: 'black')
+    linewidth : float, optional
+        Same argument as for plot.
+    text_offset : float, optonal
+        Perpendicular offset for text in axes coordinates.
+        (Default: 0.005)
+    ha : str, optional
+        Horizontal alignment. (Default: 'center')
+    va : str, optional
+        Vertical alignment. (Default: 'bottom')
+    **plot_kwargs : dict, optional
+        Keyword arguments for plot, overridden by **kwargs.
+    **text_kwargs : dict, optional
+        Keyword arguments for text, overridden by **kwargs.
+    **kwargs : dict, optional
+        Keyword arguments for both plot and text.
+
+    """
+
+    # Setup kwargs, update plot_kwargs and text_kwargs.
+    if plot_kwargs is None:
+        plot_kwargs = {}
+    if text_kwargs is None:
+        text_kwargs = {}
+
+    plot_kwargs = {'linewidth': linewidth, 'color': color, **plot_kwargs,
+                   **kwargs}
+    text_kwargs = {'ha': ha, 'va': va, 'rotation': angle, 'color': color,
+                   **text_kwargs, **kwargs}
+
+    # Convert all units and types.
+    location = np.asarray(location)  # For vector addition.
+    length_metres = length * metres_per_unit
+    angle_rad = angle * np.pi / 180
+
+    # End-point of bar.
+    end = _point_along_line(ax, location, length_metres, angle=angle_rad,
+                            tol=tol)
+
+    # Coordinates are currently in axes coordinates, so use transAxes to
+    # put into data coordinates. *zip(a, b) produces a list of x-coords,
+    # then a list of y-coords.
+    ax.plot(*zip(location, end), transform=ax.transAxes, **plot_kwargs)
+
+    # Push text away from bar in the perpendicular direction.
+    midpoint = (location + end) / 2
+    offset = text_offset * np.array([-np.sin(angle_rad), np.cos(angle_rad)])
+    text_location = midpoint + offset
+
+    # 'rotation' keyword argument is in text_kwargs.
+    ax.text(*text_location, "{} {}".format(length, unit_name),
+            rotation_mode='anchor', transform=ax.transAxes, **text_kwargs)

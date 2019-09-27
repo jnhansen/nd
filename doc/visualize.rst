@@ -39,6 +39,22 @@ The example writes to a gif image so it can be embedded here, but many video for
     :align: center
 
 
+
+Creating a map
+--------------
+
+::
+
+    >>> from nd.visualize import plot_map
+    >>> import matplotlib.pyplot as plt
+    >>> plt.figure()
+    >>> plot_map(ds, buffer=6, imscale=11)
+
+.. image:: images/map.png
+    :width: 600px
+    :align: center
+
+
 .. topic:: See Also:
 
  * `<http://xarray.pydata.org/en/stable/plotting.html>`_

@@ -7,10 +7,10 @@ from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_files, assert_equal_crs)
-from nd import warp, filters, io, change, utils
-from nd import to_rgb, write_video
+from nd import warp, filters, io, change, utils, visualize
 from nd._xarray import patch_doc
 from rasterio.crs import CRS
+import cartopy
 
 
 # ---------------
@@ -118,7 +118,7 @@ def test_accessor_nd_to_rgb():
         return [d.C11, d.C22, d.C11/d.C22]
 
     assert_equal(
-        to_rgb(rgb(ds)),
+        visualize.to_rgb(rgb(ds)),
         ds.nd.to_rgb(rgb)
     )
 
@@ -129,10 +129,17 @@ def test_accessor_nd_to_video(tmpdir):
     path_1 = str(tmpdir.join('video1.avi'))
     path_2 = str(tmpdir.join('video2.avi'))
 
-    write_video(ds, path_1)
+    visualize.write_video(ds, path_1)
     ds.nd.to_video(path_2)
 
     assert_equal_files(path_1, path_2)
+
+
+def test_accessor_nd_plot_map():
+    ds = generate_test_dataset()
+
+    ax = ds.nd.plot_map(background=None)
+    assert isinstance(ax, cartopy.mpl.geoaxes.GeoAxesSubplot)
 
 
 # ---------------

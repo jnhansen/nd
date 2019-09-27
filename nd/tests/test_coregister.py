@@ -1,12 +1,10 @@
-import pytest
-from nd.testing import generate_test_dataset, generate_test_dataarray
+import skimage.transform
+import skimage.feature
+from nd.testing import generate_test_dataset
 from nd.utils import get_vars_for_dims
 from nd.warp import Coregistration
 from nd.filters import GaussianFilter
 import numpy as np
-import xarray as xr
-import skimage.transform
-import skimage.feature
 
 
 def create_misaligned_dataset(**kwargs):
