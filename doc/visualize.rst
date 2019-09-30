@@ -20,7 +20,7 @@ Creating RGB composites from multivariate data
     >>> rgb = to_rgb([t0.C11, t0.C22, t0.C11 / t0.C22], 'images/c2_rgb.png')
 
 .. image:: images/c2_rgb.png
-    :width: 300px
+    :width: 400px
     :align: center
 
 
@@ -35,7 +35,7 @@ The example writes to a gif image so it can be embedded here, but many video for
     >>> write_video(ds, 'images/c2.gif', fps=5, timestamp=False)
 
 .. image:: images/c2.gif
-    :width: 300px
+    :width: 400px
     :align: center
 
 

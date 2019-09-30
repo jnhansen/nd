@@ -20,17 +20,17 @@ using some polygon training data, which we can rasterize to match the dataset::
     >>> path = '../data/C2.nc'
     >>> ds = nd.open_dataset(path)
     >>> labels = nd.vector.rasterize('../data/labels.shp', ds)['class'].squeeze()
-    >>> labels.plot()
+    >>> labels.where(labels > 0).plot()
 
 .. image:: images/class_labels.png
-    :width: 500px
+    :width: 600px
     :align: center
 
 If we investigate ``labels``, we see that it has an associated legend
 to match the integer classes::
 
     >>> labels
-    <xarray.DataArray 'class' (y: 100, x: 100)>
+    <xarray.DataArray 'class' (y: 400, x: 400)>
     array([[0, 0, 0, ..., 0, 0, 0],
            [0, 0, 0, ..., 0, 0, 0],
            [0, 0, 0, ..., 0, 0, 0],
@@ -39,11 +39,12 @@ to match the integer classes::
            [0, 0, 0, ..., 0, 0, 0],
            [0, 0, 0, ..., 0, 0, 0]])
     Coordinates:
-      * y        (y) float64 -9.376 -9.377 -9.377 -9.378 ... -9.437 -9.438 -9.438
-      * x        (x) float64 -63.7 -63.7 -63.7 -63.7 ... -63.64 -63.64 -63.64 -63.64
-        time     datetime64[ns] 2019-09-12
+        band     int64 1
+      * y        (y) float64 6.225e+05 6.223e+05 6.221e+05 ... 5.515e+05 5.513e+05
+      * x        (x) float64 5.729e+05 5.73e+05 5.732e+05 ... 6.438e+05 6.44e+05
+        time     datetime64[ns] 2019-09-30
     Attributes:
-        legend:   [(0, None), (1, 'forest'), (2, 'nonforest')]
+        legend:   [(0, None), (1, 'forest'), (2, 'water'), (3, 'nonforest')]
 
 ::
 
@@ -52,7 +53,7 @@ to match the integer classes::
     >>> pred.isel(time=0).plot()
 
 .. image:: images/prediction_time_0.png
-    :width: 500px
+    :width: 600px
     :align: center
 
 If we plot the mean of the predicted class over time we can see that the predictions
@@ -61,7 +62,7 @@ change because the forest cover changes over the course of the time period::
     >>> pred.mean('time').plot()
 
 .. image:: images/prediction_time_mean.png
-    :width: 500px
+    :width: 600px
     :align: center
 
 
@@ -83,7 +84,7 @@ pixel with the mean of its cluster for visualization::
     >>> means.C11.plot()
 
 .. image:: images/clustering.png
-    :width: 500px
+    :width: 600px
     :align: center
 
 It is advisable to use a clustering algorithm that scales well, such as ``MiniBatchKMeans``.
@@ -118,7 +119,7 @@ Example::
     >>> pred.plot()
 
 .. image:: images/prediction_time_feature.png
-    :width: 500px
+    :width: 600px
     :align: center
 
 Our prediction output no longer has a ``time`` dimension because it was converted into
