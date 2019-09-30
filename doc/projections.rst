@@ -12,7 +12,7 @@ You can extract the coordinate reference system of a dataset using :meth:`nd.war
 
     >>> from nd.warp import get_crs
     >>> get_crs(ds)
-    CRS({'proj': 'longlat', 'ellps': 'WGS84', 'no_defs': True})
+    CRS.from_epsg(3086)
 
 The returned object is always of type ``rasterio.crs.CRS``.
 
@@ -20,8 +20,8 @@ Similarly, the coordinate transformation can be extracted using :meth:`nd.warp.g
 
     >>> from nd.warp import get_transform
     >>> get_transform(ds)
-    Affine(0.00012639344994691423, 0.0, -63.799961134106155,
-           0.0, 0.00012639212357809862, -9.30010580901427)
+    Affine(178.27973915722524, 0.0, 572867.3883891336,
+           0.0, -178.27973915722524, 622453.9641249835)
 
 which is an ``affine.Affine`` object and represents the mapping from image coordinates to projection coordinates.
 
@@ -35,31 +35,31 @@ You can reproject your dataset to a different coordinate system using :class:`nd
 
     >>> from nd.warp import Reprojection, get_crs
     >>> get_crs(ds)
-    CRS({'proj': 'longlat', 'ellps': 'WGS84', 'no_defs': True})
+    CRS.from_epsg(3086)
     >>> proj = Reprojection(crs='EPSG:3857')
     >>> ds_reprojected = proj.apply(ds)
     >>> get_crs(ds_reprojected)
-    ...
+    CRS.from_epsg(3857)
 
 ::
 
     >>> from nd.io import open_dataset
     >>> ds = open_dataset('data/C2.nc')
-    >>> ds.C11.mean('time').plot(size=6)
+    >>> ds.C11.mean('time').plot(vmax=0.06)
 
-.. image:: images/c2_latlong.png
-    :width: 500px
+.. image:: images/c2_epsg3086.png
+    :width: 600px
     :align: center
 
 ::
 
     >>> from nd.warp import Reprojection
-    >>> goode = Reprojection(crs='+proj=goode +ellps=sphere +datum=wgs84')
-    >>> proj = goode.apply(ds)
-    >>> proj.C11.mean('time').plot()
+    >>> epsg4326 = Reprojection(crs='epsg:4326')
+    >>> proj = epsg4326.apply(ds)
+    >>> proj.C11.mean('time').plot(vmax=0.06)
 
-.. image:: images/c2_goode.png
-    :width: 500px
+.. image:: images/c2_epsg4326.png
+    :width: 600px
     :align: center
 
 
