@@ -72,6 +72,13 @@ Reference
    :caption: API Reference
    :maxdepth: 2
 
-   api/nd
-
+   api/nd.change
+   api/nd.classify
+   api/nd.filters
+   api/nd.io
+   api/nd.testing
+   api/nd.tiling
+   api/nd.utils
+   api/nd.visualize
+   api/nd.warp
    api/xarray
