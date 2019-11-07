@@ -51,6 +51,7 @@ User Guide
 
 .. toctree::
    :numbered:
+   :caption: User Guide
    :maxdepth: 1
 
    setup
@@ -68,17 +69,9 @@ Reference
 ---------
 
 .. toctree::
+   :caption: API Reference
    :maxdepth: 2
 
    api/nd
 
    api/xarray
-
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Content
-
-   changelog
-   user_guide
-   reference
