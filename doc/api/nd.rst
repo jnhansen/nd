@@ -10,5 +10,6 @@ nd package
     nd.testing
     nd.tiling
     nd.utils
+    nd.vector
     nd.visualize
     nd.warp

@@ -79,6 +79,7 @@ Reference
    api/nd.testing
    api/nd.tiling
    api/nd.utils
+   api/nd.vector
    api/nd.visualize
    api/nd.warp
    api/xarray
