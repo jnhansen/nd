@@ -200,7 +200,8 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
         colored[~mask] = 0
 
     shape = calculate_shape(shape, colored.shape[:2])
-    colored = cv2.resize(colored, shape)
+    # cv2.resize requires (width, height) rather than (height, width)
+    colored = cv2.resize(colored, shape[::-1])
 
     if output is None:
         return cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
@@ -515,7 +516,7 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
     # -----------
     geometry_map = warp.get_geometry(ds, crs=map_crs.proj4_params)
     ax.add_geometries([geometry_map], crs=map_crs,
-                      facecolor='r', edgecolor='k', alpha=0.2)
+                      facecolor=(1, 0, 0, 0.2), edgecolor=(0, 0, 0, 1))
 
     if gridlines:
         color = '0.5' if background is None else 'white'
