@@ -5,7 +5,7 @@ from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_crs)
 import numpy as np
 from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
-                           assert_raises_regex)
+                           assert_raises_regex, assert_array_almost_equal)
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
 import os
@@ -621,6 +621,26 @@ def test_reproject_one_dimensional_vars():
         # There is quite a bit of error, for now accept relatively
         # high error.
         assert np.nanstd(ratios) < 1.5
+
+
+def test_reproject_one_dimensional_coords():
+    ds = generate_test_dataset(crs=epsg4326)
+    # Add coordinates that are not dimensions
+    ds.coords['longitude'] = (('x',), ds.x.values)
+    ds.coords['latitude'] = (('y',), ds.y.values)
+
+    warped = warp.Reprojection(
+        crs=warp.get_crs(ds), width=15, height=15,
+        resampling=rasterio.warp.Resampling.bilinear
+    ).apply(ds)
+
+    # Check that xvar and yvar are still proportional to longitude
+    # and latitude
+    for coord, dim in [
+        ('longitude', 'x'), ('latitude', 'y')
+    ]:
+        assert_array_almost_equal(
+            warped.coords[coord], warped.coords[dim])
 
 
 def test_reprojection_nan_values():
