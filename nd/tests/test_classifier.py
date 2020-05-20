@@ -52,7 +52,11 @@ def test_broadcast(dims, feature_dims):
     assert blabels.shape == expected_shape
 
     # Check broadcast for DataArray
-    blabels = classify._broadcast_labels(labels, ds, feature_dims)
+    blabels = classify._broadcast_labels(
+        labels.transpose('x', 'y'), ds, feature_dims)
+    blabels_t = classify._broadcast_labels(
+        labels.transpose('y', 'x'), ds, feature_dims)
+    xr_assert_equal(blabels, blabels_t)
     assert blabels.shape == expected_shape
 
     # Check values equal along broadcast dimensions
@@ -72,6 +76,11 @@ def test_build_X(feature_dims):
     ncols = len(ds.data_vars) * \
         np.prod([N for d, N in dims.items() if d in feature_dims])
     assert X.shape == (nrows, ncols)
+
+    # Test that the original dimension order doesn't matter
+    ds_t = ds.transpose(*list(reversed(dims)))
+    X_t = classify._build_X(ds_t, feature_dims=feature_dims)
+    assert_equal(X, X_t)
 
 
 @pytest.mark.parametrize('feature_dims', [
