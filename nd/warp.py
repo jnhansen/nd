@@ -685,7 +685,10 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             output_shape = shape
             output_shape_flat = shape
 
-        output = np.zeros(output_shape_flat, dtype=da.dtype)
+        # rasterio cannot deal with float16
+        if da.dtype == np.float16:
+            values = values.astype(np.float32)
+        output = np.zeros(output_shape_flat, dtype=values.dtype)
         output[:] = np.nan
 
         rasterio.warp.reproject(
@@ -699,6 +702,9 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             **kwargs
         )
 
+        if da.dtype == np.float16:
+            output = output.astype(np.float16)
+
         # Final reshape in case the input was one-dimensional
         return output.reshape(output_shape)
 
@@ -711,16 +717,19 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #
         for v in ds.coords:
             #
-            # If the projection is the same, also reproject coordinate arrays
+            # If the projection is the same (i.e. resampling),
+            # also reproject coordinate arrays
             # that are defined over only one variable.
             #
             if dst_crs == src_crs and v not in ds.dims:
                 if ds.coords[v].dims == ('x',):
-                    result.coords[v] = \
-                        (('x',), _reproject_da(ds.coords[v], (width,)))
+                    result.coords[v] = (('y', 'x'), _reproject_da(
+                        _expand_var_to_xy(ds.coords[v], ds.coords), (height, width)))
+                        # ds.coords[v].expand_dims('y'), (1, width)).flatten())
                 elif ds.coords[v].dims == ('y',):
-                    result.coords[v] = \
-                        (('y',), _reproject_da(ds.coords[v], (height,)))
+                    result.coords[v] = (('y', 'x'), _reproject_da(
+                        _expand_var_to_xy(ds.coords[v], ds.coords), (height, width)))
+                        # ds.coords[v].expand_dims('x'), (height, 1)).flatten())
 
             if not set(ds.coords[v].dims).issuperset({'x', 'y'}):
                 continue
