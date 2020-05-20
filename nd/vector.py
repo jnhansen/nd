@@ -6,8 +6,37 @@ import pandas as pd
 import xarray as xr
 import rasterio.features
 import geopandas as gpd
+import fiona
+import shapely
 import datetime
 from . import warp
+
+
+def read_file(path, clip=None):
+    """
+    Read a geospatial vector file.
+
+    Parameters
+    ----------
+    path : str
+        The path of the file to read.
+    clip : shapely.geometry, optional
+        A geometry to intersect the vector data.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+    """
+    def records(filename, geom):
+        with fiona.open(filename) as source:
+            for feature in source:
+                if geom is None:
+                    yield feature
+                else:
+                    poly = shapely.geometry.shape(feature['geometry'])
+                    if poly.intersects(geom):
+                        yield feature
+    return gpd.GeoDataFrame.from_features(records(path, clip))
 
 
 def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
@@ -32,12 +61,12 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
         The rasterized features.
     """
 
-    bbox = warp.get_bounds(ds)
+    geom = warp.get_geometry(ds, crs=warp.get_crs(ds))
     transf = warp.get_transform(ds)
 
     # read and discard waste columns
     if isinstance(shp, str):
-        shp = gpd.read_file(shp, bbox=bbox)
+        shp = read_file(shp, clip=geom)
     else:
         # Work on a copy
         shp = shp.copy()
