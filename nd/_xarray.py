@@ -75,6 +75,11 @@ class NDAccessor:
     def to_netcdf(self, *args, **kwargs):
         return io.to_netcdf(self._obj, *args, **kwargs)
 
+    # General
+    @patch_doc(utils.apply)
+    def apply(self, *args, **kwargs):
+        return utils.apply(self._obj, *args, **kwargs)
+
     # Visualization
     @patch_doc(visualize.to_rgb)
     def to_rgb(self, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],

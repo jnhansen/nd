@@ -32,7 +32,8 @@ __all__ = ['get_shape',
            'select',
            'get_vars_for_dims',
            'expand_variables',
-           'is_complex'
+           'is_complex',
+           'apply'
            ]
 
 
@@ -42,8 +43,15 @@ def get_shape(ds):
 
 
 def get_dims(ds):
-    # The coords are in the right order, while dims and sizes are not
-    return tuple([c for c in ds.coords if c in ds.dims])
+    """
+    Return the dimension of dataset `ds` in order.
+    """
+    # The ordered dictionary is hidden behind two wrappers,
+    # need to access the dict behind the Frozen(SortedKeysDict).
+    if isinstance(ds, xr.Dataset):
+        return tuple(ds.sizes.mapping.mapping)
+    elif isinstance(ds, xr.DataArray):
+        return tuple(ds.sizes.mapping)
 
 
 def str2date(string, fmt=None, tz=False):
@@ -281,7 +289,7 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
         #     raise ValueError("`parallel` may only be used on functions "
         #                      "accepting an xarray.Dataset as "
         #                      "first argument.")
-        if dim not in ds:
+        if dim not in ds.dims:
             raise ValueError("The dataset has no dimension '{}'."
                              .format(dim))
         #
@@ -490,3 +498,94 @@ def assemble_docstring(parsed):
         d.extend([(pad + l).rstrip() for l in flat_v])
 
     return '\n'.join(d)
+
+
+def apply(ds, fn, signature=None, njobs=1):
+    """
+    Apply a function to a Dataset that operates on a defined
+    subset of dimensions.
+
+    Parameters
+    ----------
+    ds : xr.Dataset or xr.DataArray
+        The dataset to which to apply the function.
+    fn : function
+        The function to apply to the Dataset.
+    signature : str, optional
+        The signature of the function in dimension names,
+        e.g. '(time,var)->(time)'.
+        If 'var' is included, the Dataset variables will be converted into
+        a new dimension and the result will be a DataArray.
+    njobs : int, optional
+        The number of jobs to run in parallel.
+
+    Returns
+    -------
+    xr.Dataset
+        The output dataset with changed dimensions according to the
+        function signature.
+    """
+
+    def _parse_signature(sig):
+        if sig is None:
+            sig = '(time,var)->(time)'
+        m = re.match('\((.*)\)->\((.*)\)', sig)
+        dims = tuple(group.split(',') if len(group) > 0 else []
+                     for group in m.groups())
+        if len(dims) != 2:
+            raise ValueError("Invalid signature: Signature must be of the "
+                             "form '(<dim1>,...,<dimN>)->(<dim1>,...,<dimM>)'.")
+        return dims
+
+    dims_in, dims_out = _parse_signature(signature)
+
+    # All output dimensions must also be input dimensions
+    if len(dims_out) > 0 and not set(dims_out).issubset(dims_in):
+        raise ValueError("Invalid signature: All output dimensions must "
+                         "also be input dimensions.")
+
+    # Vectorize function
+    fn_vec = np.vectorize(fn, signature=signature)
+
+    # If 'var' is an input, convert variables to new dimension.
+    if isinstance(ds, xr.Dataset) and 'var' in dims_in:
+        ds = ds.to_array(dim='var')
+
+    # Determine all extra dimensions
+    src_dims = get_dims(ds)
+    dims_removed = set(dims_in) - set(dims_out)
+    output_dims = [d for d in src_dims if d not in dims_removed]
+    extra_dims = tuple(set(src_dims) - set(dims_in))
+
+    # Flatten extra dimensions
+    ds = ds.stack(z=extra_dims).transpose('z', *dims_in)
+
+    def apply_func(ds):
+        # Apply function and turn into DataArray
+        result_arr = fn_vec(ds)
+        dims = ('z',) + tuple(dims_out)
+        result = xr.DataArray(
+            result_arr,
+            dims=dims, coords={d: ds.coords[d] for d in dims}
+        ).unstack()
+        return result
+
+    # Parallelize
+    if njobs != 1:
+        chunks = njobs if njobs > 0 else None
+        apply_func = parallel(apply_func, dim='z', chunks=chunks)
+
+    # Apply function
+    if isinstance(ds, xr.DataArray):
+        result = apply_func(ds)
+        # Turn back into Dataset
+        if 'var' in result.dims:
+            result = result.to_dataset(dim='var')
+    elif isinstance(ds, xr.Dataset):
+        # Apply to each variable as DataArray
+        result = ds.map(apply_func)
+
+    # Restore original dimension order
+    result = result.transpose(*output_dims)
+
+    return result
