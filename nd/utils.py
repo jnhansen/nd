@@ -117,8 +117,10 @@ def array_chunks(array, n, axis=0, return_indices=False):
         Consecutive slices of `array` of size `n`.
     """
     if axis >= array.ndim:
-        raise ValueError("axis {:d} is out of range for given array."
-                         .format(axis))
+        raise ValueError(
+            "axis {:d} is out of range for given array."
+            .format(axis)
+        )
 
     arr_len = array.shape[axis]
     range_fn = range if not PY2 else xrange
@@ -159,8 +161,10 @@ def block_split(array, blocks):
             [14, 15]])]
     """
     if array.ndim != len(blocks):
-        raise ValueError("Length of 'blocks' must be equal to the "
-                         "array dimensionality.")
+        raise ValueError(
+            "Length of 'blocks' must be equal to the "
+            "array dimensionality."
+        )
 
     result = [array]
     for axis, nblocks in enumerate(blocks):
@@ -185,8 +189,10 @@ def block_merge(array_list, blocks):
         A numpy array with dimension len(blocks).
     """
     if len(array_list) != np.prod(blocks):
-        raise ValueError("Length of array list must be equal to the "
-                         "product of the shape elements.")
+        raise ValueError(
+            "Length of array list must be equal to the "
+            "product of the shape elements."
+        )
 
     result = array_list
     for i, nblocks in enumerate(blocks[::-1]):
@@ -290,8 +296,10 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
         #                      "accepting an xarray.Dataset as "
         #                      "first argument.")
         if dim not in ds.dims:
-            raise ValueError("The dataset has no dimension '{}'."
-                             .format(dim))
+            raise ValueError(
+                "The dataset has no dimension '{}'."
+                .format(dim)
+            )
         #
         # Prechunk the dataset to align memory access with dask
         #
@@ -432,8 +440,10 @@ def is_complex(ds):
             [np.iscomplexobj(v) for v in ds.data_vars.values()]
         )
     else:
-        raise ValueError('Not an xarray Dataset or DataArray: {}'.format(
-                         repr(ds)))
+        raise ValueError(
+            "Not an xarray Dataset or DataArray: {}"
+            .format(repr(ds))
+        )
 
 
 def _wlen(s):
@@ -533,16 +543,20 @@ def apply(ds, fn, signature=None, njobs=1):
         dims = tuple(group.split(',') if len(group) > 0 else []
                      for group in m.groups())
         if len(dims) != 2:
-            raise ValueError("Invalid signature: Signature must be of the "
-                             "form '(<dim1>,...,<dimN>)->(<dim1>,...,<dimM>)'.")
+            raise ValueError(
+                "Invalid signature: Signature must be of the "
+                "form '(<dim1>,...,<dimN>)->(<dim1>,...,<dimM>)'."
+            )
         return dims
 
     dims_in, dims_out = _parse_signature(signature)
 
     # All output dimensions must also be input dimensions
     if len(dims_out) > 0 and not set(dims_out).issubset(dims_in):
-        raise ValueError("Invalid signature: All output dimensions must "
-                         "also be input dimensions.")
+        raise ValueError(
+            "Invalid signature: All output dimensions must "
+            "also be input dimensions."
+        )
 
     # Vectorize function
     fn_vec = np.vectorize(fn, signature=signature)
