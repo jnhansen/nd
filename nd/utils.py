@@ -592,14 +592,15 @@ def apply(ds, fn, signature=None, njobs=1):
     # Apply function
     if isinstance(ds, xr.DataArray):
         result = apply_func(ds)
-        # Turn back into Dataset
-        if 'var' in result.dims:
-            result = result.to_dataset(dim='var')
     elif isinstance(ds, xr.Dataset):
         # Apply to each variable as DataArray
         result = ds.map(apply_func)
 
     # Restore original dimension order
     result = result.transpose(*output_dims)
+
+    # Turn back into Dataset
+    if 'var' in result.dims:
+        result = result.to_dataset(dim='var')
 
     return result
