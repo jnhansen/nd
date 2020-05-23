@@ -83,7 +83,7 @@ def create_snap_ds(*args, **kwargs):
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_reprojection(name, kwargs):
     ds = generate_test_dataset(**kwargs)
-    crs = warp._parse_crs('+init=epsg:4326')
+    crs = warp._parse_crs('epsg:4326')
     proj = warp.Reprojection(crs=crs)
     reprojected = proj.apply(ds)
     assert_equal_crs(crs, warp.get_crs(reprojected))
@@ -184,7 +184,7 @@ def test_resample_to_width_or_height(name, kwargs, resample_kwargs):
 
 
 @pytest.mark.parametrize('crs', [
-    CRS.from_string('+init=epsg:4326')
+    CRS.from_string('epsg:4326')
 ])
 def test_parse_crs(crs):
     assert_equal_crs(crs, warp._parse_crs(crs))
@@ -733,8 +733,8 @@ def test_alignment(tmpdir, extent, from_files):
     {'y': 20, 'x': 20, 'time': 10, 'band': 5, 'extra': 2}
 ])
 def test_reproject_with_extra_dims(dims):
-    crs1 = warp._parse_crs('+init=epsg:4326')
-    crs2 = warp._parse_crs('+init=epsg:3395')
+    crs1 = warp._parse_crs('epsg:4326')
+    crs2 = warp._parse_crs('epsg:3395')
     ds = generate_test_dataset(
         dims=dims, crs=crs1
     )
