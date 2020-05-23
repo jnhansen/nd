@@ -3,6 +3,7 @@ import numpy as np
 from numpy.testing import assert_equal, assert_raises, assert_raises_regex
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
+from xarray.testing import assert_allclose as xr_assert_allclose
 from nd import utils
 from nd.io import assemble_complex, disassemble_complex
 from nd.testing import (equal_list_of_dicts, generate_test_dataset,
@@ -188,8 +189,8 @@ def test_parallel_merge():
     result_2 = utils.xr_merge(
         utils.parallel(_fn, 'x', merge=False)(ds), dim='x')
 
-    xr_assert_equal(result, result_1)
-    xr_assert_equal(result_1, result_2)
+    xr_assert_allclose(result, result_1)
+    xr_assert_allclose(result_1, result_2)
 
 
 def test_select_list():
