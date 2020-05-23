@@ -623,6 +623,10 @@ def test_reproject_one_dimensional_vars():
         assert np.nanstd(ratios) < 1.5
 
 
+@pytest.mark.skip(
+    reason="currently failing because of an inconsistency in "
+    "rasterio: https://github.com/mapbox/rasterio/issues/1934."
+)
 def test_reproject_one_dimensional_coords():
     ds = generate_test_dataset(crs=epsg4326)
     # Add coordinates that are not dimensions
