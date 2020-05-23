@@ -6,6 +6,7 @@ from nd.testing import (generate_test_dataset, generate_test_dataarray,
 import numpy as np
 from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
                            assert_raises_regex, assert_array_almost_equal)
+import xarray as xr
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
 import os
@@ -529,6 +530,24 @@ def test_expand_var_to_xy(extra, dims):
     # dimensions
     if 'x' in dims and 'y' in dims:
         xr_assert_equal(da, expanded)
+
+
+def test_collapse_coords():
+    ds = generate_test_dataset()
+    for c in ds.coords:
+        expanded = xr.concat([ds.coords[c]] * 10, dim='new')
+        xr_assert_equal(
+            ds.coords[c], warp._collapse_coords(expanded)
+        )
+
+
+def test_expand_collapse_coords():
+    ds = generate_test_dataset()
+    for c in ['x', 'y']:
+        expanded = warp._expand_var_to_xy(ds.coords[c], ds.coords)
+        xr_assert_equal(
+            ds.coords[c], warp._collapse_coords(expanded)
+        )
 
 
 def test_reproject_no_hidden_effects():
