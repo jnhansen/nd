@@ -32,11 +32,10 @@ install:
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 - conda info -a
-- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scikit-learn
-  pytest pytest-cov coverage cartopy
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
+  pytest pytest-cov coverage cartopy ffmpeg
 - source activate test-environment
-- conda install ffmpeg pyproj proj4 -c conda-forge
-- pip install scikit-image codecov
+- pip install scikit-learn scikit-image codecov
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal
 - export C_INCLUDE_PATH=/usr/include/gdal
 - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH

@@ -466,7 +466,7 @@ def parse_docstring(doc):
 
     # Find sections
     line_numbers = np.arange(len(lines))
-    rule = re.compile('^ *\-+$')
+    rule = re.compile('^ *-+$')
     section_starts = list(line_numbers[np.array([
         rule.match(l) is not None for l in lines])])
 

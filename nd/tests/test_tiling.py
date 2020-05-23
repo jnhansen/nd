@@ -44,7 +44,9 @@ def test_auto_merge_with_buffer(use_xarray):
 
 def test_auto_merge_metadata():
     ds_meta = generate_test_dataset(dims={'y': 20, 'x': 20, 'time': 10})
-    chunks = list(utils.xr_split(ds_meta, 'time', 5))
+    # Create copy of each chunk as otherwise the metadata cannot be altered
+    # individually.
+    chunks = [c.copy() for c in utils.xr_split(ds_meta, 'time', 5)]
     for i, c in enumerate(chunks):
         c.attrs['part_number'] = i
     ds_meta['part_number'] = ('time', np.repeat(np.arange(5), 2))
