@@ -1,3 +1,6 @@
+# Import sklearn first to circumvent
+# ImportError: dlopen: cannot load any more object with static TLS
+import sklearn
 import pytest
 import numpy as np
 from nd import utils
