@@ -5,7 +5,8 @@ from nd.testing import (generate_test_dataset, generate_test_dataarray,
                         assert_equal_crs)
 import numpy as np
 from numpy.testing import (assert_equal, assert_almost_equal, assert_raises,
-                           assert_raises_regex)
+                           assert_raises_regex, assert_array_almost_equal)
+import xarray as xr
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
 import os
@@ -83,7 +84,7 @@ def create_snap_ds(*args, **kwargs):
 @pytest.mark.parametrize('name,kwargs', ds_params)
 def test_reprojection(name, kwargs):
     ds = generate_test_dataset(**kwargs)
-    crs = warp._parse_crs('+init=epsg:4326')
+    crs = warp._parse_crs('epsg:4326')
     proj = warp.Reprojection(crs=crs)
     reprojected = proj.apply(ds)
     assert_equal_crs(crs, warp.get_crs(reprojected))
@@ -184,7 +185,7 @@ def test_resample_to_width_or_height(name, kwargs, resample_kwargs):
 
 
 @pytest.mark.parametrize('crs', [
-    CRS.from_string('+init=epsg:4326')
+    CRS.from_string('epsg:4326')
 ])
 def test_parse_crs(crs):
     assert_equal_crs(crs, warp._parse_crs(crs))
@@ -531,6 +532,24 @@ def test_expand_var_to_xy(extra, dims):
         xr_assert_equal(da, expanded)
 
 
+def test_collapse_coords():
+    ds = generate_test_dataset()
+    for c in ds.coords:
+        expanded = xr.concat([ds.coords[c]] * 10, dim='new')
+        xr_assert_equal(
+            ds.coords[c], warp._collapse_coords(expanded)
+        )
+
+
+def test_expand_collapse_coords():
+    ds = generate_test_dataset()
+    for c in ['x', 'y']:
+        expanded = warp._expand_var_to_xy(ds.coords[c], ds.coords)
+        xr_assert_equal(
+            ds.coords[c], warp._collapse_coords(expanded)
+        )
+
+
 def test_reproject_no_hidden_effects():
     src_crs = epsg4326
     dst_crs = sinusoidal
@@ -623,6 +642,30 @@ def test_reproject_one_dimensional_vars():
         assert np.nanstd(ratios) < 1.5
 
 
+@pytest.mark.skip(
+    reason="currently failing because of an inconsistency in "
+    "rasterio: https://github.com/mapbox/rasterio/issues/1934."
+)
+def test_reproject_one_dimensional_coords():
+    ds = generate_test_dataset(crs=epsg4326)
+    # Add coordinates that are not dimensions
+    ds.coords['longitude'] = (('x',), ds.x.values)
+    ds.coords['latitude'] = (('y',), ds.y.values)
+
+    warped = warp.Reprojection(
+        crs=warp.get_crs(ds), width=15, height=15,
+        resampling=rasterio.warp.Resampling.bilinear
+    ).apply(ds)
+
+    # Check that xvar and yvar are still proportional to longitude
+    # and latitude
+    for coord, dim in [
+        ('longitude', 'x'), ('latitude', 'y')
+    ]:
+        assert_array_almost_equal(
+            warped.coords[coord], warped.coords[dim])
+
+
 def test_reprojection_nan_values():
     src_crs = epsg4326
     dst_crs = sinusoidal
@@ -713,8 +756,8 @@ def test_alignment(tmpdir, extent, from_files):
     {'y': 20, 'x': 20, 'time': 10, 'band': 5, 'extra': 2}
 ])
 def test_reproject_with_extra_dims(dims):
-    crs1 = warp._parse_crs('+init=epsg:4326')
-    crs2 = warp._parse_crs('+init=epsg:3395')
+    crs1 = warp._parse_crs('epsg:4326')
+    crs2 = warp._parse_crs('epsg:3395')
     ds = generate_test_dataset(
         dims=dims, crs=crs1
     )

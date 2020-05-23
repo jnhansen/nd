@@ -1,7 +1,7 @@
-nd.change package
+nd.vector package
 =================
 
-.. automodule:: nd.change
+.. automodule:: nd.vector
     :members:
     :undoc-members:
     :show-inheritance:

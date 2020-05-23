@@ -1,9 +1,6 @@
 nd.warp package
 ===============
 
-Module contents
----------------
-
 .. automodule:: nd.warp
     :members:
     :undoc-members:

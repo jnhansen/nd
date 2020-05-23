@@ -405,6 +405,6 @@ def auto_merge(datasets, buffer=True, chunks={}, meta_variables=[],
             values, legend = merged[meta].to_series().factorize()
             merged[meta] = ('time', values.astype(int))
             merged[meta].attrs['legend'] = \
-                tuple([tuple(i, v) for i, v in enumerate(legend)])
+                tuple([tuple((i, v)) for i, v in enumerate(legend)])
 
     return merged

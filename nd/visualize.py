@@ -15,6 +15,7 @@ try:
     from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 except ImportError:
     cartopy = None
+from matplotlib import ticker as mticker
 import matplotlib.pyplot as plt
 from matplotlib.transforms import Bbox
 import pyproj
@@ -199,7 +200,8 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
         colored[~mask] = 0
 
     shape = calculate_shape(shape, colored.shape[:2])
-    colored = cv2.resize(colored, shape)
+    # cv2.resize requires (width, height) rather than (height, width)
+    colored = cv2.resize(colored, shape[::-1])
 
     if output is None:
         return cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
@@ -287,7 +289,7 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
 # -------
 
 def gridlines_with_labels(ax, top=True, bottom=True, left=True,
-                          right=True, **kwargs):
+                          right=True, fontsize=12, max_nlines=5, **kwargs):
     """
     Like :meth:`cartopy.mpl.geoaxes.GeoAxes.gridlines`, but will draw
     gridline labels for arbitrary projections.
@@ -299,6 +301,10 @@ def gridlines_with_labels(ax, top=True, bottom=True, left=True,
     top, bottom, left, right : bool, optional
         Whether or not to add gridline labels at the corresponding side
         of the plot (default: all True).
+    fontsize : int, optional
+        Tick label fontsize (default: 12).
+    max_nlines : int, optional
+        Maximum number of gridlines to plot per axis (default: 5).
     kwargs : dict, optional
         Extra keyword arguments to be passed to :meth:`ax.gridlines`.
 
@@ -315,6 +321,8 @@ def gridlines_with_labels(ax, top=True, bottom=True, left=True,
 
     # Add gridlines
     gridliner = ax.gridlines(**kwargs)
+    gridliner.xlocator = mticker.MaxNLocator(max_nlines)
+    gridliner.ylocator = mticker.MaxNLocator(max_nlines)
 
     ax.tick_params(length=0)
 
@@ -393,11 +401,13 @@ def gridlines_with_labels(ax, top=True, bottom=True, left=True,
         if side in ('bottom', 'top'):
             _ax.set_xticks(ticks[valid])
             _ax.set_xticklabels([LONGITUDE_FORMATTER.format_data(t)
-                                 for t in ticklocs[axis][valid]])
+                                 for t in ticklocs[axis][valid]],
+                                fontdict={'fontsize': fontsize})
         else:
             _ax.set_yticks(ticks[valid])
             _ax.set_yticklabels([LATITUDE_FORMATTER.format_data(t)
-                                 for t in ticklocs[axis][valid]])
+                                 for t in ticklocs[axis][valid]],
+                                fontdict={'fontsize': fontsize})
 
     return gridliner
 
@@ -418,7 +428,8 @@ def _get_scalebar_length(ax):
 
 
 def plot_map(ds, buffer=None, background='_default', imscale=6,
-             gridlines=True, coastlines=True, scalebar=True):
+             gridlines=True, coastlines=True, scalebar=True,
+             gridlines_kwargs={}):
     """
     Show the boundary of the dataset on a visually appealing map.
 
@@ -440,6 +451,8 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         Whether to plot coastlines (default: True).
     scalebar : bool, optional
         Whether to add a scale bar (default: True).
+    gridlines_kwargs : dict, optional
+        Additional keyword arguments for gridlines_with_labels().
 
     Returns
     -------
@@ -503,11 +516,11 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
     # -----------
     geometry_map = warp.get_geometry(ds, crs=map_crs.proj4_params)
     ax.add_geometries([geometry_map], crs=map_crs,
-                      facecolor='r', edgecolor='k', alpha=0.2)
+                      facecolor=(1, 0, 0, 0.2), edgecolor=(0, 0, 0, 1))
 
     if gridlines:
         color = '0.5' if background is None else 'white'
-        gridlines_with_labels(ax, color=color)
+        gridlines_with_labels(ax, color=color, **gridlines_kwargs)
 
     return ax
 

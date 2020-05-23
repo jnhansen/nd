@@ -23,7 +23,7 @@ def generate_test_dataset(
         mean=0, sigma=1,
         extent=(-10.0, 50.0, 0.0, 60.0),
         random_seed=42,
-        crs='+init=epsg:4326'):
+        crs='epsg:4326'):
 
     np.random.seed(random_seed)
 
@@ -62,7 +62,7 @@ def generate_test_dataarray(
         mean=0, sigma=1,
         extent=(-10.0, 50.0, 0.0, 60.0),
         random_seed=42,
-        crs='+init=epsg:4326'):
+        crs='epsg:4326'):
     np.random.seed(random_seed)
 
     coords = OrderedDict()
@@ -289,7 +289,7 @@ def random_polygon(x, y, n_vertices, radius=1, irregularity=0.2, sigma=0.3):
 def generate_test_polygons(n_polygon=20,
                            extent=(-10.0, 50.0, 0.0, 60.0),
                            radius=1,
-                           crs='+init=epsg:4326',
+                           crs='epsg:4326',
                            random_seed=None,
                            overlap=False):
     np.random.seed(random_seed)
@@ -333,7 +333,7 @@ def generate_test_polygons(n_polygon=20,
 def generate_test_geodataframe(n_polygon=20,
                                extent=(-10.0, 50.0, 0.0, 60.0),
                                radius=1,
-                               crs='+init=epsg:4326',
+                               crs='epsg:4326',
                                random_seed=None,
                                overlap=False):
     category_list = ['apple', 'pear', 'orange', 'banana']

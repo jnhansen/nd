@@ -90,7 +90,7 @@ def _broadcast_labels(labels, ds, feature_dims=[]):
         for dim in bc_dims:
             labels = xr.concat([labels] * ds.sizes[dim], dim=dim)
             labels.coords[dim] = ds.coords[dim]
-        labels = labels.transpose(*data_dims)
+        labels = labels.transpose(*data_dims, transpose_coords=True)
         return labels
 
 
@@ -141,16 +141,19 @@ class Classifier:
 
         if labels is not None:
             # Broadcast labels to match data dimensions
-            shape = _get_data_shape(ds, feature_dims=self.feature_dims)
-            if shape != labels.shape:
-                labels = _broadcast_labels(
-                    labels, ds, feature_dims=self.feature_dims)
+            # shape = _get_data_shape(ds, feature_dims=self.feature_dims)
+            # The shape check may sometimes incorrectly pass
+            # if e.g. x and y have the same size
+            # if shape != labels.shape:
+            labels = _broadcast_labels(
+                labels, ds, feature_dims=self.feature_dims)
 
             # Ignore labels that are NaN or 0
             ymask = ~np.isnan(np.array(labels))
             np.greater(labels, 0, out=ymask, where=ymask)
             ymask = ymask.reshape(-1)
         else:
+            # Unsupervised methods don't take a labels argument
             ymask = slice(None)
 
         # Ignore values of ds that contain NaN
@@ -199,14 +202,23 @@ class Classifier:
         if self.scale:
             X = self._scaler.transform(X)
 
-        labels_flat = np.empty(mask.shape) * np.nan
-        labels_flat[mask] = self.clf.__getattribute__(func)(X)
+        result = self.clf.__getattribute__(func)(X)
         data_dims = _get_data_dims(ds, feature_dims=self.feature_dims)
         data_shape = _get_data_shape(ds, feature_dims=self.feature_dims)
         data_coords = OrderedDict(
             (dim, c) for dim, c in ds.coords.items() if dim in data_dims
         )
-        labels = xr.DataArray(labels_flat.reshape(data_shape),
+
+        labels_flat = np.empty(mask.shape + result.shape[1:]) * np.nan
+        labels_flat[mask] = result
+        labels_data = labels_flat.reshape(data_shape + result.shape[1:])
+        if len(result.shape) > 1:
+            # e.g. when func == 'predict_proba'
+            data_dims = data_dims + ('label',)
+            data_shape = data_shape + result.shape[1:]
+            data_coords['label'] = np.arange(result.shape[1])
+
+        labels = xr.DataArray(labels_data,
                               dims=data_dims, coords=data_coords)
         return labels
 

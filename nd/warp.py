@@ -532,6 +532,37 @@ def _expand_var_to_xy(da, coords):
     return expanded
 
 
+def _collapse_coords(coords):
+    """
+    Collapse the dimensions of a coordinate array along which the coordinate
+    is constant.
+
+    Parameters
+    ----------
+    coords : xr.DataArray
+        A coordinate array of arbitrary dimensions.
+
+    Returns
+    -------
+    xr.DataArray
+        The collapsed coordinates.
+    """
+
+    tol = 1e-8
+    collapsed = coords.copy()
+    numeric = np.issubdtype(coords.dtype, np.number)
+
+    for i, d in enumerate(coords.dims):
+        c0 = collapsed.isel({d: 0})
+        if (numeric and (np.abs(c0 - collapsed).values < tol).all()) \
+                or (not numeric and (c0 == collapsed).all()):
+            # this coordinate does not depend on dimension `d`:
+            collapsed = c0
+            if d in collapsed.coords:
+                del collapsed[d]
+    return collapsed
+
+
 def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
                res=None, extent=None, **kwargs):
     """Reproject a Dataset or DataArray.
@@ -685,7 +716,10 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             output_shape = shape
             output_shape_flat = shape
 
-        output = np.zeros(output_shape_flat, dtype=da.dtype)
+        # rasterio cannot deal with float16
+        if da.dtype == np.float16:
+            values = values.astype(np.float32)
+        output = np.zeros(output_shape_flat, dtype=values.dtype)
         output[:] = np.nan
 
         rasterio.warp.reproject(
@@ -699,6 +733,9 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             **kwargs
         )
 
+        if da.dtype == np.float16:
+            output = output.astype(np.float16)
+
         # Final reshape in case the input was one-dimensional
         return output.reshape(output_shape)
 
@@ -711,16 +748,22 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         #
         for v in ds.coords:
             #
-            # If the projection is the same, also reproject coordinate arrays
+            # If the projection is the same (i.e. resampling),
+            # also reproject coordinate arrays
             # that are defined over only one variable.
             #
             if dst_crs == src_crs and v not in ds.dims:
+                expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
                 if ds.coords[v].dims == ('x',):
-                    result.coords[v] = \
-                        (('x',), _reproject_da(ds.coords[v], (width,)))
+                    result.coords[v] = (('y', 'x'), _reproject_da(
+                        expanded, (height, width)))
                 elif ds.coords[v].dims == ('y',):
-                    result.coords[v] = \
-                        (('y',), _reproject_da(ds.coords[v], (height,)))
+                    result.coords[v] = (('y', 'x'), _reproject_da(
+                        expanded, (height, width)))
+
+                # Remove redundant dimensions
+                coords = _collapse_coords(result.coords[v])
+                result.coords[v] = (coords.dims, coords)
 
             if not set(ds.coords[v].dims).issuperset({'x', 'y'}):
                 continue
