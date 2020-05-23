@@ -532,6 +532,32 @@ def _expand_var_to_xy(da, coords):
     return expanded
 
 
+def _collapse_coords(coords):
+    """
+    Collapse the dimensions of a coordinate array along which the coordinate
+    is constant.
+
+    Parameters
+    ----------
+    coords : xr.DataArray
+        A coordinate array of arbitrary dimensions.
+
+    Returns
+    -------
+    xr.DataArray
+        The collapsed coordinates.
+    """
+
+    tol = 1e-8
+    collapsed = coords.copy()
+    for i, d in enumerate(coords.dims):
+        c0 = collapsed.isel({d: 0})
+        if (np.abs(c0 - collapsed).values < tol).all():
+            # this coordinate does not depend on dimension `d`:
+            collapsed = c0
+    return collapsed
+
+
 def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
                res=None, extent=None, **kwargs):
     """Reproject a Dataset or DataArray.
@@ -722,14 +748,17 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             # that are defined over only one variable.
             #
             if dst_crs == src_crs and v not in ds.dims:
+                expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
                 if ds.coords[v].dims == ('x',):
                     result.coords[v] = (('y', 'x'), _reproject_da(
-                        _expand_var_to_xy(ds.coords[v], ds.coords), (height, width)))
-                        # ds.coords[v].expand_dims('y'), (1, width)).flatten())
+                        expanded, (height, width)))
                 elif ds.coords[v].dims == ('y',):
                     result.coords[v] = (('y', 'x'), _reproject_da(
-                        _expand_var_to_xy(ds.coords[v], ds.coords), (height, width)))
-                        # ds.coords[v].expand_dims('x'), (height, 1)).flatten())
+                        expanded, (height, width)))
+
+                # Remove redundant dimensions
+                coords = _collapse_coords(result.coords[v])
+                result.coords[v] = (coords.dims, coords)
 
             if not set(ds.coords[v].dims).issuperset({'x', 'y'}):
                 continue
