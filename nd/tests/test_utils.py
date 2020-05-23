@@ -63,7 +63,7 @@ def test_array_chunks_return_indices():
     for axis in range(arr.ndim):
         for idx, chunk in utils.array_chunks(
                 arr, 8, axis=axis, return_indices=True):
-            assert_equal(chunk, arr[idx])
+            assert_equal(chunk, arr[tuple(idx)])
 
 
 def test_array_chunks_invalid_axis():
