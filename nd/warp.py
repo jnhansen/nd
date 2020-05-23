@@ -550,11 +550,16 @@ def _collapse_coords(coords):
 
     tol = 1e-8
     collapsed = coords.copy()
+    numeric = np.issubdtype(coords.dtype, np.number)
+
     for i, d in enumerate(coords.dims):
         c0 = collapsed.isel({d: 0})
-        if (np.abs(c0 - collapsed).values < tol).all():
+        if (numeric and (np.abs(c0 - collapsed).values < tol).all()) \
+                or (not numeric and (c0 == collapsed).all()):
             # this coordinate does not depend on dimension `d`:
             collapsed = c0
+            if d in collapsed.coords:
+                del collapsed[d]
     return collapsed
 
 
