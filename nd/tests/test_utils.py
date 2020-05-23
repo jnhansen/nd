@@ -3,6 +3,7 @@ import numpy as np
 from numpy.testing import assert_equal, assert_raises, assert_raises_regex
 from xarray.testing import assert_equal as xr_assert_equal
 from xarray.testing import assert_identical as xr_assert_identical
+from xarray.testing import assert_allclose as xr_assert_allclose
 from nd import utils
 from nd.io import assemble_complex, disassemble_complex
 from nd.testing import (equal_list_of_dicts, generate_test_dataset,
@@ -290,3 +291,29 @@ def test_is_complex():
 def test_is_complex_invalid_input():
     with assert_raises_regex(ValueError, 'Not an xarray Dataset or DataArray'):
         utils.is_complex('a string')
+
+
+@pytest.mark.parametrize('dims', [
+    ('x', 'y'), ('time',)
+])
+def test_apply(dims):
+    ds = generate_test_dataset()
+    result = utils.apply(ds, np.mean, signature=f'({",".join(dims)})->()')
+    ref = ds.mean(dims)
+    xr_assert_allclose(result, ref)
+
+
+def test_apply_with_vars():
+    ds = generate_test_dataset()
+    result = utils.apply(ds, lambda a: a.mean(axis=1),
+                         signature='(time,var)->(time)')
+    ref = ds.to_array(dim='var').mean('var')
+    xr_assert_allclose(result, ref)
+
+
+def test_apply_with_vars_keep_vars():
+    ds = generate_test_dataset()
+    result = utils.apply(ds, lambda a: a.mean(axis=0),
+                         signature='(time,var)->(var)')
+    ref = ds.mean('time')
+    xr_assert_allclose(result, ref)
