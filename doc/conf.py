@@ -40,9 +40,9 @@ autodoc_mock_imports = [
     'lxml',
     'skimage',
     'geopandas',
-    'nd._filters',
-    'nd._warp',
-    'nd._change',
+    # 'nd._filters',
+    # 'nd._warp',
+    # 'nd._change',
     ]
 autodoc_warningiserror = False
 
