@@ -34,6 +34,7 @@ autodoc_mock_imports = [
     'sklearn',
     'scipy',
     'rasterio',
+    'rasterio.features',
     'imageio',
     'affine',
     'cv2',
