@@ -18,6 +18,12 @@ import glob
 from operator import attrgetter
 import inspect
 import subprocess
+from unittest.mock import Mock
+
+
+MOCK_MODULES = ['rasterio']
+for m in MOCK_MODULES:
+    sys.modules[m] = Mock()
 
 
 # Mock imports for autodoc
@@ -34,7 +40,6 @@ autodoc_mock_imports = [
     'sklearn',
     'scipy',
     'rasterio',
-    'rasterio.features',
     'imageio',
     'affine',
     'cv2',
