@@ -1,5 +1,4 @@
 numpy
-sphinx==2.2.1
 pandas
 xarray
 dask
