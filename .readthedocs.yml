@@ -6,5 +6,10 @@ sphinx:
 formats:
   - pdf
 
+python:
+  install:
+    - method: pip
+      path: .
+
 conda:
   environment: doc/environment.yml
