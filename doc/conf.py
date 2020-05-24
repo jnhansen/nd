@@ -18,12 +18,12 @@ import glob
 from operator import attrgetter
 import inspect
 import subprocess
-# from unittest.mock import Mock
+from unittest.mock import Mock
 
 
-# MOCK_MODULES = ['rasterio']
-# for m in MOCK_MODULES:
-#     sys.modules[m] = Mock()
+MOCK_MODULES = ['nd._filters', 'nd._warp', 'nd._change']
+for m in MOCK_MODULES:
+    sys.modules[m] = Mock()
 
 
 # Mock imports for autodoc
