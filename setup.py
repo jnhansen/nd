@@ -124,7 +124,7 @@ if not mock_install:
 setup(
     use_scm_version=True,
     cmdclass=cmdclass,
-    ext_modules=extensions,
+    ext_modules=extensions if not mock_install else [],
     include_dirs=include_dirs,
     install_requires=install_requires
 )
