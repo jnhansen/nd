@@ -1,7 +1,6 @@
 cache:
   directories:
   - "~/.cache/pip"
-dist: trusty
 language: python
 addons:
   apt:
