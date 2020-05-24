@@ -4,3 +4,4 @@ xarray
 dask
 matplotlib
 shapely
+rasterio
