@@ -46,6 +46,8 @@ autodoc_mock_imports = [
     ]
 autodoc_warningiserror = False
 
+autosummary_mock_imports = autodoc_mock_imports
+
 
 try:
     import nd
