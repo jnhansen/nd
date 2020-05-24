@@ -1,3 +1,4 @@
+import os
 # Strangely, h5netcdf must be imported at this point
 # for the h5netcdf backend to work properly on Travis (and Ubuntu)
 try:
@@ -5,11 +6,13 @@ try:
 except Exception:
     pass
 
-# Import shapely.geometry at this point to avoid the error:
-# Assertion failed: (0), function query, file AbstractSTRtree.cpp
-# which may occur if shapely is imported *after* fiona
-import shapely.geometry
-import shapely.affinity
+# Skip on mock install
+if os.environ.get('READTHEDOCS') != 'True':
+    # Import shapely.geometry at this point to avoid the error:
+    # Assertion failed: (0), function query, file AbstractSTRtree.cpp
+    # which may occur if shapely is imported *after* fiona
+    import shapely.geometry
+    import shapely.affinity
 
 from xarray import Dataset, DataArray
 from .io import open_dataset, to_netcdf
