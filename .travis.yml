@@ -32,7 +32,8 @@ install:
 - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
   pytest pytest-cov coverage
 - source activate test-environment
-- conda install ffmpeg rasterio
+- conda install cartopy rasterio
+- conda install ffmpeg
 - pip install scikit-learn scikit-image codecov
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal
 - export C_INCLUDE_PATH=/usr/include/gdal
