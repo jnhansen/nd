@@ -6,3 +6,4 @@ dependencies:
   - sphinx=2.2.1
   - gsl
   - numpy
+  - rasterio
