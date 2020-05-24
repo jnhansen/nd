@@ -29,8 +29,6 @@ autodoc_mock_imports = [
     # 'matplotlib',
     # 'cython_gsl',
     'shapely',
-    'shapely.geometry',
-    'shapely.affinity',
     'pyproj',
     'cartopy',
     'sklearn',
