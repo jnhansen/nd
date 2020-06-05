@@ -27,6 +27,9 @@ def read_file(path, clip=None):
     -------
     geopandas.GeoDataFrame
     """
+    if clip is None:
+        return gpd.read_file(path)
+
     def records(filename, geom):
         with fiona.open(filename) as source:
             for feature in source:
@@ -36,6 +39,7 @@ def read_file(path, clip=None):
                     poly = shapely.geometry.shape(feature['geometry'])
                     if poly.intersects(geom):
                         yield feature
+
     return gpd.GeoDataFrame.from_features(records(path, clip))
 
 
