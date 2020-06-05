@@ -329,8 +329,8 @@ def generate_test_polygons(n_polygon=20,
 
             except shapely.errors.TopologicalError:
                 continue
-
-        poly.append(polygon)
+        if not polygon.is_empty:
+            poly.append(polygon)
 
     return poly
 
