@@ -164,7 +164,12 @@ def assert_equal_data(ds1, ds2):
 
 
 def assert_equal_crs(crs1, crs2, *args, **kwargs):
+    # Perform some easy checks first.
+    # If they fail check if a transform between both CRS
+    # is approximately the identity.
     if crs1 is None and crs2 is None:
+        return
+    if crs1.to_wkt() == crs2.to_wkt():
         return
     xs = np.arange(10, dtype=np.float64)
     ys = np.arange(10, dtype=np.float64)
@@ -325,7 +330,8 @@ def generate_test_polygons(n_polygon=20,
             except shapely.errors.TopologicalError:
                 continue
 
-        poly.append(polygon)
+        if not polygon.is_empty:
+            poly.append(polygon)
 
     return poly
 

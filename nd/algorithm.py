@@ -5,7 +5,10 @@ from abc import ABC, abstractmethod, ABCMeta
 import inspect
 from types import CodeType
 from collections import OrderedDict
+import sys
 from . import utils
+
+PY_VERSION = sys.version_info
 
 
 class Algorithm(ABC):
@@ -66,23 +69,29 @@ def wrap_algorithm(algo, name=None):
     new_filename = inspect.getfile(algo)
     caller = inspect.getframeinfo(inspect.stack()[1][0])
     new_firstlineno = caller.lineno
-    new_code = CodeType(
-        code.co_argcount,
-        code.co_kwonlyargcount,
-        code.co_nlocals,
-        code.co_stacksize,
-        code.co_flags,
-        code.co_code,
-        code.co_consts,
-        code.co_names,
-        code.co_varnames,
-        new_filename,
-        code.co_name,
-        new_firstlineno,
-        code.co_lnotab,
-        code.co_freevars,
-        code.co_cellvars
-    )
+    if PY_VERSION >= (3, 8):
+        new_code = code.replace(
+            co_filename=new_filename,
+            co_firstlineno=new_firstlineno
+        )
+    else:
+        new_code = CodeType(
+            code.co_argcount,
+            code.co_kwonlyargcount,
+            code.co_nlocals,
+            code.co_stacksize,
+            code.co_flags,
+            code.co_code,
+            code.co_consts,
+            code.co_names,
+            code.co_varnames,
+            new_filename,
+            code.co_name,
+            new_firstlineno,
+            code.co_lnotab,
+            code.co_freevars,
+            code.co_cellvars
+        )
     _wrapper.__code__ = new_code
 
     # Override function name
