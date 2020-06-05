@@ -352,8 +352,13 @@ def gridlines_with_labels(ax, top=True, bottom=True, left=True,
         gridline_coords[side] = ccrs.PlateCarree().transform_points(
             ax.projection, values[0], values[1])
 
-    lon_lim, lat_lim = gridliner._axes_domain(
-        background_patch=ax.background_patch)
+    # cartopy < 0.18.0:
+    try:
+        lon_lim, lat_lim = gridliner._axes_domain(
+            background_patch=ax.background_patch)
+    # cartopy >= 0.18.0
+    except Exception:
+        lon_lim, lat_lim = gridliner._axes_domain()
     ticklocs = {
         'x': gridliner.xlocator.tick_values(lon_lim[0], lon_lim[1]),
         'y': gridliner.ylocator.tick_values(lat_lim[0], lat_lim[1])
