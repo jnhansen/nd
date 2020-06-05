@@ -36,6 +36,8 @@ def read_file(path, clip=None):
                 if geom is None:
                     yield feature
                 else:
+                    if feature['geometry'] is None:
+                        continue
                     poly = shapely.geometry.shape(feature['geometry'])
                     if poly.intersects(geom):
                         yield feature
