@@ -491,6 +491,12 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
     # (centered at the polygon)
     # ----------------------------------
     map_crs = _get_orthographic_projection(ds)
+    proj4_params = map_crs.proj4_params
+    if 'a' in proj4_params:
+        # Some version of cartopy add the parameter 'a'.
+        # For some reason, the CRS cannot be parsed by rasterio with
+        # this parameter present.
+        del proj4_params['a']
 
     # Create figure
     # -------------
@@ -517,7 +523,7 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
 
     # Add polygon
     # -----------
-    geometry_map = warp.get_geometry(ds, crs=map_crs.proj4_params)
+    geometry_map = warp.get_geometry(ds, crs=proj4_params)
     ax.add_geometries([geometry_map], crs=map_crs,
                       facecolor=(1, 0, 0, 0.2), edgecolor=(0, 0, 0, 1))
 
