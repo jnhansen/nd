@@ -487,9 +487,8 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         buffer += 1.0
     buffered = shapely.affinity.scale(
         geometry_data, xfact=buffer, yfact=buffer)
-    project = pyproj.Transformer.from_proj(
-            warp._to_pyproj(ds.nd.crs),
-            pyproj.Proj(init='epsg:4326'))
+    project = pyproj.Transformer.from_crs(
+            ds.nd.crs, 'epsg:4326')
     b = shapely.ops.transform(project.transform, buffered).bounds
     extent = [b[0], b[2], b[1], b[3]]
     bb = Bbox.from_extents(extent)
