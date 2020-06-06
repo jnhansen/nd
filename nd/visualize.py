@@ -41,7 +41,11 @@ def _cmap_from_str(cmap):
     if cmap in CMAPS:
         return CMAPS[cmap]
     else:
-        return cmap
+        parsed = getattr(cv2, 'COLORMAP_{}'.format(cmap.upper()), None)
+        if parsed is not None:
+            return parsed
+
+    return cmap
 
 
 def calculate_shape(new_shape, orig_shape):
@@ -211,7 +215,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
 
 def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
                 codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-                **kwargs):
+                cmap=None, **kwargs):
     """
     Create a video from an xarray.Dataset.
 
@@ -236,8 +240,11 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         A callable that takes a Dataset as input and returns a list of
         R, G, B channels. By default will compute the C11, C22, C11/C22
         representation.
-        For a DataArray, the video will be grayscale.
+        For a DataArray, use ``cmap``.
+    cmap : str, optional
+        For DataArrays only. Colormap used to colorize univariate data.
     """
+
     # Font properties for timestamp
     font = cv2.FONT_HERSHEY_SIMPLEX
     bottomLeftCornerOfText = (20, 40)
@@ -272,7 +279,7 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     with imageio.get_writer(path, **writer_kwargs) as writer:
         for t in ds.time.values:
             d = ds.sel(time=t)
-            frame = to_rgb(rgb(d))
+            frame = to_rgb(rgb(d), cmap=cmap)
             frame = cv2.resize(frame, (width, height))
             if timestamp:
                 cv2.putText(frame, str(t)[:10],
