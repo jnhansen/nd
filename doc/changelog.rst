@@ -26,3 +26,7 @@ General updates
 
 - added :func:`nd.visualize.plot_map()` to plot the geometry of a dataset
   on a map
+
+- added :func:`nd.visualize.gridlines_with_labels()` to add perfectly aligned
+  tick labels around a map with gridlines
+
