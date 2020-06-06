@@ -292,7 +292,10 @@ def get_extent(ds):
 
 def _to_pyproj(crs):
     """Convert a rasterio.crs.CRS to pyproj.Proj"""
-    return pyproj.Proj(**crs)
+    try:
+        return pyproj.Proj(crs.to_wkt())
+    except pyproj.exceptions.CRSError:
+        return pyproj.Proj(crs.to_proj4())
 
 
 def get_geometry(ds, crs={'init': 'epsg:4326'}):
@@ -563,7 +566,8 @@ def _collapse_coords(coords):
     return collapsed
 
 
-def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
+def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
+               width=None, height=None,
                res=None, extent=None, **kwargs):
     """Reproject a Dataset or DataArray.
 
@@ -571,6 +575,9 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The input dataset
+    src_crs : CRS-like, optional
+        An object that can be parsed into a CRS. By default, try to infer from
+        input dataset.
     dst_crs : CRS-like, optional
         An object that can be parsed into a CRS. By default, use the same
         CRS as the input dataset.
@@ -593,7 +600,8 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         The projected dataset.
     """
 
-    src_crs = get_crs(ds)
+    if src_crs is None:
+        src_crs = get_crs(ds)
     src_bounds = get_bounds(ds)
     if extent is not None:
         extent = BoundingBox(*extent)
@@ -839,8 +847,12 @@ class Reprojection(Algorithm):
     ----------
     target : xarray.Dataset or xarray.DataArray, optional
         A reference to which a dataset will be aligned.
-    crs : dict or str
+    src_crs : dict or str, optional
+        The coordinate system of the input data (default: infer from data).
+    dst_crs : dict or str, optional
         The output coordinate reference system as dictionary or proj-string
+    crs : dict or str, optional
+        Alias for dst_crs for backwards compatiblity.
     extent : tuple, optional
         The output extent. By default this is inferred from the input data.
     res : tuple, optional
@@ -856,17 +868,18 @@ class Reprojection(Algorithm):
         Extra keyword arguments for ``rasterio.warp.reproject``.
     """
 
-    def __init__(self, target=None, crs=None, extent=None, res=None,
-                 width=None, height=None, transform=None, **kwargs):
+    def __init__(self, target=None, src_crs=None, dst_crs=None, crs=None,
+                 extent=None, res=None, width=None, height=None,
+                 transform=None, **kwargs):
         if target is not None:
             # Parse target information
-            for param in ['crs', 'transform', 'width', 'height', 'extent',
+            for param in ['dst_crs', 'transform', 'width', 'height', 'extent',
                           'res']:
                 if locals()[param] is not None:
                     warnings.warn('`{}` is ignored if `target` is '
                                   'specified.'.format(param))
 
-            crs = get_crs(target)
+            dst_crs = get_crs(target)
             transform = get_transform(target)
             width = ncols(target)
             height = nrows(target)
@@ -881,7 +894,21 @@ class Reprojection(Algorithm):
             raise ValueError('Need to provide either `width` and `height` or '
                              'resolution when specifying the extent.')
 
-        self.crs = _parse_crs(crs)
+        if src_crs is None:
+            self.src_crs = None
+        else:
+            try:
+                self.src_crs = _parse_crs(src_crs)
+            except CRSError:
+                raise CRSError('Could not infer projection from input data. '
+                               'Please provide the parameter `src_crs`.')
+
+        if crs is not None and dst_crs is not None:
+            warnings.warn('`crs` is ignored if `dst_crs` is specified.')
+
+        self.dst_crs = _parse_crs(
+            dst_crs if dst_crs is not None else crs
+        )
         self.extent = extent
         self.res = res
         self.width = width
@@ -903,7 +930,8 @@ class Reprojection(Algorithm):
             The reprojected dataset.
         """
 
-        return _reproject(ds, dst_crs=self.crs, dst_transform=self.transform,
+        return _reproject(ds, src_crs=self.src_crs, dst_crs=self.dst_crs,
+                          dst_transform=self.transform,
                           width=self.width, height=self.height, res=self.res,
                           extent=self.extent, **self.kwargs)
 
@@ -1021,7 +1049,7 @@ class Alignment(Algorithm):
         if crs is None:
             crs = get_crs(datasets[0])
 
-        proj = Reprojection(crs=crs, extent=extent, res=res)
+        proj = Reprojection(dst_crs=crs, extent=extent, res=res)
         for name, ds in zip(product_names, products):
             outfile = os.path.join(path, name + '_aligned.nc')
             if isinstance(ds, str):
