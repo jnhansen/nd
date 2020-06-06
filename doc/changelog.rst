@@ -4,6 +4,11 @@ Changelog
 Version 0.2 (*under development*)
 -----------------------------------
 
+General updates
+...............
+
+- add support for Python 3.8
+
 :mod:`nd.classify`
 ..................
 
