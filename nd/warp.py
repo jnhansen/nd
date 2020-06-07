@@ -601,7 +601,11 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
     """
 
     if src_crs is None:
-        src_crs = get_crs(ds)
+        try:
+            src_crs = get_crs(ds)
+        except CRSError:
+            raise CRSError('Could not infer projection from input data. '
+                           'Please provide the parameter `src_crs`.')
     src_bounds = get_bounds(ds)
     if extent is not None:
         extent = BoundingBox(*extent)
@@ -897,11 +901,7 @@ class Reprojection(Algorithm):
         if src_crs is None:
             self.src_crs = None
         else:
-            try:
-                self.src_crs = _parse_crs(src_crs)
-            except CRSError:
-                raise CRSError('Could not infer projection from input data. '
-                               'Please provide the parameter `src_crs`.')
+            self.src_crs = _parse_crs(src_crs)
 
         if crs is not None and dst_crs is not None:
             warnings.warn('`crs` is ignored if `dst_crs` is specified.')
