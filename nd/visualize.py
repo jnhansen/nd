@@ -37,11 +37,14 @@ CMAPS = {
 }
 
 
-def _cmap_from_str(cmap):
+def _parse_cmap(cmap):
     if cmap in CMAPS:
         return CMAPS[cmap]
-    else:
-        return cmap
+    try:
+        return getattr(cv2, 'COLORMAP_{}'.format(cmap.upper()))
+    except AttributeError:
+        pass
+    return cmap
 
 
 def calculate_shape(new_shape, orig_shape):
@@ -100,7 +103,7 @@ def colorize(labels, N=None, nan_vals=[], cmap='jet'):
         N = min(10, len(np.unique(labels)))
     data = (labels % N) * (255/(N-1))
     data_gray = cv2.cvtColor(data.astype(np.uint8), cv2.COLOR_GRAY2RGB)
-    data_color = cv2.applyColorMap(data_gray, _cmap_from_str(cmap))
+    data_color = cv2.applyColorMap(data_gray, _parse_cmap(cmap))
     for nv in nan_vals:
         data_color[labels == nv] = 0
     # data_color[labels == MASK_VAL] = 255
@@ -189,7 +192,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
             colored = cv2.cvtColor(im[:, :, 0], cv2.COLOR_GRAY2BGR)
             if cmap is not None:
                 # colored is now in BGR
-                colored = cv2.applyColorMap(colored, _cmap_from_str(cmap))
+                colored = cv2.applyColorMap(colored, _parse_cmap(cmap))
         else:
             # im is in RGB
             colored = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
@@ -211,7 +214,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
 
 def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
                 codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-                **kwargs):
+                cmap=None, **kwargs):
     """
     Create a video from an xarray.Dataset.
 
@@ -236,8 +239,11 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         A callable that takes a Dataset as input and returns a list of
         R, G, B channels. By default will compute the C11, C22, C11/C22
         representation.
-        For a DataArray, the video will be grayscale.
+        For a DataArray, use ``cmap``.
+    cmap : str, optional
+        For DataArrays only. Colormap used to colorize univariate data.
     """
+
     # Font properties for timestamp
     font = cv2.FONT_HERSHEY_SIMPLEX
     bottomLeftCornerOfText = (20, 40)
@@ -272,7 +278,7 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     with imageio.get_writer(path, **writer_kwargs) as writer:
         for t in ds.time.values:
             d = ds.sel(time=t)
-            frame = to_rgb(rgb(d))
+            frame = to_rgb(rgb(d), cmap=cmap)
             frame = cv2.resize(frame, (width, height))
             if timestamp:
                 cv2.putText(frame, str(t)[:10],
@@ -480,9 +486,8 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         buffer += 1.0
     buffered = shapely.affinity.scale(
         geometry_data, xfact=buffer, yfact=buffer)
-    project = pyproj.Transformer.from_proj(
-            warp._to_pyproj(ds.nd.crs),
-            pyproj.Proj(init='epsg:4326'))
+    project = pyproj.Transformer.from_crs(
+            ds.nd.crs, 'epsg:4326')
     b = shapely.ops.transform(project.transform, buffered).bounds
     extent = [b[0], b[2], b[1], b[3]]
     bb = Bbox.from_extents(extent)

@@ -6,13 +6,35 @@
 
 # nd
 
-This package contains a selection of tools to handle and analyze satellite data.
+## Overview
+
+The main goal of this library is to generalize
+methods that work in lower dimensions to higher-dimensional data.
+
+Multi-dimensional data often arises as spatio-temporal datacubes,
+e.g. climate data or time series of geospatial satellite data.
+Many data analysis methods are designed to work on single images
+or time series at a single point.
+`nd` makes it easy to broadcast these methods across a whole dataset,
+adding additional features such as automatic parallelization.
+
+Examples include
+
+- pixelwise change detection algorithms
+- reprojection between coordinate systems
+- machine learning algorithms
+
+`nd` is built on `xarray`.
+Internally, all data is passed around as ``xarray`` Datasets and all provided methods expect this format as inputs.
+An ``xarray.Dataset`` is essentially a Python representation of the NetCDF file format and as such easily reads/writes NetCDF files.
+
+
+<!-- This package contains a selection of tools to handle and analyze satellite data. -->
 ``nd`` is making heavy use of the ``xarray`` and ``rasterio`` libraries.
 The GDAL library is only used via ``rasterio`` as a compatibility layer to enable reading supported file formats.
-Internally, all data is passed around as ``xarray`` Datasets and all provided methods expect this format as inputs.
 `nd.open_dataset` may be used to read any NetCDF file or any GDAL-readable file into an ``xarray.Dataset``.
 
-An ``xarray.Dataset`` is essentially a Python representation of the NetCDF file format and as such easily reads/writes NetCDF files.
+Read the [Documentation](https://nd.readthedocs.io/en/latest/) for detailed user guides.
 
 ## Installation
 

@@ -29,7 +29,7 @@ install:
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 - conda info -a
-- conda create -n test-environment --force python=$TRAVIS_PYTHON_VERSION numpy
+- conda create -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
   rasterio ffmpeg cartopy pytest pytest-cov coverage -c conda-forge
 - source activate test-environment
 - pip install scikit-learn scikit-image codecov
