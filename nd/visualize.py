@@ -37,7 +37,7 @@ CMAPS = {
 }
 
 
-def _cmap_from_str(cmap):
+def _parse_cmap(cmap):
     if cmap in CMAPS:
         return CMAPS[cmap]
     try:
@@ -103,7 +103,7 @@ def colorize(labels, N=None, nan_vals=[], cmap='jet'):
         N = min(10, len(np.unique(labels)))
     data = (labels % N) * (255/(N-1))
     data_gray = cv2.cvtColor(data.astype(np.uint8), cv2.COLOR_GRAY2RGB)
-    data_color = cv2.applyColorMap(data_gray, _cmap_from_str(cmap))
+    data_color = cv2.applyColorMap(data_gray, _parse_cmap(cmap))
     for nv in nan_vals:
         data_color[labels == nv] = 0
     # data_color[labels == MASK_VAL] = 255
@@ -192,7 +192,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
             colored = cv2.cvtColor(im[:, :, 0], cv2.COLOR_GRAY2BGR)
             if cmap is not None:
                 # colored is now in BGR
-                colored = cv2.applyColorMap(colored, _cmap_from_str(cmap))
+                colored = cv2.applyColorMap(colored, _parse_cmap(cmap))
         else:
             # im is in RGB
             colored = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)

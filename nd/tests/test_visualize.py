@@ -32,16 +32,16 @@ def test_calculate_shape(shape, orig_shape, expected):
     ('turbo', cv2.COLORMAP_TURBO),
     ('hot', cv2.COLORMAP_HOT),
 ])
-def test_cmap_from_str(s, cmap):
+def test_parse_cmap(s, cmap):
     for name in [s, s.upper()]:
-        assert visualize._cmap_from_str(name) == cmap
+        assert visualize._parse_cmap(name) == cmap
 
 
 @pytest.mark.parametrize('cmap', [
     cv2.COLORMAP_JET, cv2.COLORMAP_TURBO, cv2.COLORMAP_HOT
 ])
-def test_cmap_from_str_cv2(cmap):
-    assert visualize._cmap_from_str(cmap) == cmap
+def test_parse_cmap_cv2(cmap):
+    assert visualize._parse_cmap(cmap) == cmap
 
 
 @pytest.mark.parametrize('output', [None, 'test.jpg'])
@@ -78,7 +78,7 @@ def test_to_rgb_gray(tmpdir, output, pmin, pmax, vmin, vmax):
 @pytest.mark.parametrize('cmap', ['hot', 'turbo'])
 @pytest.mark.parametrize('vmin, vmax', [(0, 1), (0.2, 0.8), (0.45, 0.55)])
 def test_to_rgb_cmap(cmap, vmin, vmax):
-    cm = visualize._cmap_from_str(cmap)
+    cm = visualize._parse_cmap(cmap)
     values = np.random.rand(100, 100)
     rgb = visualize.to_rgb(values, vmin=vmin, vmax=vmax, cmap=cmap)
     test = np.atleast_2d([0, 255]).astype(np.uint8)
