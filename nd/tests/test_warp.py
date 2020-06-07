@@ -102,6 +102,28 @@ def test_reprojection_failure():
         _ = warp.Reprojection(crs=epsg4326, extent=extent)
 
 
+def test_reprojection_with_src_crs():
+    src_crs = epsg4326
+    dst_crs = sinusoidal
+    # Set up test dataset with and without CRS information
+    ds = generate_test_dataset(crs=src_crs)
+    assert_equal_crs(src_crs, ds.nd.crs)
+    ds_nocrs = ds.copy()
+    del ds_nocrs.attrs['crs']
+    assert ds_nocrs.nd.crs is None
+
+    with assert_raises_regex(
+            CRSError,
+            "Could not infer projection from input data. "
+            "Please provide the parameter `src_crs`."):
+        warp.Reprojection(dst_crs=dst_crs).apply(ds_nocrs)
+
+    xr_assert_equal(
+        warp.Reprojection(dst_crs=dst_crs).apply(ds),
+        warp.Reprojection(src_crs=src_crs, dst_crs=dst_crs).apply(ds_nocrs)
+    )
+
+
 @pytest.mark.parametrize('generator', [
     generate_test_dataset,
     generate_test_dataarray

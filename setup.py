@@ -59,7 +59,10 @@ def get_gsl_lib_dir():
 
 
 change_libraries = ['gsl', 'gslcblas']
-change_library_dirs = [get_gsl_lib_dir()]
+if mock_install:
+    change_library_dirs = []
+else:
+    change_library_dirs = [get_gsl_lib_dir()]
 change_include_dirs = ['.']
 
 cmdclass = {}
@@ -84,10 +87,13 @@ if USE_CYTHON:
         extensions, compiler_directives=compiler_directives)
     cmdclass = {'build_ext': build_ext}
 
-include_dirs = [
-    numpy.get_include(),
-    get_gsl_include_dir()
-]
+if mock_install:
+    include_dirs = []
+else:
+    include_dirs = [
+        numpy.get_include(),
+        get_gsl_include_dir()
+    ]
 
 install_requires = [
     "numpy",
@@ -118,7 +124,7 @@ if not mock_install:
 setup(
     use_scm_version=True,
     cmdclass=cmdclass,
-    ext_modules=extensions,
+    ext_modules=extensions if not mock_install else [],
     include_dirs=include_dirs,
     install_requires=install_requires
 )
