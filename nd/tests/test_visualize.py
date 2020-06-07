@@ -37,6 +37,13 @@ def test_cmap_from_str(s, cmap):
         assert visualize._cmap_from_str(name) == cmap
 
 
+@pytest.mark.parametrize('cmap', [
+    cv2.COLORMAP_JET, cv2.COLORMAP_TURBO, cv2.COLORMAP_HOT
+])
+def test_cmap_from_str_cv2(cmap):
+    assert visualize._cmap_from_str(cmap) == cmap
+
+
 @pytest.mark.parametrize('output', [None, 'test.jpg'])
 @pytest.mark.parametrize('pmin,pmax,vmin,vmax', [
     (0, 100, None, None),

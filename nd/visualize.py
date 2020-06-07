@@ -40,11 +40,10 @@ CMAPS = {
 def _cmap_from_str(cmap):
     if cmap in CMAPS:
         return CMAPS[cmap]
-    else:
-        parsed = getattr(cv2, 'COLORMAP_{}'.format(cmap.upper()), None)
-        if parsed is not None:
-            return parsed
-
+    try:
+        return getattr(cv2, 'COLORMAP_{}'.format(cmap.upper()))
+    except AttributeError:
+        pass
     return cmap
 
 
