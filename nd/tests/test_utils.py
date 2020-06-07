@@ -298,7 +298,8 @@ def test_is_complex_invalid_input():
 ])
 def test_apply(dims):
     ds = generate_test_dataset()
-    result = utils.apply(ds, np.mean, signature=f'({",".join(dims)})->()')
+    result = utils.apply(
+        ds, np.mean, signature='({})->()'.format(",".join(dims)))
     ref = ds.mean(dims)
     xr_assert_allclose(result, ref)
 
