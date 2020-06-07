@@ -594,7 +594,11 @@ def apply(ds, fn, signature=None, njobs=1):
         result = apply_func(ds)
     elif isinstance(ds, xr.Dataset):
         # Apply to each variable as DataArray
-        result = ds.map(apply_func)
+        try:
+            result = ds.map(apply_func)
+        except AttributeError:
+            # Backwards compatibility for xarray < 0.14.1:
+            result = ds.apply(apply_func)
 
     # Restore original dimension order
     result = result.transpose(*output_dims)
