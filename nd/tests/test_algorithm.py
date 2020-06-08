@@ -10,10 +10,14 @@ import inspect
 # Create algorithm
 class DummyAlgorithm(Algorithm):
     """test docstring"""
+
+    _parallel = False
+
     def __init__(self, value, *args, **kwargs):
         self.value = value
 
     def apply(self, ds):
+        """Apply dummy algorithm."""
         return ds + self.value
 
 

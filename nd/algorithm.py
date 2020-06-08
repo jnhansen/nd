@@ -14,12 +14,48 @@ PY_VERSION = sys.version_info
 class Algorithm(ABC):
     __metaclass__ = ABCMeta
 
+    _parallel = True
+
     @abstractmethod
     def apply(self, ds):
         return
 
-    def parallel_apply(self, ds, dim, jobs=None):
-        return utils.parallel(self.apply, dim=dim, chunks=jobs)
+    def _buffer(self):
+        """Return the required tile buffer when parallelizing"""
+        return 0
+
+    def _parallel_dimension(self, ds):
+        """Return the dimension along which to parallelize"""
+        return 'y'
+
+    def papply(self, ds, njobs=1, *args, **kwargs):
+        """
+        Parallel implementation of ``apply()``.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            The input dataset.
+        njobs : int, optional
+            Number of jobs to run in parallel. Setting njobs to -1
+            uses the number of available cores.
+            Disable parallelism by setting njobs to 1 (default).
+        args : tuple
+        kwargs : dict,
+            Additional arguments to be forwarded to ``apply()``.
+        """
+        if not self._parallel:
+            raise NotImplementedError(
+                "Parallelism is not implemented for this algorithm.")
+
+        if njobs == 1:
+            return self.apply(ds, *args, **kwargs)
+        else:
+            buffer = self._buffer()
+            dim = self._parallel_dimension(ds)
+            return utils.parallel(
+                self.apply, dim=dim, chunks=njobs, buffer=buffer
+            )(ds, *args, **kwargs)
 
 
 def extract_arguments(fn, args, kwargs):
@@ -58,7 +94,11 @@ def wrap_algorithm(algo, name=None):
         apply_kwargs = extract_arguments(algo.apply, args, kwargs)
         init_args = apply_kwargs.pop('args', ())
         init_kwargs = apply_kwargs.pop('kwargs', {})
-        return algo(*init_args, **init_kwargs).apply(**apply_kwargs)
+        if algo._parallel:
+            apply_kwargs['njobs'] = init_kwargs.pop('njobs', 1)
+            return algo(*init_args, **init_kwargs).papply(**apply_kwargs)
+        else:
+            return algo(*init_args, **init_kwargs).apply(**apply_kwargs)
 
     # Override function module
     _wrapper.__module__ = algo.__module__
@@ -98,6 +138,28 @@ def wrap_algorithm(algo, name=None):
     if name is not None:
         _wrapper.__name__ = name
 
+    # Override signature
+    sig_init = inspect.signature(algo.__init__)
+    sig_apply = inspect.signature(algo.apply)
+    parameters = tuple(sig_apply.parameters.values())[1:]
+    if algo._parallel:
+        sig_papply = inspect.signature(algo.papply)
+        parameters += (sig_papply.parameters['njobs'],)
+    parameters += tuple(sig_init.parameters.values())[1:]
+    # Sort parameters:
+    # 1) put variadic parameters last
+    # 2) put arguments without defaults first
+    parameters = sorted(
+        parameters,
+        key=lambda p: (p.kind, p.default is not inspect._empty)
+    )
+    new_parameters = []
+    for p in parameters:
+        if p not in new_parameters:
+            new_parameters.append(p)
+    sig = sig_init.replace(parameters=new_parameters)
+    _wrapper.__signature__ = sig
+
     # Override docstring
     link = ':class:`{}.{}`'.format(algo.__module__, algo.__name__)
     doc = utils.parse_docstring(algo.__doc__)
@@ -109,14 +171,15 @@ def wrap_algorithm(algo, name=None):
             doc['Parameters'] = apply_doc['Parameters'] + doc['Parameters']
         if 'Returns' in apply_doc:
             doc['Returns'] = apply_doc['Returns']
-    _wrapper.__doc__ = utils.assemble_docstring(doc)
-
-    # Override signature
-    sig_init = inspect.signature(algo.__init__)
-    sig_apply = inspect.signature(algo.apply)
-    parameters = tuple(sig_apply.parameters.values())[1:] + \
-        tuple(sig_init.parameters.values())[1:]
-    sig = sig_init.replace(parameters=parameters)
-    _wrapper.__signature__ = sig
+    if algo._parallel:
+        if 'Parameters' not in doc:
+            doc['Parameters'] = []
+        doc['Parameters'].append(
+            ['njobs : int, optional',
+                '    Number of jobs to run in parallel. Setting njobs to -1 ',
+                '    uses the number of available cores.',
+                '    Disable parallelism by setting njobs to 1 (default).']
+        )
+    _wrapper.__doc__ = utils.assemble_docstring(doc, sig=sig)
 
     return _wrapper
