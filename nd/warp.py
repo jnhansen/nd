@@ -915,6 +915,12 @@ class Reprojection(Algorithm):
         self.transform = transform
         self.kwargs = kwargs
 
+    def _buffer(self):
+        return 0
+
+    def _parallel_dimension(self, ds):
+        return 'time'
+
     def apply(self, ds):
         """Apply the projection to a dataset.
 
