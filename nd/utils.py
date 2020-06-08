@@ -491,9 +491,41 @@ def parse_docstring(doc):
     return parsed
 
 
-def assemble_docstring(parsed):
+def assemble_docstring(parsed, sig=None):
+    """
+    Assemble a docstring from an OrderedDict as returned by
+    :meth:`nd.utils.parse_docstring()`
+
+    Parameters
+    ----------
+    parsed : OrderedDict
+        A parsed docstring as obtained by ``nd.utils.parse_docstring()``.
+    sig : function signature, optional
+        If provided, the parameters in the docstring will be ordered according
+        to the parameter order in the function signature.
+
+    Returns
+    -------
+    str
+        The assembled docstring.
+
+    """
+
+    parsed = parsed.copy()
     indent = parsed.pop('indent')
     pad = ' '*indent
+
+    # Sort 'Parameters' section according to signature
+    if sig is not None and 'Parameters' in parsed:
+        order = tuple(sig.parameters.keys())
+
+        def sort_index(p):
+            key = p[0].split(':')[0].strip(' *')
+            if key == '':
+                return 9999
+            return order.index(key)
+
+        parsed['Parameters'] = sorted(parsed['Parameters'], key=sort_index)
 
     d = []
     for k, v in parsed.items():
