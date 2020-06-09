@@ -1,7 +1,6 @@
 """
 This module provides several helper functions.
 """
-import sys
 import numpy as np
 import xarray as xr
 import multiprocessing as mp
@@ -14,8 +13,6 @@ from collections import OrderedDict
 import re
 from operator import add
 from functools import reduce
-
-PY2 = sys.version_info < (3, 0)
 
 
 __all__ = ['get_shape',
@@ -91,8 +88,7 @@ def chunks(l, n):
     iterable
         Consecutive slices of l of size n.
     """
-    range_fn = range if not PY2 else xrange
-    for i in range_fn(0, len(l), n):
+    for i in range(0, len(l), n):
         yield l[i:i + n]
 
 
@@ -123,8 +119,7 @@ def array_chunks(array, n, axis=0, return_indices=False):
         )
 
     arr_len = array.shape[axis]
-    range_fn = range if not PY2 else xrange
-    for i in range_fn(0, arr_len, n):
+    for i in range(0, arr_len, n):
         indices = [slice(None), ] * array.ndim
         indices[axis] = slice(i, i+n)
         if return_indices:
