@@ -298,23 +298,26 @@ def test_is_complex_invalid_input():
 ])
 def test_apply(dims):
     ds = generate_test_dataset()
-    result = utils.apply(
-        ds, np.mean, signature='({})->()'.format(",".join(dims)))
     ref = ds.mean(dims)
+    result = utils.apply(
+        ds, np.mean, signature='({})->()'.format(",".join(dims))
+    ).transpose(*ref.nd.dims)
     xr_assert_allclose(result, ref)
 
 
 def test_apply_with_vars():
     ds = generate_test_dataset()
-    result = utils.apply(ds, lambda a: a.mean(axis=1),
-                         signature='(time,var)->(time)')
     ref = ds.to_array(dim='var').mean('var')
+    result = utils.apply(
+        ds, lambda a: a.mean(axis=1), signature='(time,var)->(time)'
+    ).transpose(*ref.nd.dims)
     xr_assert_allclose(result, ref)
 
 
 def test_apply_with_vars_keep_vars():
     ds = generate_test_dataset()
-    result = utils.apply(ds, lambda a: a.mean(axis=0),
-                         signature='(time,var)->(var)')
     ref = ds.mean('time')
+    result = utils.apply(
+        ds, lambda a: a.mean(axis=0), signature='(time,var)->(var)'
+    ).transpose(*ref.nd.dims)
     xr_assert_allclose(result, ref)
