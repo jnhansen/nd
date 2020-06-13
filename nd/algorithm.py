@@ -90,6 +90,8 @@ def parallelize(func):
     # Override docstring
     # ------------------
     doc = utils.parse_docstring(func.__doc__)
+    if 'Parameters' not in doc:
+        doc['Parameters'] = []
     doc['Parameters'].append(
         ['njobs : int, optional',
          '    Number of jobs to run in parallel. Setting njobs to -1 ',
@@ -211,7 +213,10 @@ def wrap_algorithm(algo, name=None):
     if algo.apply.__doc__ is not None:
         apply_doc = utils.parse_docstring(algo.apply.__doc__)
         if 'Parameters' in apply_doc:
-            doc['Parameters'] = apply_doc['Parameters'] + doc['Parameters']
+            if 'Parameters' not in doc:
+                doc['Parameters'] = apply_doc['Parameters']
+            else:
+                doc['Parameters'] = apply_doc['Parameters'] + doc['Parameters']
         if 'Returns' in apply_doc:
             doc['Returns'] = apply_doc['Returns']
     _wrapper.__doc__ = utils.assemble_docstring(doc, sig=sig)

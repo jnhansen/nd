@@ -1,5 +1,6 @@
 import pytest
-from nd.algorithm import (Algorithm, extract_arguments, wrap_algorithm)
+from nd.algorithm import (Algorithm, extract_arguments, wrap_algorithm,
+                          parallelize)
 from nd.testing import (generate_test_dataset, generate_test_dataarray)
 from xarray.testing import assert_equal as xr_assert_equal
 from numpy.testing import assert_raises_regex, assert_equal
@@ -11,11 +12,21 @@ import inspect
 class DummyAlgorithm(Algorithm):
     """test docstring"""
 
-    _parallel = False
+    def __init__(self, value, *args, **kwargs):
+        self.value = value
+
+    def apply(self, ds):
+        """Apply dummy algorithm."""
+        return ds + self.value
+
+
+class ParallelDummyAlgorithm(Algorithm):
+    """test docstring"""
 
     def __init__(self, value, *args, **kwargs):
         self.value = value
 
+    @parallelize
     def apply(self, ds):
         """Apply dummy algorithm."""
         return ds + self.value
@@ -79,3 +90,16 @@ def test_extract_arguments(args, kwargs):
     bound = extract_arguments(fn, args, kwargs)
     actual = fn(*args, **kwargs)
     assert_equal(bound, actual)
+
+
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+@pytest.mark.parametrize('njobs', [-1, 1, 2])
+def test_parallelized_apply(generator, njobs):
+    ds = generator()
+    algo = ParallelDummyAlgorithm(3)
+    ref = algo.apply(ds)
+    result = algo.apply(ds, njobs=njobs)
+    xr_assert_equal(ref, result)
