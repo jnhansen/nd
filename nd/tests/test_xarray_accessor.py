@@ -182,6 +182,28 @@ def test_accessor_nd_to_netcdf(tmpdir, generator):
     )
 
 
+# --------------------
+# Test general methods
+# --------------------
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_apply(generator):
+    ds = generator()
+
+    def func(arr):
+        """Reduce a two dimensional array to its mean."""
+        return arr.mean()
+
+    signature = '(x,y)->()'
+
+    xr_assert_equal(
+        ds.nd.apply(func, signature=signature),
+        utils.apply(ds, func, signature=signature)
+    )
+
+
 # -------------------------------
 # Test change detection accessors
 # -------------------------------
