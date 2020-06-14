@@ -82,9 +82,14 @@ class NDAccessor:
 
     # Visualization
     @patch_doc(visualize.to_rgb)
-    def to_rgb(self, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-               *args, **kwargs):
-        data = rgb(self._obj)
+    def to_rgb(self, rgb=None, *args, **kwargs):
+        if isinstance(self._obj, xr.DataArray):
+            data = self._obj
+        else:
+            if rgb is None:
+                def rgb(d):
+                    return[d.C11, d.C22, d.C11/d.C22]
+            data = rgb(self._obj)
         return visualize.to_rgb(data, *args, **kwargs)
 
     @patch_doc(visualize.write_video)
