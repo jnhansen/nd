@@ -4,7 +4,6 @@ This module contains the abstract base class Algorithm.
 from abc import ABC, abstractmethod, ABCMeta
 import inspect
 from types import CodeType
-from collections import OrderedDict
 import sys
 import multiprocessing as mp
 from functools import partial
@@ -106,31 +105,6 @@ def parallelize(func):
     return wrapper
 
 
-def extract_arguments(fn, args, kwargs):
-    """
-    Given a function fn, return the leftover `*args` and `**kwargs`.
-    """
-    def _(*args, **kwargs):
-        pass
-    sig = inspect.signature(fn)
-
-    # Remove 'self' parameter
-    if 'self' in sig.parameters:
-        sig = sig.replace(parameters=tuple(sig.parameters.values())[1:])
-
-    # Use an OrderedDict to maintain the parameter order in the signature
-    parameters = OrderedDict(sig.parameters)
-    parameters.update(OrderedDict(inspect.signature(_).parameters))
-    parameters = sorted(
-        parameters.values(),
-        key=lambda p: (p.kind, p.default is not inspect._empty)
-    )
-    new_sig = sig.replace(parameters=parameters)
-    bound = new_sig.bind(*args, **kwargs)
-    bound.apply_defaults()
-    return bound.arguments
-
-
 def wrap_algorithm(algo, name=None):
     """
     Return the function representation of an Algorithm derived class.
@@ -143,7 +117,7 @@ def wrap_algorithm(algo, name=None):
 
     def _wrapper(*args, **kwargs):
         # First, apply the arguments to .apply():
-        apply_kwargs = extract_arguments(algo.apply, args, kwargs)
+        apply_kwargs = utils.extract_arguments(algo.apply, args, kwargs)
         init_args = apply_kwargs.pop('args', ())
         init_kwargs = apply_kwargs.pop('kwargs', {})
         return algo(*init_args, **init_kwargs).apply(**apply_kwargs)

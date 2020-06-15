@@ -13,6 +13,7 @@ from collections import OrderedDict
 import re
 from operator import add
 from functools import reduce
+import inspect
 
 
 __all__ = ['get_shape',
@@ -448,6 +449,10 @@ def _wlen(s):
 
 def parse_docstring(doc):
     parsed = OrderedDict()
+
+    if doc is None:
+        return parsed
+
     lines = doc.split('\n')
 
     # Find indentation level and reset to 0
@@ -635,3 +640,28 @@ def apply(ds, fn, signature=None, njobs=1):
         result = result.to_dataset(dim='var')
 
     return result
+
+
+def extract_arguments(fn, args, kwargs):
+    """
+    Given a function fn, return the leftover `*args` and `**kwargs`.
+    """
+    def _(*args, **kwargs):
+        pass
+    sig = inspect.signature(fn)
+
+    # Remove 'self' parameter
+    if 'self' in sig.parameters:
+        sig = sig.replace(parameters=tuple(sig.parameters.values())[1:])
+
+    # Use an OrderedDict to maintain the parameter order in the signature
+    parameters = OrderedDict(sig.parameters)
+    parameters.update(OrderedDict(inspect.signature(_).parameters))
+    parameters = sorted(
+        parameters.values(),
+        key=lambda p: (p.kind, p.default is not inspect._empty)
+    )
+    new_sig = sig.replace(parameters=parameters)
+    bound = new_sig.bind(*args, **kwargs)
+    bound.apply_defaults()
+    return bound.arguments
