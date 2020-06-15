@@ -239,8 +239,11 @@ def xr_merge(ds_list, dim, buffer=0):
     xarray.Dataset
     """
     if buffer > 0 and len(ds_list) > 1:
-        idx_first = slice(None, -buffer)
-        idx_middle = slice(buffer, -buffer)
+        # Explicit conversion to int fixes
+        # underflow issue that sometimes arises
+        # when called from @algorithm.parallelize decorated function
+        idx_first = slice(None, -int(buffer))
+        idx_middle = slice(buffer, -int(buffer))
         idx_end = slice(buffer, None)
         parts = [ds_list[0].isel(**{dim: idx_first})] + \
                 [ds.isel(**{dim: idx_middle}) for ds in ds_list[1:-1]] + \
