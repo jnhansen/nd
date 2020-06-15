@@ -1,5 +1,5 @@
 import pytest
-from nd.algorithm import (Algorithm, extract_arguments, wrap_algorithm,
+from nd.algorithm import (Algorithm, wrap_algorithm,
                           parallelize)
 from nd.testing import (generate_test_dataset, generate_test_dataarray)
 from xarray.testing import assert_equal as xr_assert_equal
@@ -73,23 +73,6 @@ def test_invalid_algorithm_no_apply():
         "with abstract methods apply"
     ):
         MissingApplyAlgorithm()
-
-
-@pytest.mark.parametrize('args,kwargs', [
-    ((1, 2, 3), dict(c=4, d=5)),
-    ((1,), dict(b=2, d=3)),
-    ((1, 2, 3, 4, 5), dict()),
-    ((), dict(b=2, a=1)),
-])
-def test_extract_arguments(args, kwargs):
-    def fn(a, b, *args, c=None, **kwargs):
-        return OrderedDict(
-            a=a, b=b, args=args, c=c, kwargs=kwargs
-        )
-
-    bound = extract_arguments(fn, args, kwargs)
-    actual = fn(*args, **kwargs)
-    assert_equal(bound, actual)
 
 
 @pytest.mark.parametrize('generator', [

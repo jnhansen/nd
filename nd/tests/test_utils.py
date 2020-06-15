@@ -11,6 +11,7 @@ from nd.testing import (equal_list_of_dicts, generate_test_dataset,
 import time
 from datetime import datetime
 from dateutil.tz import tzutc
+from collections import OrderedDict
 
 
 @pytest.mark.parametrize('fmt', [
@@ -330,3 +331,20 @@ def test_apply_with_vars_keep_vars():
         result.transpose(*ref.nd.dims),
         ref.transpose(*ref.nd.dims)
     )
+
+
+@pytest.mark.parametrize('args,kwargs', [
+    ((1, 2, 3), dict(c=4, d=5)),
+    ((1,), dict(b=2, d=3)),
+    ((1, 2, 3, 4, 5), dict()),
+    ((), dict(b=2, a=1)),
+])
+def test_extract_arguments(args, kwargs):
+    def fn(a, b, *args, c=None, **kwargs):
+        return OrderedDict(
+            a=a, b=b, args=args, c=c, kwargs=kwargs
+        )
+
+    bound = utils.extract_arguments(fn, args, kwargs)
+    actual = fn(*args, **kwargs)
+    assert_equal(bound, actual)

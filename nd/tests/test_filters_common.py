@@ -52,8 +52,9 @@ def test_filter_mutable_dimension(f):
 
 
 @pytest.mark.parametrize('f', filter_classes)
-def test_parallelized_filter(f):
+@pytest.mark.parametrize('dims', [('x', 'y'), ('x', 'y', 'time')])
+def test_parallelized_filter(f, dims):
     xr_assert_allclose(
-        f(dims=('x', 'y')).apply(ds),
-        f(dims=('x', 'y')).apply(ds, njobs=2)
+        f(dims=dims).apply(ds),
+        f(dims=dims).apply(ds, njobs=2)
     )
