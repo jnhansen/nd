@@ -356,8 +356,10 @@ class GaussianFilter(Filter):
         else:
             # The kernel size is determined in scipy
             # by truncation after N sigma (default 4)
+            axis = self.dims.index(dim)
+            sigma = self.sigma[axis]
             truncate = 4.0
-            radius = int(truncate * self.sigma + 0.5)
+            radius = int(truncate * sigma + 0.5)
             return radius
 
     def _filter(self, arr, axes, output):
