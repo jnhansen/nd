@@ -212,9 +212,10 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
         cv2.imwrite(output, colored)
 
 
-def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
+def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
+                width=None, height=None, fps=1,
                 codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-                cmap=None, **kwargs):
+                cmap=None, mask=None, **kwargs):
     """
     Create a video from an xarray.Dataset.
 
@@ -224,9 +225,13 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         The dataset must have dimensions 'y', 'x', and 'time'.
     path : str
         The output file path of the video.
-    timestamp : bool, optional
-        Whether to print the timestamp in the upper left corner
-        (default: True).
+    timestamp : str, optional
+        Location to print the timestamp:
+        ['upper left', 'lower left', 'upper right', 'lower right',
+        'ul', 'll', 'ur', 'lr']
+        Set to `None` to disable (default: 'upper left').
+    fontcolor : tuple, optional
+        RGB tuple for timestamp font color (default: (0, 0, 0), i.e., black).
     width : int, optional
         The width of the video (default: ds.dim['x'])
     height : int, optional
@@ -242,14 +247,9 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         For a DataArray, use ``cmap``.
     cmap : str, optional
         For DataArrays only. Colormap used to colorize univariate data.
+    mask : np.ndarray, optional
+        If specified, parts of the image outside of the mask will be black.
     """
-
-    # Font properties for timestamp
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    bottomLeftCornerOfText = (20, 40)
-    fontScale = 1
-    fontColor = (0, 0, 0)
-    lineType = 2
 
     # For a DataArray, the video is grayscale.
     if isinstance(ds, xr.DataArray):
@@ -260,6 +260,22 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     height, width = calculate_shape(
         (height, width), (ds.coords['y'].size, ds.coords['x'].size)
     )
+
+    # Font properties for timestamp
+    if timestamp in ['upper right', 'ur']:
+        bottomLeftCornerOfText = (width-230, 40)
+    elif timestamp in ['lower left', 'll']:
+        bottomLeftCornerOfText = (20, height-20)
+    elif timestamp in ['lower right', 'lr']:
+        bottomLeftCornerOfText = (width-230, height-20)
+    elif timestamp in ['upper left', 'ul']:
+        bottomLeftCornerOfText = (20, 40)
+    else:
+        bottomLeftCornerOfText = (20, 40)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    fontScale = 1
+    fontColor = fontcolor
+    lineType = 2
 
     _, ext = os.path.splitext(path)
 
@@ -278,9 +294,9 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     with imageio.get_writer(path, **writer_kwargs) as writer:
         for t in ds.time.values:
             d = ds.sel(time=t)
-            frame = to_rgb(rgb(d), cmap=cmap)
+            frame = to_rgb(rgb(d), cmap=cmap, mask=mask)
             frame = cv2.resize(frame, (width, height))
-            if timestamp:
+            if timestamp not in [False, None]:
                 cv2.putText(frame, str(t)[:10],
                             bottomLeftCornerOfText,
                             font,

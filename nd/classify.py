@@ -46,9 +46,15 @@ def class_mean(ds, labels):
 
 def _build_X(ds, feature_dims=[]):
     data_dims = _get_data_dims(ds, feature_dims=feature_dims)
-    variables = utils.get_vars_for_dims(ds, data_dims)
     features = tuple(feature_dims) + ('variable',)
-    data = ds[variables].to_array().stack(feature=features).transpose(
+
+    if isinstance(ds, xr.Dataset):
+        variables = utils.get_vars_for_dims(ds, data_dims)
+        data = ds[variables].to_array()
+    else:
+        data = ds.expand_dims('variable')
+
+    data = data.stack(feature=features).transpose(
         *data_dims, 'feature', transpose_coords=True).values
     return data.reshape((-1, data.shape[-1]))
 

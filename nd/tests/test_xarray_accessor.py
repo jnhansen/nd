@@ -123,6 +123,15 @@ def test_accessor_nd_to_rgb():
     )
 
 
+def test_accessor_nd_to_rgb_default():
+    ds = generate_test_dataset(dims={'y': 50, 'x': 50})
+
+    assert_equal(
+        visualize.to_rgb([ds.C11, ds.C22, ds.C11/ds.C22]),
+        ds.nd.to_rgb()
+    )
+
+
 def test_accessor_nd_to_video(tmpdir):
     ds = generate_test_dataset()
 
@@ -179,6 +188,28 @@ def test_accessor_nd_to_netcdf(tmpdir, generator):
     xr_assert_equal(
         io.open_dataset(path_1),
         io.open_dataset(path_2)
+    )
+
+
+# --------------------
+# Test general methods
+# --------------------
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_apply(generator):
+    ds = generator()
+
+    def func(arr):
+        """Reduce a two dimensional array to its mean."""
+        return arr.mean()
+
+    signature = '(x,y)->()'
+
+    xr_assert_equal(
+        ds.nd.apply(func, signature=signature),
+        utils.apply(ds, func, signature=signature)
     )
 
 

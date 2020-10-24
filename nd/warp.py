@@ -12,7 +12,7 @@ from rasterio.coords import BoundingBox
 from rasterio.crs import CRS
 from rasterio.errors import CRSError
 from affine import Affine
-from .algorithm import Algorithm, wrap_algorithm
+from .algorithm import Algorithm, wrap_algorithm, parallelize
 from .io import to_netcdf, open_dataset, disassemble_complex
 from .utils import get_vars_for_dims
 try:
@@ -915,6 +915,13 @@ class Reprojection(Algorithm):
         self.transform = transform
         self.kwargs = kwargs
 
+    def _buffer(self):
+        return 0
+
+    def _parallel_dimension(self, ds):
+        return 'time'
+
+    @parallelize
     def apply(self, ds):
         """Apply the projection to a dataset.
 
@@ -961,6 +968,7 @@ class Resample(Algorithm):
         self.height = height
         self.kwargs = kwargs
 
+    @parallelize
     def apply(self, ds):
         """Resample the dataset.
 
@@ -1002,6 +1010,7 @@ class Alignment(Algorithm):
         self.crs = crs
         self.extent = extent
 
+    @parallelize
     def apply(self, datasets, path):
         """Resample datasets to common extent and resolution.
 

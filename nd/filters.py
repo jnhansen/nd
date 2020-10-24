@@ -7,7 +7,7 @@ in an arbitrary number of dimensions.
 .. autofunction:: _expand_kernel
 """
 
-from .algorithm import Algorithm, wrap_algorithm
+from .algorithm import Algorithm, wrap_algorithm, parallelize
 from abc import abstractmethod
 from .utils import get_vars_for_dims, expand_variables, is_complex
 from .io import disassemble_complex, assemble_complex
@@ -102,6 +102,7 @@ class Filter(Algorithm):
     def __init__(self, *args, **kwargs):
         return
 
+    @parallelize
     def apply(self, ds, inplace=False):
         """
         Apply the filter to the input dataset.
@@ -229,6 +230,29 @@ class ConvolutionFilter(Filter):
         self.kernel = kernel
         self.kwargs = kwargs
 
+    def _parallel_dimension(self, ds):
+        """
+        If there are dimensions that are not part of the filter,
+        parallelize along the largest of those dimensions.
+        """
+        extra_dims = list(set(ds.nd.dims) - set(self.dims))
+        if len(extra_dims) > 0:
+            return sorted(
+                extra_dims, key=lambda d: ds[d].size, reverse=True)[0]
+        else:
+            return sorted(
+                ds.nd.dims, key=lambda d: ds[d].size, reverse=True)[0]
+
+    def _buffer(self, dim):
+        """
+        Given the dimension to parallelize, return the required buffer.
+        """
+        if dim not in self.dims:
+            return 0
+        else:
+            axis = self.dims.index(dim)
+            return self.kernel.shape[axis] // 2
+
     def _filter(self, arr, axes, output):
         # Reshape kernel to match dimension of input array.
         new_kernel_shape = np.ones(arr.ndim, dtype=int)
@@ -310,6 +334,34 @@ class GaussianFilter(Filter):
         self.sigma = sigma
         self.kwargs = kwargs
 
+    def _parallel_dimension(self, ds):
+        """
+        If there are dimensions that are not part of the filter,
+        parallelize along the largest of those dimensions.
+        """
+        extra_dims = list(set(ds.nd.dims) - set(self.dims))
+        if len(extra_dims) > 0:
+            return sorted(
+                extra_dims, key=lambda d: ds[d].size, reverse=True)[0]
+        else:
+            return sorted(
+                ds.nd.dims, key=lambda d: ds[d].size, reverse=True)[0]
+
+    def _buffer(self, dim):
+        """
+        Given the dimension to parallelize, return the required buffer.
+        """
+        if dim not in self.dims:
+            return 0
+        else:
+            # The kernel size is determined in scipy
+            # by truncation after N sigma (default 4)
+            axis = self.dims.index(dim)
+            sigma = self.sigma[axis]
+            truncate = 4.0
+            radius = int(truncate * sigma + 0.5)
+            return radius
+
     def _filter(self, arr, axes, output):
         # Generate n-dimensional sigma
         ndsigma = [0] * arr.ndim
@@ -368,6 +420,29 @@ class NLMeansFilter(Filter):
         self.sigma = sigma
         self.h = h
         self.n_eff = n_eff
+
+    def _parallel_dimension(self, ds):
+        """
+        If there are dimensions that are not part of the filter,
+        parallelize along the largest of those dimensions.
+        """
+        extra_dims = list(set(ds.nd.dims) - set(self.dims))
+        if len(extra_dims) > 0:
+            return sorted(
+                extra_dims, key=lambda d: ds[d].size, reverse=True)[0]
+        else:
+            return sorted(
+                ds.nd.dims, key=lambda d: ds[d].size, reverse=True)[0]
+
+    def _buffer(self, dim):
+        """
+        Given the dimension to parallelize, return the required buffer.
+        """
+        if dim not in self.dims:
+            return 0
+        else:
+            axis = self.dims.index(dim)
+            return self.r[axis] + self.f[axis]
 
     def _filter(self, arr, axes, output):
         #

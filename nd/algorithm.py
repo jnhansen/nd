@@ -4,8 +4,9 @@ This module contains the abstract base class Algorithm.
 from abc import ABC, abstractmethod, ABCMeta
 import inspect
 from types import CodeType
-from collections import OrderedDict
 import sys
+import multiprocessing as mp
+from functools import partial
 from . import utils
 
 PY_VERSION = sys.version_info
@@ -16,31 +17,92 @@ class Algorithm(ABC):
 
     @abstractmethod
     def apply(self, ds):
+        """
+        Must be implemented by derived classes and should be given
+        @parallelize decorator where appropriate.
+        """
         return
 
-    def parallel_apply(self, ds, dim, jobs=None):
-        return utils.parallel(self.apply, dim=dim, chunks=jobs)
+    def _buffer(self, dim):
+        """
+        Return the required tile buffer when parallelizing over the given
+        dimension.
+        """
+        return 0
+
+    def _parallel_dimension(self, ds):
+        """Return the dimension along which to parallelize"""
+        return 'y'
 
 
-def extract_arguments(fn, args, kwargs):
+def parallelize(func):
     """
-    Given a function fn, return the leftover `*args` and `**kwargs`.
+    Decorator. Parallelize a function that takes an xarray dataset as first
+    argument.
+
+    Parameters
+    ----------
+    fn : function
+        *Must* take an xarray.Dataset as first argument.
+
+    Returns
+    -------
+    function
+        A parallelized function that may be called with exactly the same
+        arguments as `fn`.
     """
-    def _(*args, **kwargs):
-        pass
-    sig = inspect.signature(fn)
 
-    # Remove 'self' parameter
-    if 'self' in sig.parameters:
-        sig = sig.replace(parameters=tuple(sig.parameters.values())[1:])
+    # Create wrapper function
+    # -----------------------
+    def wrapper(self, ds, *args, njobs=1, **kwargs):
+        method = partial(func, self)
+        if njobs == -1:
+            njobs = mp.cpu_count()
+        if njobs == 1:
+            return method(ds, *args, **kwargs)
+        else:
+            dim = self._parallel_dimension(ds)
+            buffer = self._buffer(dim)
+            return utils.parallel(
+                method, dim=dim, chunks=njobs, buffer=buffer
+            )(ds, *args, **kwargs)
 
-    # Use an OrderedDict to maintain the parameter order in the signature
-    parameters = OrderedDict(sig.parameters)
-    parameters.update(OrderedDict(inspect.signature(_).parameters))
-    new_sig = sig.replace(parameters=tuple(parameters.values()))
-    bound = new_sig.bind(*args, **kwargs)
-    bound.apply_defaults()
-    return bound.arguments
+    # Override signature
+    # ------------------
+    sig_func = inspect.signature(func)
+    sig_wrapper = inspect.signature(wrapper)
+    parameters = tuple(sig_func.parameters.values())
+    parameters += (sig_wrapper.parameters['njobs'],)
+    # Sort parameters:
+    # 1) put variadic parameters last
+    # 2) put arguments without defaults first
+    parameters = sorted(
+        parameters,
+        key=lambda p: (p.kind, p.default is not inspect._empty)
+    )
+    new_parameters = []
+    for p in parameters:
+        if p not in new_parameters:
+            new_parameters.append(p)
+    sig = sig_func.replace(parameters=new_parameters)
+
+    # Override docstring
+    # ------------------
+    doc = utils.parse_docstring(func.__doc__)
+    if 'Parameters' not in doc:
+        doc['Parameters'] = []
+    doc['Parameters'].append(
+        ['njobs : int, optional',
+         '    Number of jobs to run in parallel. Setting njobs to -1 ',
+         '    uses the number of available cores.',
+         '    Disable parallelism by setting njobs to 1 (default).']
+    )
+    doc = utils.assemble_docstring(doc, sig=sig)
+
+    wrapper.__signature__ = sig
+    wrapper.__doc__ = doc
+
+    return wrapper
 
 
 def wrap_algorithm(algo, name=None):
@@ -55,7 +117,7 @@ def wrap_algorithm(algo, name=None):
 
     def _wrapper(*args, **kwargs):
         # First, apply the arguments to .apply():
-        apply_kwargs = extract_arguments(algo.apply, args, kwargs)
+        apply_kwargs = utils.extract_arguments(algo.apply, args, kwargs)
         init_args = apply_kwargs.pop('args', ())
         init_kwargs = apply_kwargs.pop('kwargs', {})
         return algo(*init_args, **init_kwargs).apply(**apply_kwargs)
@@ -98,6 +160,25 @@ def wrap_algorithm(algo, name=None):
     if name is not None:
         _wrapper.__name__ = name
 
+    # Override signature
+    sig_init = inspect.signature(algo.__init__)
+    sig_apply = inspect.signature(algo.apply)
+    parameters = tuple(sig_apply.parameters.values())[1:] + \
+        tuple(sig_init.parameters.values())[1:]
+    # Sort parameters:
+    # 1) put variadic parameters last
+    # 2) put arguments without defaults first
+    parameters = sorted(
+        parameters,
+        key=lambda p: (p.kind, p.default is not inspect._empty)
+    )
+    new_parameters = []
+    for p in parameters:
+        if p not in new_parameters:
+            new_parameters.append(p)
+    sig = sig_init.replace(parameters=new_parameters)
+    _wrapper.__signature__ = sig
+
     # Override docstring
     link = ':class:`{}.{}`'.format(algo.__module__, algo.__name__)
     doc = utils.parse_docstring(algo.__doc__)
@@ -106,17 +187,12 @@ def wrap_algorithm(algo, name=None):
     if algo.apply.__doc__ is not None:
         apply_doc = utils.parse_docstring(algo.apply.__doc__)
         if 'Parameters' in apply_doc:
-            doc['Parameters'] = apply_doc['Parameters'] + doc['Parameters']
+            if 'Parameters' not in doc:
+                doc['Parameters'] = apply_doc['Parameters']
+            else:
+                doc['Parameters'] = apply_doc['Parameters'] + doc['Parameters']
         if 'Returns' in apply_doc:
             doc['Returns'] = apply_doc['Returns']
-    _wrapper.__doc__ = utils.assemble_docstring(doc)
-
-    # Override signature
-    sig_init = inspect.signature(algo.__init__)
-    sig_apply = inspect.signature(algo.apply)
-    parameters = tuple(sig_apply.parameters.values())[1:] + \
-        tuple(sig_init.parameters.values())[1:]
-    sig = sig_init.replace(parameters=parameters)
-    _wrapper.__signature__ = sig
+    _wrapper.__doc__ = utils.assemble_docstring(doc, sig=sig)
 
     return _wrapper

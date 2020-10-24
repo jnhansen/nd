@@ -3,6 +3,7 @@ import numpy as np
 from nd import utils
 from nd import classify
 from nd.testing import create_mock_classes
+from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -19,9 +20,12 @@ from collections import OrderedDict
     KNeighborsClassifier(3),
     RandomForestClassifier(n_estimators=20),
 ])
-def test_classifier(clf):
+@pytest.mark.parametrize('array', (True, False))
+def test_classifier(clf, array):
     dims = OrderedDict([('y', 50), ('x', 50)])
     ds, labels_true = create_mock_classes(dims)
+    if array:
+        ds = ds['C11']
 
     # Select 10% for training
     labels_train = labels_true.copy()
@@ -120,6 +124,20 @@ def test_fit_predict():
     xr_assert_equal(
         c.fit(ds, labels).predict(ds),
         c.fit_predict(ds, labels)
+    )
+
+
+def test_predict_proba():
+    dims = OrderedDict([('y', 50), ('x', 50), ('time', 10)])
+    ds, labels = create_mock_classes(dims)
+    c = classify.Classifier(LogisticRegression())
+    pred = c.fit(ds, labels).predict(ds)
+    proba = c.fit(ds, labels).predict(ds, func='predict_proba')
+    assert (proba >= 0).all()
+    assert (proba <= 1).all()
+    xr_assert_equal(
+        pred,
+        proba.argmax('label') + 1
     )
 
 

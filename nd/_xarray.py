@@ -13,19 +13,33 @@ def patch_doc(source):
     class method with the corresponding data from `source`.
     """
     def _patch(func):
-        # Override docstring
-        doc = utils.parse_docstring(source.__doc__)
-        if 'Parameters' in doc:
-            doc['Parameters'] = doc['Parameters'][1:]
-        func.__doc__ = utils.assemble_docstring(doc)
-
         # Override signature.
-        # The first paramete is always the xarray object itself
+        # The first parameter is always the xarray object itself
         sig = inspect.signature(source)
+        sig_extra = inspect.signature(func)
+        extra_params = tuple(p for name, p in sig_extra.parameters.items()
+                             if name not in ['self', 'args', 'kwargs'])
         self_param = inspect.signature(func).parameters['self']
-        parameters = (self_param,) + tuple(sig.parameters.values())[1:]
+        parameters = (self_param,) + tuple(sig.parameters.values())[1:] + \
+            extra_params
+        parameters = sorted(
+            parameters,
+            key=lambda p: (p.kind, p.default is not inspect._empty)
+        )
         new_sig = sig.replace(parameters=parameters)
         func.__signature__ = new_sig
+
+        # Override docstring
+        doc = utils.parse_docstring(source.__doc__)
+        doc_extra = utils.parse_docstring(func.__doc__)
+        if 'Parameters' in doc:
+            doc['Parameters'] = doc['Parameters'][1:]
+        if 'Parameters' in doc_extra:
+            if 'Parameters' not in doc:
+                doc['Parameters'] = []
+            doc['Parameters'] += doc_extra['Parameters']
+        func.__doc__ = utils.assemble_docstring(doc, sig=new_sig)
+
         return func
 
     return _patch
@@ -75,11 +89,29 @@ class NDAccessor:
     def to_netcdf(self, *args, **kwargs):
         return io.to_netcdf(self._obj, *args, **kwargs)
 
+    # General
+    @patch_doc(utils.apply)
+    def apply(self, *args, **kwargs):
+        return utils.apply(self._obj, *args, **kwargs)
+
     # Visualization
     @patch_doc(visualize.to_rgb)
-    def to_rgb(self, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-               *args, **kwargs):
-        data = rgb(self._obj)
+    def to_rgb(self, rgb=None, *args, **kwargs):
+        """
+        Parameters
+        ----------
+        rgb : callable
+            Ignored if `ds` is a DataArray.
+            A function returning an RGB tuple from the dataset,
+            e.g., `lambda d: [d.B4, d.B3, d.B2]`
+        """
+        if isinstance(self._obj, xr.DataArray):
+            data = self._obj
+        else:
+            if rgb is None:
+                def rgb(d):
+                    return[d.C11, d.C22, d.C11/d.C22]
+            data = rgb(self._obj)
         return visualize.to_rgb(data, *args, **kwargs)
 
     @patch_doc(visualize.write_video)
@@ -114,16 +146,16 @@ class FilterAccessor:
     # Filter methods
     @patch_doc(filters.nlmeans)
     def nlmeans(self, *args, **kwargs):
-        return filters.NLMeansFilter(*args, **kwargs).apply(self._obj)
+        return filters.nlmeans(self._obj, *args, **kwargs)
 
     @patch_doc(filters.boxcar)
     def boxcar(self, *args, **kwargs):
-        return filters.BoxcarFilter(*args, **kwargs).apply(self._obj)
+        return filters.boxcar(self._obj, *args, **kwargs)
 
     @patch_doc(filters.convolution)
     def convolve(self, *args, **kwargs):
-        return filters.ConvolutionFilter(*args, **kwargs).apply(self._obj)
+        return filters.convolution(self._obj, *args, **kwargs)
 
     @patch_doc(filters.gaussian)
     def gaussian(self, *args, **kwargs):
-        return filters.GaussianFilter(*args, **kwargs).apply(self._obj)
+        return filters.gaussian(self._obj, *args, **kwargs)
