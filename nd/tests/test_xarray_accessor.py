@@ -123,6 +123,15 @@ def test_accessor_nd_to_rgb():
     )
 
 
+def test_accessor_nd_to_rgb_default():
+    ds = generate_test_dataset(dims={'y': 50, 'x': 50})
+
+    assert_equal(
+        visualize.to_rgb([ds.C11, ds.C22, ds.C11/ds.C22]),
+        ds.nd.to_rgb()
+    )
+
+
 def test_accessor_nd_to_video(tmpdir):
     ds = generate_test_dataset()
 
