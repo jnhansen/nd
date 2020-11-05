@@ -764,17 +764,22 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
             # that are defined over only one variable.
             #
             if dst_crs == src_crs and v not in ds.dims:
-                expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
-                if ds.coords[v].dims == ('x',):
-                    result.coords[v] = (('y', 'x'), _reproject_da(
-                        expanded, (height, width)))
-                elif ds.coords[v].dims == ('y',):
-                    result.coords[v] = (('y', 'x'), _reproject_da(
-                        expanded, (height, width)))
 
-                # Remove redundant dimensions
-                coords = _collapse_coords(result.coords[v])
-                result.coords[v] = (coords.dims, coords)
+                if len(ds.coords[v].dims) == 0:
+                    result.coords[v] = (ds.coords[v].dims, ds.coords[v])
+
+                else:
+                    expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
+                    if ds.coords[v].dims == ('x',):
+                        result.coords[v] = (('y', 'x'), _reproject_da(
+                            expanded, (height, width)))
+                    elif ds.coords[v].dims == ('y',):
+                        result.coords[v] = (('y', 'x'), _reproject_da(
+                            expanded, (height, width)))
+
+                    # Remove redundant dimensions
+                    coords = _collapse_coords(result.coords[v])
+                    result.coords[v] = (coords.dims, coords)
 
             if not set(ds.coords[v].dims).issuperset({'x', 'y'}):
                 continue
