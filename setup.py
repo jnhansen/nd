@@ -58,11 +58,19 @@ def get_gsl_lib_dir():
     return lib_gsl_dir
 
 
+# Check if libgsl is available
+try:
+    GSL_INC_DIR = get_gsl_include_dir()
+    GSL_LIB_DIR = get_gsl_lib_dir()
+    GSL = True
+except ImportError:
+    GSL = False
+
 change_libraries = ['gsl', 'gslcblas']
-if mock_install:
+if mock_install or not GSL:
     change_library_dirs = []
 else:
-    change_library_dirs = [get_gsl_lib_dir()]
+    change_library_dirs = [GSL_LIB_DIR]
 change_include_dirs = ['.']
 
 cmdclass = {}
@@ -87,12 +95,12 @@ if USE_CYTHON:
         extensions, compiler_directives=compiler_directives)
     cmdclass = {'build_ext': build_ext}
 
-if mock_install:
+if mock_install or not GSL:
     include_dirs = []
 else:
     include_dirs = [
         numpy.get_include(),
-        get_gsl_include_dir()
+        GSL_INC_DIR
     ]
 
 install_requires = [
