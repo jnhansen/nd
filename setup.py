@@ -100,8 +100,12 @@ if USE_CYTHON:
         extensions, compiler_directives=compiler_directives)
     cmdclass = {'build_ext': build_ext}
 
-if mock_install or not GSL:
+if mock_install:
     include_dirs = []
+elif not GSL:
+    include_dirs = [
+        numpy.get_include()
+    ]
 else:
     include_dirs = [
         numpy.get_include(),
