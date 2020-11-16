@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -12,9 +13,25 @@ import geopandas as gpd
 from numpy.testing import assert_almost_equal
 from nd.algorithm import Algorithm
 from nd.warp import _parse_crs
+from nd.utils import check_dependencies
 import hashlib
 import os
 from collections import OrderedDict
+
+
+def requires(dependency):
+    """Decorator to be used for skipping tests if the dependency
+    requirements are not met.
+    """
+    if isinstance(dependency, (list, tuple)):
+        missing = not all(
+            [check_dependencies[d] for d in dependency]
+        )
+    else:
+        missing = not check_dependencies[dependency]
+    return pytest.mark.skipif(
+        missing, reason="This test requires the following "
+                        "dependencies: {}".format(dependency))
 
 
 def generate_test_dataset(

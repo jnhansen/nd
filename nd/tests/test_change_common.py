@@ -20,6 +20,10 @@ cd_classes = [_[1] for _ in change_detectors]
 
 @pytest.mark.parametrize('cd', cd_classes)
 def test_change_input_output(cd):
+    if cd._skip:
+        pytest.skip('The dependency requirements for this class are '
+                    'not fulfilled: {}'.format(cd._requires))
+
     instance = cd()
     result = instance.apply(ds)
 

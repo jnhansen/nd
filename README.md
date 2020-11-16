@@ -42,7 +42,9 @@ Read the [Documentation](https://nd.readthedocs.io/en/latest/) for detailed user
 pip install nd
 ```
 
-Note that ``nd`` requires the ``libgsl-dev`` C library to be installed.
+Note that the following algorithms require the ``libgsl-dev`` C library to be installed:
+
+- ``nd.change.OmnibusTest``
 
 
 ## What does this library add?

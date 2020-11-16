@@ -3,6 +3,7 @@ from nd import testing
 from nd.change import OmnibusTest
 
 
+@testing.requires('gsl')
 def test_change():
     ds1 = testing.generate_test_dataset(
         dims={'y': 5, 'x': 5, 'time': 10},
