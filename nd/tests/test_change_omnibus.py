@@ -1,8 +1,16 @@
+import pytest
 import xarray as xr
 from nd import testing
 from nd.change import OmnibusTest
+try:
+    import nd._change
+except ImportError:
+    GSL = False
+else:
+    GSL = True
 
 
+@pytest.mark.skipif(not GSL, rason="This test requires libgsl")
 def test_change():
     ds1 = testing.generate_test_dataset(
         dims={'y': 5, 'x': 5, 'time': 10},
