@@ -76,19 +76,24 @@ change_include_dirs = ['.']
 cmdclass = {}
 
 extensions = [
-    Extension("nd._change", ["nd/_change" + ext],
-              libraries=change_libraries,
-              library_dirs=change_library_dirs,
-              include_dirs=change_include_dirs,
-              extra_compile_args=['-O3'],
-              extra_link_args=[],
-              ),
     Extension("nd._filters", ["nd/_filters" + ext],
               extra_compile_args=['-O3'],
               extra_link_args=[],
               ),
     Extension("nd._warp", ["nd/_warp" + ext]),
 ]
+if GSL:
+    # Only build the cython change module
+    # if libgsl is available
+    extensions.append(
+        Extension("nd._change", ["nd/_change" + ext],
+                  libraries=change_libraries,
+                  library_dirs=change_library_dirs,
+                  include_dirs=change_include_dirs,
+                  extra_compile_args=['-O3'],
+                  extra_link_args=[],
+                  )
+    )
 
 if USE_CYTHON:
     extensions = cythonize(
