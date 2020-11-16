@@ -42,6 +42,12 @@ Read the [Documentation](https://nd.readthedocs.io/en/latest/) for detailed user
 pip install nd
 ```
 
+It is recommended that you have GDAL available before installation and also make sure to have the correct environment variable set:
+
+```bash
+export GDAL_DATA=$(gdal-config --datadir)
+```
+
 Note that the following algorithms require the ``libgsl-dev`` C library to be installed:
 
 - ``nd.change.OmnibusTest``
