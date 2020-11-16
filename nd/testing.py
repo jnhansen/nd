@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -15,6 +16,19 @@ from nd.warp import _parse_crs
 import hashlib
 import os
 from collections import OrderedDict
+
+# -------------------------------------------------------------------
+# Skip markers
+# -------------------------------------------------------------------
+try:
+    import nd._change
+except ImportError:
+    GSL = False
+else:
+    GSL = True
+
+requires_gsl = pytest.mark.skipif(not GSL, reason="This test requires libgsl")
+# -------------------------------------------------------------------
 
 
 def generate_test_dataset(

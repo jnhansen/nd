@@ -6,7 +6,7 @@ from collections import OrderedDict
 from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
-                        assert_equal_files, assert_equal_crs)
+                        assert_equal_files, assert_equal_crs, requires_gsl)
 from nd import warp, filters, io, change, utils, visualize
 from nd._xarray import patch_doc
 from rasterio.crs import CRS
@@ -217,6 +217,7 @@ def test_accessor_nd_apply(generator):
 # Test change detection accessors
 # -------------------------------
 
+@requires_gsl
 def test_accessor_nd_omnibus():
     ds1 = generate_test_dataset(
         dims={'y': 5, 'x': 5, 'time': 10},
