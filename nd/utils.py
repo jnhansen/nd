@@ -12,8 +12,9 @@ import itertools
 from collections import OrderedDict
 import re
 from operator import add
-from functools import reduce
+from functools import reduce, wraps, partial
 import inspect
+import shutil
 
 
 __all__ = ['get_shape',
@@ -33,6 +34,66 @@ __all__ = ['get_shape',
            'is_complex',
            'apply'
            ]
+
+
+# -------------------------------------------------------------------
+# Dependency checks
+# -------------------------------------------------------------------
+check_dependencies = {}
+check_dependencies['gsl'] = (shutil.which('gsl-config') is not None)
+check_dependencies['gdal'] = (shutil.which('gdal-config') is not None)
+# -------------------------------------------------------------------
+
+
+def requires(dependency=[]):
+    """Class decorator to specify dependency requirements.
+
+    Will raise an ImportError when the class is instantiated
+    if any of the dependencies are missing. This relies on
+    `nd.utils.check_dependencies`.
+    """
+    if isinstance(dependency, (list, tuple)):
+        check = all(
+            [check_dependencies[d] for d in dependency]
+        )
+    else:
+        check = check_dependencies[dependency]
+
+    def decorator(cls):
+        old_init = cls.__init__
+        @wraps(cls.__init__)
+        def new_init(self, *args, **kwargs):
+            if not check:
+                raise ImportError('This function requires the following '
+                                  'dependencies: {}'.format(dependency))
+            return old_init(self, *args, **kwargs)
+
+        cls.__init__ = new_init
+        cls._requires = dependency
+        cls._skip = not check
+        return cls
+    return decorator
+
+
+# def _requires(func, dependency):
+#     if isinstance(dependency, (list, tuple)):
+#         check = all(
+#             [check_dependencies[d] for d in dependency]
+#         )
+#     else:
+#         check = check_dependencies[dependency]
+
+#     @wraps(func)
+#     def wrapper(*args, **kwargs):
+#         if not check:
+#             raise ImportError('This function requires the following '
+#                               'dependencies: {}'.format(dependency))
+#         return func(*args, **kwargs)
+
+#     return wrapper
+
+
+# requires = partial(_requires, dependency=[])
 
 
 def get_shape(ds):
