@@ -9,8 +9,10 @@ except ImportError:
 else:
     GSL = True
 
+requires_gsl = pytest.mark.skipif(not GSL, reason="This test requires libgsl")
 
-@pytest.mark.skipif(not GSL, rason="This test requires libgsl")
+
+@requires_gsl
 def test_change():
     ds1 = testing.generate_test_dataset(
         dims={'y': 5, 'x': 5, 'time': 10},
