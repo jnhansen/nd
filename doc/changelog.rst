@@ -1,13 +1,14 @@
 Changelog
 =========
 
-Version 0.2 (*under development*)
------------------------------------
+Version 0.2
+-----------
 
 General updates
 ...............
 
 - add support for Python 3.8
+- make ``libgsl`` dependency optional
 
 :mod:`nd.classify`
 ..................
@@ -20,6 +21,13 @@ General updates
 
 - added :func:`nd.tiling.debuffer()` to automatically remove buffer from
   tiled datasets
+
+
+:mod:`nd.utils`
+...............
+
+- added :func:`nd.utils.apply()` to apply functions with specified signature to arbitrary subsets of dataset dimensions
+
 
 :mod:`nd.visualize`
 ...................
