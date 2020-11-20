@@ -27,6 +27,6 @@ Rebuilding the C extensions from Cython
 
 In case you want to rebuild the C extensions from the
 ``.pyx`` files, you need to install the additional dependencies
-``cython`` and ``cythongsl``. With those are installed,
+``cython`` and ``cythongsl``. With those installed,
 ``pip install`` will automatically regenerate the C files
 prior to compilation.
