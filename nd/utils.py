@@ -75,27 +75,6 @@ def requires(dependency=[]):
     return decorator
 
 
-# def _requires(func, dependency):
-#     if isinstance(dependency, (list, tuple)):
-#         check = all(
-#             [check_dependencies[d] for d in dependency]
-#         )
-#     else:
-#         check = check_dependencies[dependency]
-
-#     @wraps(func)
-#     def wrapper(*args, **kwargs):
-#         if not check:
-#             raise ImportError('This function requires the following '
-#                               'dependencies: {}'.format(dependency))
-#         return func(*args, **kwargs)
-
-#     return wrapper
-
-
-# requires = partial(_requires, dependency=[])
-
-
 def get_shape(ds):
     # The coords are in the right order, while dims and sizes are not
     return tuple([ds.sizes[c] for c in ds.coords if c in ds.dims])
