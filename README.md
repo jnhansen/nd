@@ -36,6 +36,11 @@ The GDAL library is only used via ``rasterio`` as a compatibility layer to enabl
 
 Read the [Documentation](https://nd.readthedocs.io/en/latest/) for detailed user guides.
 
+You can also have a look at these two example notebooks:
+
+- [Visualizing and reprojecting GHRSST data](examples/tutorial_ghrsst.ipynb)
+- [Change detection in Sentinel-1](examples/tutorial_s1.ipynb)
+
 ## Installation
 
 ```
