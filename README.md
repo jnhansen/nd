@@ -2,6 +2,7 @@
 [![codecov](https://codecov.io/gh/jnhansen/nd/branch/master/graph/badge.svg)](https://codecov.io/gh/jnhansen/nd)
 [![Documentation](https://readthedocs.org/projects/nd/badge/?version=latest)](https://nd.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/nd.svg)](https://badge.fury.io/py/nd)
+[![DOI](https://zenodo.org/badge/130597386.svg)](https://zenodo.org/badge/latestdoi/130597386)
 
 
 # nd
