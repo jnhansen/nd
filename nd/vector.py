@@ -54,6 +54,8 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
         Either the filename of a shapefile or an iterable
     ds : xarray.Dataset
         The reference dataset to match the raster shape.
+    columns : list of str, optional
+        List of column names to read.
     encode_labels : bool, optional
         If True, convert categorical data to integer values. The corresponding
         labels are accessible in the metadata.
