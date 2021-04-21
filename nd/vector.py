@@ -45,7 +45,8 @@ def read_file(path, clip=None):
     return gpd.GeoDataFrame.from_features(records(path, clip))
 
 
-def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
+def rasterize(shp, ds, columns=None, encode_labels=True,
+              date_field=None, date_fmt=None):
     """Rasterize a vector dataset to match a reference raster.
 
     Parameters
@@ -62,6 +63,8 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
         (default: True).
     date_field : str, optional
         The name of field containing the timestamp.
+    date_fmt : str, optional
+        The date format to parse date_field. Passed to pd.to_datetime().
 
     Returns
     -------
@@ -104,7 +107,7 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
     else:
         if date_field not in shp:
             raise ValueError('Field {} does not exist.'.format(date_field))
-        shp[date_field] = pd.to_datetime(shp[date_field])
+        shp[date_field] = pd.to_datetime(shp[date_field], format=date_fmt)
 
     if columns is not None:
         # Avoid duplicate columns if 'geometry' or date_field have been
