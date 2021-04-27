@@ -485,7 +485,8 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         The corresponding GeoAxes object.
 
     """
-
+    if cartopy is None:
+        raise ImportError('Cartopy is required for this function.')
     if background == '_default':
         try:
             background = cimgt.Stamen('terrain-background')
