@@ -113,6 +113,7 @@ if not mock_install:
         "pyproj>=2.0",
         "geopandas",
         "scikit-image",
+        "multiprocess",
     ])
 
 setup(
