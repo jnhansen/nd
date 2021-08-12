@@ -147,7 +147,10 @@ def get_crs(ds, format='crs'):
             try:
                 crs = _parse_crs(ds['crs'].attrs[attr])
             except CRSError:
-                pass
+                try:
+                    crs = _parse_crs(ds['crs'].attrs[attr][0])
+                except CRSError:
+                    pass
             else:
                 break
 
@@ -341,6 +344,8 @@ def _get_transform_from_metadata(ds):
     elif isinstance(ds, xr.Dataset) and \
             'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
         transf_str = ds.data_vars['crs'].attrs['i2m']
+        if isinstance(transf_str, np.ndarray) and len(transf_str) == 1:
+            transf_str = transf_str[0]
         a = list(map(float, transf_str.split(',')))
         return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
 
@@ -730,6 +735,11 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
         # rasterio cannot deal with float16
         if da.dtype == np.float16:
             values = values.astype(np.float32)
+
+        # Integers cannot be set to nan
+        if np.issubdtype(values.dtype, np.integer):
+            values = values.astype(np.float32)
+
         output = np.zeros(output_shape_flat, dtype=values.dtype)
         output[:] = np.nan
 
