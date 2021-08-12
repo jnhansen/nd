@@ -103,9 +103,12 @@ def get_dims(ds):
     """
     # The ordered dictionary is hidden behind two wrappers,
     # need to access the dict behind the Frozen(SortedKeysDict).
-    if isinstance(ds, xr.Dataset):
+    if (xr.__version__ < '0.19.0') \
+            and isinstance(ds, xr.Dataset):
         return tuple(ds.sizes.mapping.mapping)
-    elif isinstance(ds, xr.DataArray):
+    else:
+        # The following code always works for DataArrays,
+        # and also for Datasets for xarray >= 0.19.0
         return tuple(ds.sizes.mapping)
 
 

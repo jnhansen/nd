@@ -521,7 +521,7 @@ def test_get_common_resolution_different_projections():
 def test_get_dims(generator):
     dims = {'x': 5, 'y': 10, 'time': 15}
     ds = generator(dims=dims)
-    assert_equal(warp.get_dims(ds), dims)
+    assert_equal(warp.get_dim_sizes(ds), dims)
 
 
 @pytest.mark.parametrize('extra,dims', [
@@ -720,7 +720,7 @@ def test_reprojection_nan_values():
 
 def test_reproject_coordinates():
     ds = generate_test_dataset(crs=epsg4326)
-    dims = warp.get_dims(ds)
+    dims = warp.get_dim_sizes(ds)
     ds.coords['lat'] = ds['y']
     ds.coords['lon'] = ds['x']
     ds.coords['altitude'] = (('y', 'x'),

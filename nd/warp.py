@@ -14,7 +14,7 @@ from rasterio.errors import CRSError
 from affine import Affine
 from .algorithm import Algorithm, wrap_algorithm, parallelize
 from .io import to_netcdf, open_dataset, disassemble_complex
-from .utils import get_vars_for_dims
+from .utils import get_vars_for_dims, get_dims
 try:
     import skimage
 except ImportError:
@@ -43,16 +43,16 @@ __all__ = ['Reprojection',
            'get_common_resolution']
 
 
-def _get_dim_order(ds):
-    """
-    Return the dimension of dataset `ds` in order.
-    """
-    # The ordered dictionary is hidden behind two wrappers,
-    # need to access the dict behind the Frozen(SortedKeysDict).
-    if isinstance(ds, xr.Dataset):
-        return list(ds.sizes.mapping.mapping)
-    elif isinstance(ds, xr.DataArray):
-        return list(ds.sizes.mapping)
+# def _get_dim_order(ds):
+#     """
+#     Return the dimension of dataset `ds` in order.
+#     """
+#     # The ordered dictionary is hidden behind two wrappers,
+#     # need to access the dict behind the Frozen(SortedKeysDict).
+#     if isinstance(ds, xr.Dataset):
+#         return list(ds.sizes.mapping.mapping)
+#     elif isinstance(ds, xr.DataArray):
+#         return list(ds.sizes.mapping)
 
 
 def _get_projection_dim_order(ds):
@@ -60,7 +60,7 @@ def _get_projection_dim_order(ds):
     Return the dimension order required by the projection operations.
     This moves the x and y dimensions to the end.
     """
-    dims = _get_dim_order(ds)
+    dims = get_dims(ds)
     extra_dims = set(dims) - {'y', 'x'}
     ordered_extra_dims = \
         tuple(d for d in dims if d in extra_dims)
@@ -475,7 +475,7 @@ def get_common_resolution(datasets, mode='min'):
         return tuple(resolutions.mean(axis=0))
 
 
-def get_dims(ds):
+def get_dim_sizes(ds):
     if isinstance(ds, xr.Dataset):
         return dict(ds.dims)
     elif isinstance(ds, xr.DataArray):
@@ -483,11 +483,11 @@ def get_dims(ds):
 
 
 def nrows(ds):
-    return get_dims(ds)['y']
+    return get_dim_sizes(ds)['y']
 
 
 def ncols(ds):
-    return get_dims(ds)['x']
+    return get_dim_sizes(ds)['x']
 
 
 def _add_latlon(ds, n=50):
@@ -678,7 +678,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
                 **src_bounds._asdict())
 
     src_transform = get_transform(ds)
-    src_dims = _get_dim_order(ds)
+    src_dims = get_dims(ds)
     dst_crs = _parse_crs(dst_crs)
 
     #
@@ -704,7 +704,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
         coord_dims = tuple(c for c in ('y', 'x') if c in da.dims)
         extra_dims = set(da.dims) - set(coord_dims)
         # Preserve original dimension order
-        orig_dim_order = _get_dim_order(da)
+        orig_dim_order = get_dims(da)
         ordered_extra_dims = \
             tuple(d for d in orig_dim_order if d in extra_dims)
         dim_order = ordered_extra_dims + coord_dims
@@ -808,7 +808,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
             if set(ds[v].dims) == set(vdims) or set(ds[v].dims) == {'y', 'x'}:
                 result[v] = (vdims, _reproject_da(ds[v], shape))
                 # Reorder dimensions of each variable to match original.
-                result[v] = result[v].transpose(*_get_dim_order(ds[v]),
+                result[v] = result[v].transpose(*get_dims(ds[v]),
                                                 transpose_coords=True)
             elif common == {'x'} or common == {'y'}:
                 # Does the data contain either x or y dimension?
@@ -836,7 +836,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
                               coords=dst_coords, name=ds.name)
 
         # Reorder dimensions to match original.
-        result = result.transpose(*_get_dim_order(ds), transpose_coords=True)
+        result = result.transpose(*get_dims(ds), transpose_coords=True)
 
     #
     # Add metadata
