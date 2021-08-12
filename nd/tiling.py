@@ -264,7 +264,14 @@ def debuffer(datasets, flat=True):
                  in zip(data, [None] + buf_start, buf_stop + [None])]
         # Force conversion to ndarray *without* converting the
         # xarray Datasets:
-        return np.asarray(debuf + [None])[:-1]
+        # For numpy >= 1.20.0, the following line no longer works:
+        #   return np.asarray(debuf + [None])[:-1]
+        # Need to use the following hacky workaround:
+        N = len(debuf)
+        arr = np.empty(N, dtype=object)
+        for i in range(N):
+            arr[i] = debuf[i]
+        return arr
 
     dims = utils.get_dims(datasets[0])
     grid = sort_into_array(datasets)
