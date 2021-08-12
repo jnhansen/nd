@@ -27,19 +27,26 @@ def read_file(path, clip=None):
     -------
     geopandas.GeoDataFrame
     """
+    if clip is None:
+        return gpd.read_file(path)
+
     def records(filename, geom):
         with fiona.open(filename) as source:
             for feature in source:
                 if geom is None:
                     yield feature
                 else:
+                    if feature['geometry'] is None:
+                        continue
                     poly = shapely.geometry.shape(feature['geometry'])
                     if poly.intersects(geom):
                         yield feature
+
     return gpd.GeoDataFrame.from_features(records(path, clip))
 
 
-def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
+def rasterize(shp, ds, columns=None, encode_labels=True,
+              date_field=None, date_fmt=None):
     """Rasterize a vector dataset to match a reference raster.
 
     Parameters
@@ -48,12 +55,16 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
         Either the filename of a shapefile or an iterable
     ds : xarray.Dataset
         The reference dataset to match the raster shape.
+    columns : list of str, optional
+        List of column names to read.
     encode_labels : bool, optional
         If True, convert categorical data to integer values. The corresponding
         labels are accessible in the metadata.
         (default: True).
     date_field : str, optional
         The name of field containing the timestamp.
+    date_fmt : str, optional
+        The date format to parse date_field. Passed to pd.to_datetime().
 
     Returns
     -------
@@ -96,7 +107,7 @@ def rasterize(shp, ds, columns=None, encode_labels=True, date_field=None):
     else:
         if date_field not in shp:
             raise ValueError('Field {} does not exist.'.format(date_field))
-        shp[date_field] = pd.to_datetime(shp[date_field])
+        shp[date_field] = pd.to_datetime(shp[date_field], format=date_fmt)
 
     if columns is not None:
         # Avoid duplicate columns if 'geometry' or date_field have been

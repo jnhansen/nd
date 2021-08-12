@@ -58,36 +58,59 @@ def get_gsl_lib_dir():
     return lib_gsl_dir
 
 
+# Check if libgsl is available
+try:
+    GSL_INC_DIR = get_gsl_include_dir()
+    GSL_LIB_DIR = get_gsl_lib_dir()
+    GSL = True
+except ImportError:
+    GSL = False
+
 change_libraries = ['gsl', 'gslcblas']
-change_library_dirs = [get_gsl_lib_dir()]
+if mock_install or not GSL:
+    change_library_dirs = []
+else:
+    change_library_dirs = [GSL_LIB_DIR]
 change_include_dirs = ['.']
 
 cmdclass = {}
 
 extensions = [
-    Extension("nd._change", ["nd/_change" + ext],
-              libraries=change_libraries,
-              library_dirs=change_library_dirs,
-              include_dirs=change_include_dirs,
-              extra_compile_args=['-O3'],
-              extra_link_args=[],
-              ),
     Extension("nd._filters", ["nd/_filters" + ext],
               extra_compile_args=['-O3'],
               extra_link_args=[],
               ),
     Extension("nd._warp", ["nd/_warp" + ext]),
 ]
+if GSL:
+    # Only build the cython change module
+    # if libgsl is available
+    extensions.append(
+        Extension("nd._change", ["nd/_change" + ext],
+                  libraries=change_libraries,
+                  library_dirs=change_library_dirs,
+                  include_dirs=change_include_dirs,
+                  extra_compile_args=['-O3'],
+                  extra_link_args=[],
+                  )
+    )
 
 if USE_CYTHON:
     extensions = cythonize(
         extensions, compiler_directives=compiler_directives)
     cmdclass = {'build_ext': build_ext}
 
-include_dirs = [
-    numpy.get_include(),
-    get_gsl_include_dir()
-]
+if mock_install:
+    include_dirs = []
+elif not GSL:
+    include_dirs = [
+        numpy.get_include()
+    ]
+else:
+    include_dirs = [
+        numpy.get_include(),
+        GSL_INC_DIR
+    ]
 
 install_requires = [
     "numpy",
@@ -119,7 +142,7 @@ if not mock_install:
 setup(
     use_scm_version=True,
     cmdclass=cmdclass,
-    ext_modules=extensions,
+    ext_modules=extensions if not mock_install else [],
     include_dirs=include_dirs,
     install_requires=install_requires
 )

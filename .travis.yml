@@ -1,29 +1,54 @@
-sudo: required
 cache:
   directories:
   - "~/.cache/pip"
-dist: trusty
 language: python
 addons:
   apt:
     packages:
-    - libhdf5-serial-dev
-    - netcdf-bin
-    - libnetcdf-dev
-    - gsl-bin
-    - libgsl0-dev
-    - libgdal1-dev
+    - &basic_deps [libhdf5-serial-dev, netcdf-bin, libnetcdf-dev]
+    - &gsl_deps [gsl-bin, libgsl0-dev]
+    - &gdal_deps [libgdal1-dev]
 before_install:
 - sudo apt-get update -q
 - nc-config --version
 - h5cc -showconfig
-matrix:
+jobs:
   include:
   - python: 3.5
+    addons:
+      apt:
+        packages:
+          - *basic_deps
+          - *gdal_deps
+          - *gsl_deps
   - python: 3.6
+    addons:
+      apt:
+        packages:
+          - *basic_deps
+          - *gdal_deps
+          - *gsl_deps
   - python: 3.7
-    dist: xenial
-    sudo: true
+    addons:
+      apt:
+        packages:
+          - *basic_deps
+          - *gdal_deps
+          - *gsl_deps
+  - python: 3.8
+    addons:
+      apt:
+        packages:
+          - *basic_deps
+          - *gdal_deps
+          - *gsl_deps
+  - python: 3.7
+    env: NOGSL=True
+    addons:
+      apt:
+        packages:
+          - *basic_deps
+          - *gdal_deps
 install:
 - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
 - bash miniconda.sh -b -p $HOME/miniconda
@@ -32,8 +57,8 @@ install:
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 - conda info -a
-- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
-  pytest pytest-cov coverage cartopy ffmpeg
+- conda create -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
+  rasterio ffmpeg cartopy pytest pytest-cov coverage -c conda-forge
 - source activate test-environment
 - pip install scikit-learn scikit-image codecov
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal

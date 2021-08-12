@@ -12,7 +12,7 @@ from rasterio.coords import BoundingBox
 from rasterio.crs import CRS
 from rasterio.errors import CRSError
 from affine import Affine
-from .algorithm import Algorithm, wrap_algorithm
+from .algorithm import Algorithm, wrap_algorithm, parallelize
 from .io import to_netcdf, open_dataset, disassemble_complex
 from .utils import get_vars_for_dims
 try:
@@ -147,7 +147,10 @@ def get_crs(ds, format='crs'):
             try:
                 crs = _parse_crs(ds['crs'].attrs[attr])
             except CRSError:
-                pass
+                try:
+                    crs = _parse_crs(ds['crs'].attrs[attr][0])
+                except CRSError:
+                    pass
             else:
                 break
 
@@ -292,7 +295,10 @@ def get_extent(ds):
 
 def _to_pyproj(crs):
     """Convert a rasterio.crs.CRS to pyproj.Proj"""
-    return pyproj.Proj(**crs)
+    try:
+        return pyproj.Proj(crs.to_wkt())
+    except pyproj.exceptions.CRSError:
+        return pyproj.Proj(crs.to_proj4())
 
 
 def get_geometry(ds, crs={'init': 'epsg:4326'}):
@@ -338,6 +344,8 @@ def _get_transform_from_metadata(ds):
     elif isinstance(ds, xr.Dataset) and \
             'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
         transf_str = ds.data_vars['crs'].attrs['i2m']
+        if isinstance(transf_str, np.ndarray) and len(transf_str) == 1:
+            transf_str = transf_str[0]
         a = list(map(float, transf_str.split(',')))
         return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
 
@@ -563,7 +571,8 @@ def _collapse_coords(coords):
     return collapsed
 
 
-def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
+def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
+               width=None, height=None,
                res=None, extent=None, **kwargs):
     """Reproject a Dataset or DataArray.
 
@@ -571,6 +580,9 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
     ----------
     ds : xarray.Dataset or xarray.DataArray
         The input dataset
+    src_crs : CRS-like, optional
+        An object that can be parsed into a CRS. By default, try to infer from
+        input dataset.
     dst_crs : CRS-like, optional
         An object that can be parsed into a CRS. By default, use the same
         CRS as the input dataset.
@@ -593,7 +605,11 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         The projected dataset.
     """
 
-    src_crs = get_crs(ds)
+    if src_crs is None:
+        src_crs = get_crs(ds)
+    if src_crs is None:
+        raise CRSError('Could not infer projection from input data. '
+                       'Please provide the parameter `src_crs`.')
     src_bounds = get_bounds(ds)
     if extent is not None:
         extent = BoundingBox(*extent)
@@ -719,6 +735,11 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
         # rasterio cannot deal with float16
         if da.dtype == np.float16:
             values = values.astype(np.float32)
+
+        # Integers cannot be set to nan
+        if np.issubdtype(values.dtype, np.integer):
+            values = values.astype(np.float32)
+
         output = np.zeros(output_shape_flat, dtype=values.dtype)
         output[:] = np.nan
 
@@ -753,17 +774,22 @@ def _reproject(ds, dst_crs=None, dst_transform=None, width=None, height=None,
             # that are defined over only one variable.
             #
             if dst_crs == src_crs and v not in ds.dims:
-                expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
-                if ds.coords[v].dims == ('x',):
-                    result.coords[v] = (('y', 'x'), _reproject_da(
-                        expanded, (height, width)))
-                elif ds.coords[v].dims == ('y',):
-                    result.coords[v] = (('y', 'x'), _reproject_da(
-                        expanded, (height, width)))
 
-                # Remove redundant dimensions
-                coords = _collapse_coords(result.coords[v])
-                result.coords[v] = (coords.dims, coords)
+                if len(ds.coords[v].dims) == 0:
+                    result.coords[v] = (ds.coords[v].dims, ds.coords[v])
+
+                else:
+                    expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
+                    if ds.coords[v].dims == ('x',):
+                        result.coords[v] = (('y', 'x'), _reproject_da(
+                            expanded, (height, width)))
+                    elif ds.coords[v].dims == ('y',):
+                        result.coords[v] = (('y', 'x'), _reproject_da(
+                            expanded, (height, width)))
+
+                    # Remove redundant dimensions
+                    coords = _collapse_coords(result.coords[v])
+                    result.coords[v] = (coords.dims, coords)
 
             if not set(ds.coords[v].dims).issuperset({'x', 'y'}):
                 continue
@@ -839,8 +865,12 @@ class Reprojection(Algorithm):
     ----------
     target : xarray.Dataset or xarray.DataArray, optional
         A reference to which a dataset will be aligned.
-    crs : dict or str
+    src_crs : dict or str, optional
+        The coordinate system of the input data (default: infer from data).
+    dst_crs : dict or str, optional
         The output coordinate reference system as dictionary or proj-string
+    crs : dict or str, optional
+        Alias for dst_crs for backwards compatiblity.
     extent : tuple, optional
         The output extent. By default this is inferred from the input data.
     res : tuple, optional
@@ -856,17 +886,18 @@ class Reprojection(Algorithm):
         Extra keyword arguments for ``rasterio.warp.reproject``.
     """
 
-    def __init__(self, target=None, crs=None, extent=None, res=None,
-                 width=None, height=None, transform=None, **kwargs):
+    def __init__(self, target=None, src_crs=None, dst_crs=None, crs=None,
+                 extent=None, res=None, width=None, height=None,
+                 transform=None, **kwargs):
         if target is not None:
             # Parse target information
-            for param in ['crs', 'transform', 'width', 'height', 'extent',
+            for param in ['dst_crs', 'transform', 'width', 'height', 'extent',
                           'res']:
                 if locals()[param] is not None:
                     warnings.warn('`{}` is ignored if `target` is '
                                   'specified.'.format(param))
 
-            crs = get_crs(target)
+            dst_crs = get_crs(target)
             transform = get_transform(target)
             width = ncols(target)
             height = nrows(target)
@@ -881,7 +912,17 @@ class Reprojection(Algorithm):
             raise ValueError('Need to provide either `width` and `height` or '
                              'resolution when specifying the extent.')
 
-        self.crs = _parse_crs(crs)
+        if src_crs is None:
+            self.src_crs = None
+        else:
+            self.src_crs = _parse_crs(src_crs)
+
+        if crs is not None and dst_crs is not None:
+            warnings.warn('`crs` is ignored if `dst_crs` is specified.')
+
+        self.dst_crs = _parse_crs(
+            dst_crs if dst_crs is not None else crs
+        )
         self.extent = extent
         self.res = res
         self.width = width
@@ -889,6 +930,13 @@ class Reprojection(Algorithm):
         self.transform = transform
         self.kwargs = kwargs
 
+    def _buffer(self):
+        return 0
+
+    def _parallel_dimension(self, ds):
+        return 'time'
+
+    @parallelize
     def apply(self, ds):
         """Apply the projection to a dataset.
 
@@ -903,7 +951,8 @@ class Reprojection(Algorithm):
             The reprojected dataset.
         """
 
-        return _reproject(ds, dst_crs=self.crs, dst_transform=self.transform,
+        return _reproject(ds, src_crs=self.src_crs, dst_crs=self.dst_crs,
+                          dst_transform=self.transform,
                           width=self.width, height=self.height, res=self.res,
                           extent=self.extent, **self.kwargs)
 
@@ -934,6 +983,7 @@ class Resample(Algorithm):
         self.height = height
         self.kwargs = kwargs
 
+    @parallelize
     def apply(self, ds):
         """Resample the dataset.
 
@@ -975,6 +1025,7 @@ class Alignment(Algorithm):
         self.crs = crs
         self.extent = extent
 
+    @parallelize
     def apply(self, datasets, path):
         """Resample datasets to common extent and resolution.
 
@@ -1021,7 +1072,7 @@ class Alignment(Algorithm):
         if crs is None:
             crs = get_crs(datasets[0])
 
-        proj = Reprojection(crs=crs, extent=extent, res=res)
+        proj = Reprojection(dst_crs=crs, extent=extent, res=res)
         for name, ds in zip(product_names, products):
             outfile = os.path.join(path, name + '_aligned.nc')
             if isinstance(ds, str):

@@ -388,7 +388,12 @@ def auto_merge(datasets, buffer=True, chunks={}, meta_variables=[],
         # combine_by_coords() was introduced in xarray 0.12.2
         if not use_xarray_combine:
             raise AttributeError('Requested use of custom implementation.')
-        merged = xr.combine_by_coords(datasets)
+        try:
+            merged = xr.combine_by_coords(datasets, combine_attrs='drop')
+        except TypeError:
+            # For xarray < 0.16
+            merged = xr.combine_by_coords(datasets)
+
     except AttributeError:
         merged = datasets
         while len(merged) > 1:

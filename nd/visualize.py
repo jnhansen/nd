@@ -37,11 +37,14 @@ CMAPS = {
 }
 
 
-def _cmap_from_str(cmap):
+def _parse_cmap(cmap):
     if cmap in CMAPS:
         return CMAPS[cmap]
-    else:
-        return cmap
+    try:
+        return getattr(cv2, 'COLORMAP_{}'.format(cmap.upper()))
+    except AttributeError:
+        pass
+    return cmap
 
 
 def calculate_shape(new_shape, orig_shape):
@@ -100,7 +103,7 @@ def colorize(labels, N=None, nan_vals=[], cmap='jet'):
         N = min(10, len(np.unique(labels)))
     data = (labels % N) * (255/(N-1))
     data_gray = cv2.cvtColor(data.astype(np.uint8), cv2.COLOR_GRAY2RGB)
-    data_color = cv2.applyColorMap(data_gray, _cmap_from_str(cmap))
+    data_color = cv2.applyColorMap(data_gray, _parse_cmap(cmap))
     for nv in nan_vals:
         data_color[labels == nv] = 0
     # data_color[labels == MASK_VAL] = 255
@@ -189,7 +192,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
             colored = cv2.cvtColor(im[:, :, 0], cv2.COLOR_GRAY2BGR)
             if cmap is not None:
                 # colored is now in BGR
-                colored = cv2.applyColorMap(colored, _cmap_from_str(cmap))
+                colored = cv2.applyColorMap(colored, _parse_cmap(cmap))
         else:
             # im is in RGB
             colored = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
@@ -209,9 +212,10 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
         cv2.imwrite(output, colored)
 
 
-def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
+def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
+                width=None, height=None, fps=1,
                 codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-                **kwargs):
+                cmap=None, mask=None, **kwargs):
     """
     Create a video from an xarray.Dataset.
 
@@ -221,9 +225,13 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         The dataset must have dimensions 'y', 'x', and 'time'.
     path : str
         The output file path of the video.
-    timestamp : bool, optional
-        Whether to print the timestamp in the upper left corner
-        (default: True).
+    timestamp : str, optional
+        Location to print the timestamp:
+        ['upper left', 'lower left', 'upper right', 'lower right',
+        'ul', 'll', 'ur', 'lr']
+        Set to `None` to disable (default: 'upper left').
+    fontcolor : tuple, optional
+        RGB tuple for timestamp font color (default: (0, 0, 0), i.e., black).
     width : int, optional
         The width of the video (default: ds.dim['x'])
     height : int, optional
@@ -236,14 +244,12 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
         A callable that takes a Dataset as input and returns a list of
         R, G, B channels. By default will compute the C11, C22, C11/C22
         representation.
-        For a DataArray, the video will be grayscale.
+        For a DataArray, use ``cmap``.
+    cmap : str, optional
+        For DataArrays only. Colormap used to colorize univariate data.
+    mask : np.ndarray, optional
+        If specified, parts of the image outside of the mask will be black.
     """
-    # Font properties for timestamp
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    bottomLeftCornerOfText = (20, 40)
-    fontScale = 1
-    fontColor = (0, 0, 0)
-    lineType = 2
 
     # For a DataArray, the video is grayscale.
     if isinstance(ds, xr.DataArray):
@@ -254,6 +260,22 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     height, width = calculate_shape(
         (height, width), (ds.coords['y'].size, ds.coords['x'].size)
     )
+
+    # Font properties for timestamp
+    if timestamp in ['upper right', 'ur']:
+        bottomLeftCornerOfText = (width-230, 40)
+    elif timestamp in ['lower left', 'll']:
+        bottomLeftCornerOfText = (20, height-20)
+    elif timestamp in ['lower right', 'lr']:
+        bottomLeftCornerOfText = (width-230, height-20)
+    elif timestamp in ['upper left', 'ul']:
+        bottomLeftCornerOfText = (20, 40)
+    else:
+        bottomLeftCornerOfText = (20, 40)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    fontScale = 1
+    fontColor = fontcolor
+    lineType = 2
 
     _, ext = os.path.splitext(path)
 
@@ -272,9 +294,9 @@ def write_video(ds, path, timestamp=True, width=None, height=None, fps=1,
     with imageio.get_writer(path, **writer_kwargs) as writer:
         for t in ds.time.values:
             d = ds.sel(time=t)
-            frame = to_rgb(rgb(d))
+            frame = to_rgb(rgb(d), cmap=cmap, mask=mask)
             frame = cv2.resize(frame, (width, height))
-            if timestamp:
+            if timestamp not in [False, None]:
                 cv2.putText(frame, str(t)[:10],
                             bottomLeftCornerOfText,
                             font,
@@ -352,8 +374,11 @@ def gridlines_with_labels(ax, top=True, bottom=True, left=True,
         gridline_coords[side] = ccrs.PlateCarree().transform_points(
             ax.projection, values[0], values[1])
 
-    lon_lim, lat_lim = gridliner._axes_domain(
-        background_patch=ax.background_patch)
+    # Get longitude and latitude limits
+    points = np.concatenate(list(gridline_coords.values()))
+    lon_lim = (points[:, 0].min(), points[:, 0].max())
+    lat_lim = (points[:, 1].min(), points[:, 1].max())
+
     ticklocs = {
         'x': gridliner.xlocator.tick_values(lon_lim[0], lon_lim[1]),
         'y': gridliner.ylocator.tick_values(lat_lim[0], lat_lim[1])
@@ -460,7 +485,8 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         The corresponding GeoAxes object.
 
     """
-
+    if cartopy is None:
+        raise ImportError('Cartopy is required for this function.')
     if background == '_default':
         try:
             background = cimgt.Stamen('terrain-background')
@@ -477,9 +503,8 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         buffer += 1.0
     buffered = shapely.affinity.scale(
         geometry_data, xfact=buffer, yfact=buffer)
-    project = pyproj.Transformer.from_proj(
-            warp._to_pyproj(ds.nd.crs),
-            pyproj.Proj(init='epsg:4326'))
+    project = pyproj.Transformer.from_crs(
+            ds.nd.crs, 'epsg:4326')
     b = shapely.ops.transform(project.transform, buffered).bounds
     extent = [b[0], b[2], b[1], b[3]]
     bb = Bbox.from_extents(extent)
@@ -488,6 +513,12 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
     # (centered at the polygon)
     # ----------------------------------
     map_crs = _get_orthographic_projection(ds)
+    proj4_params = map_crs.proj4_params
+    if 'a' in proj4_params:
+        # Some version of cartopy add the parameter 'a'.
+        # For some reason, the CRS cannot be parsed by rasterio with
+        # this parameter present.
+        del proj4_params['a']
 
     # Create figure
     # -------------
@@ -514,7 +545,7 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
 
     # Add polygon
     # -----------
-    geometry_map = warp.get_geometry(ds, crs=map_crs.proj4_params)
+    geometry_map = warp.get_geometry(ds, crs=proj4_params)
     ax.add_geometries([geometry_map], crs=map_crs,
                       facecolor=(1, 0, 0, 0.2), edgecolor=(0, 0, 0, 1))
 

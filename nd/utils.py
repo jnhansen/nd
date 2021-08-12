@@ -1,7 +1,6 @@
 """
 This module provides several helper functions.
 """
-import sys
 import numpy as np
 import xarray as xr
 import multiprocess as mp
@@ -31,7 +30,8 @@ __all__ = ['get_shape',
            'select',
            'get_vars_for_dims',
            'expand_variables',
-           'is_complex'
+           'is_complex',
+           'apply'
            ]
 
 
@@ -88,7 +88,6 @@ def requires(dependency=[]):
         cls._requires = dependency
         cls._skip = not check
         return cls
-
     return decorator
 
 
@@ -98,8 +97,15 @@ def get_shape(ds):
 
 
 def get_dims(ds):
-    # The coords are in the right order, while dims and sizes are not
-    return tuple([c for c in ds.coords if c in ds.dims])
+    """
+    Return the dimension of dataset `ds` in order.
+    """
+    # The ordered dictionary is hidden behind two wrappers,
+    # need to access the dict behind the Frozen(SortedKeysDict).
+    if isinstance(ds, xr.Dataset):
+        return tuple(ds.sizes.mapping.mapping)
+    elif isinstance(ds, xr.DataArray):
+        return tuple(ds.sizes.mapping)
 
 
 def squeeze(obj):
@@ -175,8 +181,10 @@ def array_chunks(array, n, axis=0, return_indices=False):
         Consecutive slices of `array` of size `n`.
     """
     if axis >= array.ndim:
-        raise ValueError("axis {:d} is out of range for given array."
-                         .format(axis))
+        raise ValueError(
+            "axis {:d} is out of range for given array."
+            .format(axis)
+        )
 
     arr_len = array.shape[axis]
     for i in range(0, arr_len, n):
@@ -216,8 +224,10 @@ def block_split(array, blocks):
             [14, 15]])]
     """
     if array.ndim != len(blocks):
-        raise ValueError("Length of 'blocks' must be equal to the "
-                         "array dimensionality.")
+        raise ValueError(
+            "Length of 'blocks' must be equal to the "
+            "array dimensionality."
+        )
 
     result = [array]
     for axis, nblocks in enumerate(blocks):
@@ -242,8 +252,10 @@ def block_merge(array_list, blocks):
         A numpy array with dimension len(blocks).
     """
     if len(array_list) != np.prod(blocks):
-        raise ValueError("Length of array list must be equal to the "
-                         "product of the shape elements.")
+        raise ValueError(
+            "Length of array list must be equal to the "
+            "product of the shape elements."
+        )
 
     result = array_list
     for i, nblocks in enumerate(blocks[::-1]):
@@ -294,8 +306,11 @@ def xr_merge(ds_list, dim, buffer=0):
     xarray.Dataset
     """
     if buffer > 0 and len(ds_list) > 1:
-        idx_first = slice(None, -buffer)
-        idx_middle = slice(buffer, -buffer)
+        # Explicit conversion to int fixes
+        # underflow issue that sometimes arises
+        # when called from @algorithm.parallelize decorated function
+        idx_first = slice(None, -int(buffer))
+        idx_middle = slice(buffer, -int(buffer))
         idx_end = slice(buffer, None)
         parts = [ds_list[0].isel(**{dim: idx_first})] + \
                 [ds.isel(**{dim: idx_middle}) for ds in ds_list[1:-1]] + \
@@ -483,8 +498,10 @@ def is_complex(ds):
             [np.iscomplexobj(v) for v in ds.data_vars.values()]
         )
     else:
-        raise ValueError('Not an xarray Dataset or DataArray: {}'.format(
-                         repr(ds)))
+        raise ValueError(
+            "Not an xarray Dataset or DataArray: {}"
+            .format(repr(ds))
+        )
 
 
 def _wlen(s):
@@ -494,6 +511,10 @@ def _wlen(s):
 
 def parse_docstring(doc):
     parsed = OrderedDict()
+
+    if doc is None:
+        return parsed
+
     lines = doc.split('\n')
 
     # Find indentation level and reset to 0
@@ -532,9 +553,41 @@ def parse_docstring(doc):
     return parsed
 
 
-def assemble_docstring(parsed):
+def assemble_docstring(parsed, sig=None):
+    """
+    Assemble a docstring from an OrderedDict as returned by
+    :meth:`nd.utils.parse_docstring()`
+
+    Parameters
+    ----------
+    parsed : OrderedDict
+        A parsed docstring as obtained by ``nd.utils.parse_docstring()``.
+    sig : function signature, optional
+        If provided, the parameters in the docstring will be ordered according
+        to the parameter order in the function signature.
+
+    Returns
+    -------
+    str
+        The assembled docstring.
+
+    """
+
+    parsed = parsed.copy()
     indent = parsed.pop('indent')
     pad = ' '*indent
+
+    # Sort 'Parameters' section according to signature
+    if sig is not None and 'Parameters' in parsed:
+        order = tuple(sig.parameters.keys())
+
+        def sort_index(p):
+            key = p[0].split(':')[0].strip(' *')
+            if key == '':
+                return 9999
+            return order.index(key)
+
+        parsed['Parameters'] = sorted(parsed['Parameters'], key=sort_index)
 
     d = []
     for k, v in parsed.items():
@@ -549,3 +602,128 @@ def assemble_docstring(parsed):
         d.extend([(pad + l).rstrip() for l in flat_v])
 
     return '\n'.join(d)
+
+
+def apply(ds, fn, signature=None, njobs=1):
+    """
+    Apply a function to a Dataset that operates on a defined
+    subset of dimensions.
+
+    Parameters
+    ----------
+    ds : xr.Dataset or xr.DataArray
+        The dataset to which to apply the function.
+    fn : function
+        The function to apply to the Dataset.
+    signature : str, optional
+        The signature of the function in dimension names,
+        e.g. '(time,var)->(time)'.
+        If 'var' is included, the Dataset variables will be converted into
+        a new dimension and the result will be a DataArray.
+    njobs : int, optional
+        The number of jobs to run in parallel.
+
+    Returns
+    -------
+    xr.Dataset
+        The output dataset with changed dimensions according to the
+        function signature.
+    """
+
+    def _parse_signature(sig):
+        if sig is None:
+            sig = '(time,var)->(time)'
+        m = re.match('\((.*)\)->\((.*)\)', sig)
+        dims = tuple(group.split(',') if len(group) > 0 else []
+                     for group in m.groups())
+        if len(dims) != 2:
+            raise ValueError(
+                "Invalid signature: Signature must be of the "
+                "form '(<dim1>,...,<dimN>)->(<dim1>,...,<dimM>)'."
+            )
+        return dims
+
+    dims_in, dims_out = _parse_signature(signature)
+
+    # All output dimensions must also be input dimensions
+    if len(dims_out) > 0 and not set(dims_out).issubset(dims_in):
+        raise ValueError(
+            "Invalid signature: All output dimensions must "
+            "also be input dimensions."
+        )
+
+    # Vectorize function
+    fn_vec = np.vectorize(fn, signature=signature)
+
+    # If 'var' is an input, convert variables to new dimension.
+    if isinstance(ds, xr.Dataset) and 'var' in dims_in:
+        ds = ds.to_array(dim='var')
+
+    # Determine all extra dimensions
+    src_dims = get_dims(ds)
+    dims_removed = set(dims_in) - set(dims_out)
+    output_dims = [d for d in src_dims if d not in dims_removed]
+    extra_dims = tuple(set(src_dims) - set(dims_in))
+
+    # Flatten extra dimensions
+    ds = ds.stack(z=extra_dims).transpose('z', *dims_in)
+
+    def apply_func(ds):
+        # Apply function and turn into DataArray
+        result_arr = fn_vec(ds)
+        dims = ('z',) + tuple(dims_out)
+        result = xr.DataArray(
+            result_arr,
+            dims=dims, coords={d: ds.coords[d] for d in dims}
+        ).unstack()
+        return result
+
+    # Parallelize
+    if njobs != 1:
+        chunks = njobs if njobs > 0 else None
+        apply_func = parallel(apply_func, dim='z', chunks=chunks)
+
+    # Apply function
+    if isinstance(ds, xr.DataArray):
+        result = apply_func(ds)
+    elif isinstance(ds, xr.Dataset):
+        # Apply to each variable as DataArray
+        try:
+            result = ds.map(apply_func)
+        except AttributeError:
+            # Backwards compatibility for xarray < 0.14.1:
+            result = ds.apply(apply_func)
+
+    # Restore original dimension order
+    result = result.transpose(*output_dims)
+
+    # Turn back into Dataset
+    if 'var' in result.dims:
+        result = result.to_dataset(dim='var')
+
+    return result
+
+
+def extract_arguments(fn, args, kwargs):
+    """
+    Given a function fn, return the leftover `*args` and `**kwargs`.
+    """
+    def _(*args, **kwargs):
+        pass
+    sig = inspect.signature(fn)
+
+    # Remove 'self' parameter
+    if 'self' in sig.parameters:
+        sig = sig.replace(parameters=tuple(sig.parameters.values())[1:])
+
+    # Use an OrderedDict to maintain the parameter order in the signature
+    parameters = OrderedDict(sig.parameters)
+    parameters.update(OrderedDict(inspect.signature(_).parameters))
+    parameters = sorted(
+        parameters.values(),
+        key=lambda p: (p.kind, p.default is not inspect._empty)
+    )
+    new_sig = sig.replace(parameters=parameters)
+    bound = new_sig.bind(*args, **kwargs)
+    bound.apply_defaults()
+    return bound.arguments

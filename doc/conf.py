@@ -29,7 +29,7 @@ autodoc_mock_imports = [
     # 'matplotlib',
     # 'cython_gsl',
     'shapely',
-    'shapely.geometry',
+    'fiona',
     'pyproj',
     'cartopy',
     'sklearn',
@@ -46,6 +46,8 @@ autodoc_mock_imports = [
     'nd._change',
     ]
 autodoc_warningiserror = False
+
+autosummary_mock_imports = autodoc_mock_imports
 
 
 try:

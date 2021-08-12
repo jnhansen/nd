@@ -6,7 +6,7 @@ from collections import OrderedDict
 from numpy.testing import assert_equal
 from xarray.testing import assert_equal as xr_assert_equal
 from nd.testing import (generate_test_dataset, generate_test_dataarray,
-                        assert_equal_files, assert_equal_crs)
+                        assert_equal_files, assert_equal_crs, requires)
 from nd import warp, filters, io, change, utils, visualize
 from nd._xarray import patch_doc
 from rasterio.crs import CRS
@@ -126,6 +126,15 @@ def test_accessor_nd_to_rgb():
     )
 
 
+def test_accessor_nd_to_rgb_default():
+    ds = generate_test_dataset(dims={'y': 50, 'x': 50})
+
+    assert_equal(
+        visualize.to_rgb([ds.C11, ds.C22, ds.C11/ds.C22]),
+        ds.nd.to_rgb()
+    )
+
+
 def test_accessor_nd_to_video(tmpdir):
     ds = generate_test_dataset()
 
@@ -186,10 +195,33 @@ def test_accessor_nd_to_netcdf(tmpdir, generator):
     )
 
 
+# --------------------
+# Test general methods
+# --------------------
+@pytest.mark.parametrize('generator', [
+    generate_test_dataset,
+    generate_test_dataarray
+])
+def test_accessor_nd_apply(generator):
+    ds = generator()
+
+    def func(arr):
+        """Reduce a two dimensional array to its mean."""
+        return arr.mean()
+
+    signature = '(x,y)->()'
+
+    xr_assert_equal(
+        ds.nd.apply(func, signature=signature),
+        utils.apply(ds, func, signature=signature)
+    )
+
+
 # -------------------------------
 # Test change detection accessors
 # -------------------------------
 
+@requires('gsl')
 def test_accessor_nd_omnibus():
     ds1 = generate_test_dataset(
         dims={'y': 5, 'x': 5, 'time': 10},

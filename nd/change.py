@@ -1,7 +1,11 @@
 from .algorithm import Algorithm, wrap_algorithm
 from .io import disassemble_complex
 from .filters import BoxcarFilter
-from . import _change
+from .utils import requires
+try:
+    from . import _change
+except ImportError:
+    _change = None
 import numpy as np
 import xarray as xr
 
@@ -73,6 +77,7 @@ def _omnibus_change_detection(ds, alpha=0.01, ml=None, n=1, njobs=1):
     return change_arr
 
 
+@requires('gsl')
 class OmnibusTest(ChangeDetection):
     """
     OmnibusTest
@@ -98,6 +103,9 @@ class OmnibusTest(ChangeDetection):
     """
 
     def __init__(self, ml=None, n=1, alpha=0.01, *args, **kwargs):
+        if _change is None:
+            raise ImportError(
+                'This algorithm requires the _change extension to be built.')
         self.ml = ml
         self.n = n
         self.alpha = alpha
