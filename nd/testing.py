@@ -9,12 +9,25 @@ import rasterio.transform
 import rasterio.warp
 import shapely
 import geopandas as gpd
+import pytest
 from numpy.testing import assert_almost_equal
 from nd.algorithm import Algorithm
 from nd.warp import _parse_crs
+from nd.utils import check_requirements
 import hashlib
 import os
 from collections import OrderedDict
+
+
+def requires(dependency):
+    """Decorator to be used for skipping tests if the dependency
+    requirements are not met.
+    """
+    available = check_requirements(dependency)
+    return pytest.mark.skipif(
+        not available,
+        reason="This test requires the following "
+               "dependencies: {}".format(dependency))
 
 
 def generate_test_dataset(
