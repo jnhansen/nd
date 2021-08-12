@@ -679,7 +679,7 @@ def apply(ds, fn, signature=None, njobs=1):
         result = xr.DataArray(
             result_arr,
             dims=dims, coords={d: ds.coords[d] for d in dims}
-        ).unstack()
+        )
         return result
 
     # Parallelize
@@ -699,7 +699,7 @@ def apply(ds, fn, signature=None, njobs=1):
             result = ds.apply(apply_func)
 
     # Restore original dimension order
-    result = result.transpose(*output_dims)
+    result = result.unstack().transpose(*output_dims)
 
     # Turn back into Dataset
     if 'var' in result.dims:
