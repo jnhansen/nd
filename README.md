@@ -12,7 +12,7 @@
 The main goal of this library is to generalize
 methods that work in lower dimensions to higher-dimensional data.
 
-Multi-dimensional data often arises as spatio-temporal datacubes,
+Multi-dimensional data often arise as spatio-temporal datacubes,
 e.g. climate data or time series of geospatial satellite data.
 Many data analysis methods are designed to work on single images
 or time series at a single point.
@@ -26,7 +26,7 @@ Examples include
 - machine learning algorithms
 
 `nd` is built on `xarray`.
-Internally, all data is passed around as ``xarray`` Datasets and all provided methods expect this format as inputs.
+Internally, all data are passed around as ``xarray`` Datasets and all provided methods expect this format as inputs.
 An ``xarray.Dataset`` is essentially a Python representation of the NetCDF file format and as such easily reads/writes NetCDF files.
 
 
