@@ -1,6 +1,16 @@
 Changelog
 =========
 
+
+Version 0.3 *(under development)*
+---------------------------------
+
+General updates
+...............
+
+- drop support for Python 3.5
+
+
 Version 0.2
 -----------
 

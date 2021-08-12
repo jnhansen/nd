@@ -14,13 +14,6 @@ before_install:
 - h5cc -showconfig
 jobs:
   include:
-  - python: 3.5
-    addons:
-      apt:
-        packages:
-          - *basic_deps
-          - *gdal_deps
-          - *gsl_deps
   - python: 3.6
     addons:
       apt:
