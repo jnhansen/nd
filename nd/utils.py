@@ -14,6 +14,7 @@ from operator import add
 from functools import reduce, wraps
 import shutil
 import importlib
+import inspect
 
 
 __all__ = ['get_shape',
