@@ -818,7 +818,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
                 ))
             else:
                 # The variable doesn't contain either y or x dimension.
-                result[v] = (ds[v].dims, ds[v])
+                result[v] = (ds[v].dims, ds[v].data)
 
         #
         # Create lat and lon coordinates
