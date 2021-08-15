@@ -348,3 +348,40 @@ def test_extract_arguments(args, kwargs):
     bound = utils.extract_arguments(fn, args, kwargs)
     actual = fn(*args, **kwargs)
     assert_equal(bound, actual)
+
+
+@pytest.mark.parametrize('req,exists', [
+    ('numpy', True),
+    ('made_up_module', False),
+    ('gdal', True),
+    (['numpy', 'xarray'], True),
+    (['numpy', 'made_up_module'], False),
+])
+def test_check_requirements(req, exists):
+    assert utils.check_requirements(req) == exists
+
+
+@pytest.mark.parametrize('req,exists', [
+    ('numpy', True),
+    ('made_up_module', False),
+    ('gdal', True),
+    (['numpy', 'xarray'], True),
+    (['numpy', 'made_up_module'], False),
+])
+def test_requires(req, exists):
+    # Define class with given requirements
+    @utils.requires(req)
+    class C():
+        def __init__(self):
+            pass
+
+    if exists:
+        # Shoudl be able to instantiate class
+        try:
+            C()
+        except Exception as e:
+            pytest.fail(e)
+    else:
+        # Class instantiation should fail
+        with assert_raises_regex(ImportError, f'requires .* {req}'):
+            C()
