@@ -385,3 +385,14 @@ def test_requires(req, exists):
         # Class instantiation should fail
         with assert_raises_regex(ImportError, f'requires .* {req}'):
             C()
+
+
+def test_squeeze():
+    a = generate_test_dataarray(dims={'y': 1})
+    value = a.values[0]
+    squeezed = utils.squeeze(a)
+    assert isinstance(squeezed, float)
+    assert value == squeezed
+
+    b = generate_test_dataarray(dims={'y': 2})
+    xr_assert_identical(b, utils.squeeze(b))
