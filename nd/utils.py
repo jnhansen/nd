@@ -67,7 +67,7 @@ def check_requirements(dependency=[]):
 
 
 def requires(dependency=[]):
-    """Class decorator to specify dependency requirements.
+    """Class/function decorator to specify dependency requirements.
 
     Will raise an ImportError when the class is instantiated
     if any of the dependencies are missing. This relies on
@@ -75,13 +75,13 @@ def requires(dependency=[]):
     """
     check = check_requirements(dependency)
 
-    def decorator(cls):
+    def cls_decorator(cls):
         old_init = cls.__init__
 
         @wraps(cls.__init__)
         def new_init(self, *args, **kwargs):
             if not check:
-                raise ImportError('This function requires the following '
+                raise ImportError('This class requires the following '
                                   'dependencies: {}'.format(dependency))
             return old_init(self, *args, **kwargs)
 
@@ -89,6 +89,22 @@ def requires(dependency=[]):
         cls._requires = dependency
         cls._skip = not check
         return cls
+
+    def func_decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if not check:
+                raise ImportError('This function requires the following '
+                                  'dependencies: {}'.format(dependency))
+            return func(*args, **kwargs)
+        return wrapper
+
+    def decorator(obj):
+        if inspect.isclass(obj):
+            return cls_decorator(obj)
+        else:
+            return func_decorator(obj)
+
     return decorator
 
 

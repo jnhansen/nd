@@ -368,7 +368,7 @@ def test_check_requirements(req, exists):
     (['numpy', 'xarray'], True),
     (['numpy', 'made_up_module'], False),
 ])
-def test_requires(req, exists):
+def test_requires_class(req, exists):
     # Define class with given requirements
     @utils.requires(req)
     class C():
@@ -376,7 +376,7 @@ def test_requires(req, exists):
             pass
 
     if exists:
-        # Shoudl be able to instantiate class
+        # Should be able to instantiate class
         try:
             C()
         except Exception as e:
@@ -385,6 +385,31 @@ def test_requires(req, exists):
         # Class instantiation should fail
         with assert_raises_regex(ImportError, f'requires .* {req}'):
             C()
+
+
+@pytest.mark.parametrize('req,exists', [
+    ('numpy', True),
+    ('made_up_module', False),
+    ('gdal', True),
+    (['numpy', 'xarray'], True),
+    (['numpy', 'made_up_module'], False),
+])
+def test_requires_function(req, exists):
+    # Define class with given requirements
+    @utils.requires(req)
+    def func():
+        pass
+
+    if exists:
+        # Should be able to instantiate class
+        try:
+            func()
+        except Exception as e:
+            pytest.fail(e)
+    else:
+        # Class instantiation should fail
+        with assert_raises_regex(ImportError, f'requires .* {req}'):
+            func()
 
 
 def test_squeeze():
