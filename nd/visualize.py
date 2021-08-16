@@ -22,6 +22,7 @@ import pyproj
 import shapely.geometry
 import shapely.affinity
 from . import warp
+from .utils import requires
 
 
 __all__ = ['colorize',
@@ -215,7 +216,8 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
 def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
                 width=None, height=None, fps=1,
                 codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-                cmap=None, mask=None, **kwargs):
+                cmap=None, mask=None, contours=None,
+                **kwargs):
     """
     Create a video from an xarray.Dataset.
 
@@ -295,6 +297,10 @@ def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
         for t in ds.time.values:
             d = ds.sel(time=t)
             frame = to_rgb(rgb(d), cmap=cmap, mask=mask)
+            # Contours
+            if contours is not None:
+                frame = cv2.drawContours(
+                    frame, contours, -1, (255, 255, 255), thickness=1)
             frame = cv2.resize(frame, (width, height))
             if timestamp not in [False, None]:
                 cv2.putText(frame, str(t)[:10],
@@ -310,6 +316,7 @@ def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
 # Mapping
 # -------
 
+@requires('cartopy')
 def gridlines_with_labels(ax, top=True, bottom=True, left=True,
                           right=True, fontsize=12, max_nlines=5, **kwargs):
     """
@@ -336,11 +343,6 @@ def gridlines_with_labels(ax, top=True, bottom=True, left=True,
         The :class:`Gridliner` object resulting from ``ax.gridlines()``.
 
     """
-
-    if cartopy is None:
-        raise ImportError("Module `cartopy` is required to "
-                          "use this method.")
-
     # Add gridlines
     gridliner = ax.gridlines(**kwargs)
     gridliner.xlocator = mticker.MaxNLocator(max_nlines)
@@ -452,6 +454,7 @@ def _get_scalebar_length(ax):
     return scale
 
 
+@requires('cartopy')
 def plot_map(ds, buffer=None, background='_default', imscale=6,
              gridlines=True, coastlines=True, scalebar=True,
              gridlines_kwargs={}):
@@ -485,8 +488,6 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         The corresponding GeoAxes object.
 
     """
-    if cartopy is None:
-        raise ImportError('Cartopy is required for this function.')
     if background == '_default':
         try:
             background = cimgt.Stamen('terrain-background')
