@@ -14,7 +14,7 @@ from rasterio.errors import CRSError
 from affine import Affine
 from .algorithm import Algorithm, wrap_algorithm, parallelize
 from .io import to_netcdf, open_dataset, disassemble_complex
-from .utils import get_vars_for_dims, get_dims
+from .utils import get_vars_for_dims, get_dims, requires
 try:
     import skimage
 except ImportError:
@@ -1123,10 +1123,8 @@ class Coregistration(Algorithm):
                            upsampling=self.upsampling)
 
 
+@requires('skimage')
 def _coregister(ds, reference, upsampling, order=3):
-    if skimage is None:
-        raise ImportError("Module `skimage` is required to "
-                          "use this method.")
     ref_var = 'C11'
     ds_new = disassemble_complex(ds)
     ref = ds_new.isel(time=reference)[ref_var].values
