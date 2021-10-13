@@ -73,6 +73,7 @@ def calculate_shape(new_shape, orig_shape):
         if width is not None:
             # Determine height from given width
             height = width * orig_shape[0] / orig_shape[1]
+            height = height // 2 * 2
         else:
             # Both are None: Use original shape
             height = orig_shape[0]
@@ -80,6 +81,7 @@ def calculate_shape(new_shape, orig_shape):
     elif width is None:
         # Determine width from given height
         width = height * orig_shape[1] / orig_shape[0]
+        width = width // 2 * 2
 
     return (int(height), int(width))
 
@@ -215,7 +217,7 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
 
 def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
                 width=None, height=None, fps=1,
-                codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
+                codec=None, rgb=None,
                 cmap=None, mask=None, contours=None,
                 **kwargs):
     """
@@ -253,10 +255,14 @@ def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
         If specified, parts of the image outside of the mask will be black.
     """
 
-    # For a DataArray, the video is grayscale.
-    if isinstance(ds, xr.DataArray):
-        def rgb(d):
-            return d
+    if rgb is None:
+        # For a DataArray, the video is grayscale.
+        if isinstance(ds, xr.DataArray):
+            def rgb(d):
+                return d
+        else:
+            def rgb(d):
+                return [d.C11, d.C22, d.C11/d.C22]
 
     # Use coords rather than dims so it also works for DataArray
     height, width = calculate_shape(
