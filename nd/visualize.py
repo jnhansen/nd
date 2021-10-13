@@ -706,9 +706,14 @@ def _point_along_line(ax, start, distance, angle=0, tol=0.01):
         a_phys = _axes_to_lonlat(ax, a_axes)
         b_phys = _axes_to_lonlat(ax, b_axes)
 
-        # Geodesic().inverse returns a NumPy MemoryView like [[distance,
-        # start azimuth, end azimuth]].
-        return geodesic.inverse(a_phys, b_phys).base[0, 0]
+        inv = geodesic.inverse(a_phys, b_phys)
+        try:
+            # Geodesic().inverse returns a NumPy MemoryView like [[distance,
+            # start azimuth, end azimuth]].
+            return inv.base[0, 0]
+        except TypeError:
+            # In newer versions, it is a plain numpy array
+            return inv[0, 0]
 
     end = _upper_bound(start, direction, distance, dist_func)
 
