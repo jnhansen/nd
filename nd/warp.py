@@ -776,7 +776,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
             if dst_crs == src_crs and v not in ds.dims:
 
                 if len(ds.coords[v].dims) == 0:
-                    result.coords[v] = (ds.coords[v].dims, ds.coords[v])
+                    result.coords[v] = (ds.coords[v].dims, ds.coords[v].data)
 
                 else:
                     expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
