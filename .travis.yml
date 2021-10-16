@@ -14,13 +14,6 @@ before_install:
 - h5cc -showconfig
 jobs:
   include:
-  - python: 3.5
-    addons:
-      apt:
-        packages:
-          - *basic_deps
-          - *gdal_deps
-          - *gsl_deps
   - python: 3.6
     addons:
       apt:
@@ -58,9 +51,10 @@ install:
 - conda update -q conda
 - conda info -a
 - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
-  rasterio ffmpeg cartopy pytest pytest-cov coverage -c conda-forge
+  ffmpeg cartopy pytest pytest-cov coverage proj">=7.0" -c conda-forge
 - source activate test-environment
-- pip install scikit-learn scikit-image codecov
+- conda install scikit-learn scikit-image
+- pip install codecov
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal
 - export C_INCLUDE_PATH=/usr/include/gdal
 - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH

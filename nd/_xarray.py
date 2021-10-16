@@ -101,11 +101,11 @@ class NDAccessor:
         Parameters
         ----------
         rgb : callable
-            Ignored if `ds` is a DataArray.
             A function returning an RGB tuple from the dataset,
-            e.g., `lambda d: [d.B4, d.B3, d.B2]`
+            e.g., `lambda d: [d.B4, d.B3, d.B2]` or
+            `lambda d: [d.isel(band=0), d.isel(band=1), d.isel(band=2)]`
         """
-        if isinstance(self._obj, xr.DataArray):
+        if isinstance(self._obj, xr.DataArray) and rgb is None:
             data = self._obj
         else:
             if rgb is None:

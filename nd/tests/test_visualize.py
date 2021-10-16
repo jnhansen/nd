@@ -1,14 +1,17 @@
 from nd import visualize
 from nd import warp
 from numpy.testing import assert_equal
-from nd.testing import generate_test_dataset
+from nd.testing import generate_test_dataset, requires
 import numpy as np
 import pytest
 import imageio
 import os
 import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.io.img_tiles as cimgt
+try:
+    import cartopy.crs as ccrs
+    import cartopy.io.img_tiles as cimgt
+except (ModuleNotFoundError, ImportError):
+    pass
 import shapely.affinity
 import cv2
 
@@ -145,6 +148,7 @@ def test_colorize(N, nan_vals):
         assert (colored[labels == nv] == 0).all()
 
 
+@requires('cartopy')
 @pytest.mark.parametrize('extent', [
     [10, 20, -25, -15],
     [-5, 2, -2, 3]
@@ -215,6 +219,7 @@ def test_gridlines_with_labels(tmpdir, extent):
         assert np.abs(value - np.abs(lat)) < tol_lat
 
 
+@requires('cartopy')
 def test_plot_map(tmpdir):
     extent = [-5, -2, 2, 3]
     buffer = 2
@@ -242,6 +247,7 @@ def test_plot_map(tmpdir):
     assert ax_ymax < ymax + ytol
 
 
+@requires('cartopy')
 def test_plot_map_with_background(tmpdir):
     extent = [-10.0, 50.0, 0.0, 56.0]
     ds = generate_test_dataset(extent=extent)

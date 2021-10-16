@@ -14,7 +14,7 @@ from rasterio.errors import CRSError
 from affine import Affine
 from .algorithm import Algorithm, wrap_algorithm, parallelize
 from .io import to_netcdf, open_dataset, disassemble_complex
-from .utils import get_vars_for_dims
+from .utils import get_vars_for_dims, get_dims, requires
 try:
     import skimage
 except ImportError:
@@ -43,16 +43,16 @@ __all__ = ['Reprojection',
            'get_common_resolution']
 
 
-def _get_dim_order(ds):
-    """
-    Return the dimension of dataset `ds` in order.
-    """
-    # The ordered dictionary is hidden behind two wrappers,
-    # need to access the dict behind the Frozen(SortedKeysDict).
-    if isinstance(ds, xr.Dataset):
-        return list(ds.sizes.mapping.mapping)
-    elif isinstance(ds, xr.DataArray):
-        return list(ds.sizes.mapping)
+# def _get_dim_order(ds):
+#     """
+#     Return the dimension of dataset `ds` in order.
+#     """
+#     # The ordered dictionary is hidden behind two wrappers,
+#     # need to access the dict behind the Frozen(SortedKeysDict).
+#     if isinstance(ds, xr.Dataset):
+#         return list(ds.sizes.mapping.mapping)
+#     elif isinstance(ds, xr.DataArray):
+#         return list(ds.sizes.mapping)
 
 
 def _get_projection_dim_order(ds):
@@ -60,7 +60,7 @@ def _get_projection_dim_order(ds):
     Return the dimension order required by the projection operations.
     This moves the x and y dimensions to the end.
     """
-    dims = _get_dim_order(ds)
+    dims = get_dims(ds)
     extra_dims = set(dims) - {'y', 'x'}
     ordered_extra_dims = \
         tuple(d for d in dims if d in extra_dims)
@@ -147,7 +147,10 @@ def get_crs(ds, format='crs'):
             try:
                 crs = _parse_crs(ds['crs'].attrs[attr])
             except CRSError:
-                pass
+                try:
+                    crs = _parse_crs(ds['crs'].attrs[attr][0])
+                except CRSError:
+                    pass
             else:
                 break
 
@@ -341,6 +344,8 @@ def _get_transform_from_metadata(ds):
     elif isinstance(ds, xr.Dataset) and \
             'crs' in ds.data_vars and 'i2m' in ds.data_vars['crs'].attrs:
         transf_str = ds.data_vars['crs'].attrs['i2m']
+        if isinstance(transf_str, np.ndarray) and len(transf_str) == 1:
+            transf_str = transf_str[0]
         a = list(map(float, transf_str.split(',')))
         return Affine(a[0], a[2], a[4], a[1], a[3], a[5])
 
@@ -470,7 +475,7 @@ def get_common_resolution(datasets, mode='min'):
         return tuple(resolutions.mean(axis=0))
 
 
-def get_dims(ds):
+def get_dim_sizes(ds):
     if isinstance(ds, xr.Dataset):
         return dict(ds.dims)
     elif isinstance(ds, xr.DataArray):
@@ -478,11 +483,11 @@ def get_dims(ds):
 
 
 def nrows(ds):
-    return get_dims(ds)['y']
+    return get_dim_sizes(ds)['y']
 
 
 def ncols(ds):
-    return get_dims(ds)['x']
+    return get_dim_sizes(ds)['x']
 
 
 def _add_latlon(ds, n=50):
@@ -673,7 +678,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
                 **src_bounds._asdict())
 
     src_transform = get_transform(ds)
-    src_dims = _get_dim_order(ds)
+    src_dims = get_dims(ds)
     dst_crs = _parse_crs(dst_crs)
 
     #
@@ -699,7 +704,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
         coord_dims = tuple(c for c in ('y', 'x') if c in da.dims)
         extra_dims = set(da.dims) - set(coord_dims)
         # Preserve original dimension order
-        orig_dim_order = _get_dim_order(da)
+        orig_dim_order = get_dims(da)
         ordered_extra_dims = \
             tuple(d for d in orig_dim_order if d in extra_dims)
         dim_order = ordered_extra_dims + coord_dims
@@ -730,6 +735,11 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
         # rasterio cannot deal with float16
         if da.dtype == np.float16:
             values = values.astype(np.float32)
+
+        # Integers cannot be set to nan
+        if np.issubdtype(values.dtype, np.integer):
+            values = values.astype(np.float32)
+
         output = np.zeros(output_shape_flat, dtype=values.dtype)
         output[:] = np.nan
 
@@ -766,7 +776,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
             if dst_crs == src_crs and v not in ds.dims:
 
                 if len(ds.coords[v].dims) == 0:
-                    result.coords[v] = (ds.coords[v].dims, ds.coords[v])
+                    result.coords[v] = (ds.coords[v].dims, ds.coords[v].data)
 
                 else:
                     expanded = _expand_var_to_xy(ds.coords[v], ds.coords)
@@ -798,7 +808,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
             if set(ds[v].dims) == set(vdims) or set(ds[v].dims) == {'y', 'x'}:
                 result[v] = (vdims, _reproject_da(ds[v], shape))
                 # Reorder dimensions of each variable to match original.
-                result[v] = result[v].transpose(*_get_dim_order(ds[v]),
+                result[v] = result[v].transpose(*get_dims(ds[v]),
                                                 transpose_coords=True)
             elif common == {'x'} or common == {'y'}:
                 # Does the data contain either x or y dimension?
@@ -808,7 +818,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
                 ))
             else:
                 # The variable doesn't contain either y or x dimension.
-                result[v] = (ds[v].dims, ds[v])
+                result[v] = (ds[v].dims, ds[v].data)
 
         #
         # Create lat and lon coordinates
@@ -826,7 +836,7 @@ def _reproject(ds, src_crs=None, dst_crs=None, dst_transform=None,
                               coords=dst_coords, name=ds.name)
 
         # Reorder dimensions to match original.
-        result = result.transpose(*_get_dim_order(ds), transpose_coords=True)
+        result = result.transpose(*get_dims(ds), transpose_coords=True)
 
     #
     # Add metadata
@@ -1113,10 +1123,8 @@ class Coregistration(Algorithm):
                            upsampling=self.upsampling)
 
 
+@requires('skimage')
 def _coregister(ds, reference, upsampling, order=3):
-    if skimage is None:
-        raise ImportError("Module `skimage` is required to "
-                          "use this method.")
     ref_var = 'C11'
     ds_new = disassemble_complex(ds)
     ref = ds_new.isel(time=reference)[ref_var].values

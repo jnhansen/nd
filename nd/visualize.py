@@ -22,6 +22,7 @@ import pyproj
 import shapely.geometry
 import shapely.affinity
 from . import warp
+from .utils import requires
 
 
 __all__ = ['colorize',
@@ -72,6 +73,7 @@ def calculate_shape(new_shape, orig_shape):
         if width is not None:
             # Determine height from given width
             height = width * orig_shape[0] / orig_shape[1]
+            height = height // 2 * 2
         else:
             # Both are None: Use original shape
             height = orig_shape[0]
@@ -79,6 +81,7 @@ def calculate_shape(new_shape, orig_shape):
     elif width is None:
         # Determine width from given height
         width = height * orig_shape[1] / orig_shape[0]
+        width = width // 2 * 2
 
     return (int(height), int(width))
 
@@ -214,8 +217,9 @@ def to_rgb(data, output=None, vmin=None, vmax=None, pmin=2, pmax=98,
 
 def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
                 width=None, height=None, fps=1,
-                codec=None, rgb=lambda d: [d.C11, d.C22, d.C11/d.C22],
-                cmap=None, mask=None, **kwargs):
+                codec=None, rgb=None,
+                cmap=None, mask=None, contours=None,
+                **kwargs):
     """
     Create a video from an xarray.Dataset.
 
@@ -251,10 +255,14 @@ def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
         If specified, parts of the image outside of the mask will be black.
     """
 
-    # For a DataArray, the video is grayscale.
-    if isinstance(ds, xr.DataArray):
-        def rgb(d):
-            return d
+    if rgb is None:
+        # For a DataArray, the video is grayscale.
+        if isinstance(ds, xr.DataArray):
+            def rgb(d):
+                return d
+        else:
+            def rgb(d):
+                return [d.C11, d.C22, d.C11/d.C22]
 
     # Use coords rather than dims so it also works for DataArray
     height, width = calculate_shape(
@@ -295,6 +303,10 @@ def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
         for t in ds.time.values:
             d = ds.sel(time=t)
             frame = to_rgb(rgb(d), cmap=cmap, mask=mask)
+            # Contours
+            if contours is not None:
+                frame = cv2.drawContours(
+                    frame, contours, -1, (255, 255, 255), thickness=1)
             frame = cv2.resize(frame, (width, height))
             if timestamp not in [False, None]:
                 cv2.putText(frame, str(t)[:10],
@@ -310,6 +322,7 @@ def write_video(ds, path, timestamp='upper left', fontcolor=(0, 0, 0),
 # Mapping
 # -------
 
+@requires('cartopy')
 def gridlines_with_labels(ax, top=True, bottom=True, left=True,
                           right=True, fontsize=12, max_nlines=5, **kwargs):
     """
@@ -336,11 +349,6 @@ def gridlines_with_labels(ax, top=True, bottom=True, left=True,
         The :class:`Gridliner` object resulting from ``ax.gridlines()``.
 
     """
-
-    if cartopy is None:
-        raise ImportError("Module `cartopy` is required to "
-                          "use this method.")
-
     # Add gridlines
     gridliner = ax.gridlines(**kwargs)
     gridliner.xlocator = mticker.MaxNLocator(max_nlines)
@@ -452,6 +460,7 @@ def _get_scalebar_length(ax):
     return scale
 
 
+@requires('cartopy')
 def plot_map(ds, buffer=None, background='_default', imscale=6,
              gridlines=True, coastlines=True, scalebar=True,
              gridlines_kwargs={}):
@@ -485,7 +494,6 @@ def plot_map(ds, buffer=None, background='_default', imscale=6,
         The corresponding GeoAxes object.
 
     """
-
     if background == '_default':
         try:
             background = cimgt.Stamen('terrain-background')
@@ -698,9 +706,14 @@ def _point_along_line(ax, start, distance, angle=0, tol=0.01):
         a_phys = _axes_to_lonlat(ax, a_axes)
         b_phys = _axes_to_lonlat(ax, b_axes)
 
-        # Geodesic().inverse returns a NumPy MemoryView like [[distance,
-        # start azimuth, end azimuth]].
-        return geodesic.inverse(a_phys, b_phys).base[0, 0]
+        inv = geodesic.inverse(a_phys, b_phys)
+        try:
+            # Geodesic().inverse returns a NumPy MemoryView like [[distance,
+            # start azimuth, end azimuth]].
+            return inv.base[0, 0]
+        except TypeError:
+            # In newer versions, it is a plain numpy array
+            return inv[0, 0]
 
     end = _upper_bound(start, direction, distance, dist_func)
 

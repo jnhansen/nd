@@ -3,8 +3,7 @@ This module provides several helper functions.
 """
 import numpy as np
 import xarray as xr
-import multiprocessing as mp
-from dask import delayed
+import multiprocess as mp
 import datetime
 from dateutil.tz import tzutc
 from dateutil.parser import parse as parsedate
@@ -12,9 +11,10 @@ import itertools
 from collections import OrderedDict
 import re
 from operator import add
-from functools import reduce, wraps, partial
-import inspect
+from functools import reduce, wraps
 import shutil
+import importlib
+import inspect
 
 
 __all__ = ['get_shape',
@@ -45,26 +45,43 @@ check_dependencies['gdal'] = (shutil.which('gdal-config') is not None)
 # -------------------------------------------------------------------
 
 
+def check_requirements(dependency=[]):
+    def _check(dep):
+        if dep in check_dependencies and check_dependencies[dep]:
+            return True
+        try:
+            importlib.import_module(dep)
+        except ModuleNotFoundError:
+            return False
+        else:
+            return True
+
+    if isinstance(dependency, (list, tuple)):
+        check = all(
+            [_check(d) for d in dependency]
+        )
+    else:
+        check = _check(dependency)
+
+    return check
+
+
 def requires(dependency=[]):
-    """Class decorator to specify dependency requirements.
+    """Class/function decorator to specify dependency requirements.
 
     Will raise an ImportError when the class is instantiated
     if any of the dependencies are missing. This relies on
     `nd.utils.check_dependencies`.
     """
-    if isinstance(dependency, (list, tuple)):
-        check = all(
-            [check_dependencies[d] for d in dependency]
-        )
-    else:
-        check = check_dependencies[dependency]
+    check = check_requirements(dependency)
 
-    def decorator(cls):
+    def cls_decorator(cls):
         old_init = cls.__init__
+
         @wraps(cls.__init__)
         def new_init(self, *args, **kwargs):
             if not check:
-                raise ImportError('This function requires the following '
+                raise ImportError('This class requires the following '
                                   'dependencies: {}'.format(dependency))
             return old_init(self, *args, **kwargs)
 
@@ -72,6 +89,22 @@ def requires(dependency=[]):
         cls._requires = dependency
         cls._skip = not check
         return cls
+
+    def func_decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if not check:
+                raise ImportError('This function requires the following '
+                                  'dependencies: {}'.format(dependency))
+            return func(*args, **kwargs)
+        return wrapper
+
+    def decorator(obj):
+        if inspect.isclass(obj):
+            return cls_decorator(obj)
+        else:
+            return func_decorator(obj)
+
     return decorator
 
 
@@ -86,10 +119,24 @@ def get_dims(ds):
     """
     # The ordered dictionary is hidden behind two wrappers,
     # need to access the dict behind the Frozen(SortedKeysDict).
-    if isinstance(ds, xr.Dataset):
+    if (xr.__version__ < '0.19.0') \
+            and isinstance(ds, xr.Dataset):
         return tuple(ds.sizes.mapping.mapping)
-    elif isinstance(ds, xr.DataArray):
+    else:
+        # The following code always works for DataArrays,
+        # and also for Datasets for xarray >= 0.19.0
         return tuple(ds.sizes.mapping)
+
+
+def squeeze(obj):
+    """
+    Return the item of an array of length 1,
+    otherwise return original object.
+    """
+    try:
+        return obj.item()
+    except (ValueError, AttributeError):
+        return obj
 
 
 def str2date(string, fmt=None, tz=False):
@@ -293,8 +340,7 @@ def xr_merge(ds_list, dim, buffer=0):
     return xr.concat(parts, dim=dim)
 
 
-def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
-             compute=True):
+def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0):
     """
     Parallelize a function that takes an xarray dataset as first argument.
 
@@ -314,9 +360,6 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
         ... to be implemented
     buffer : int, optional
         (default: 0)
-    compute : bool, optional
-        If True, return the computed result. Otherwise, return the dask
-        computation object (default: True).
 
     Returns
     -------
@@ -330,34 +373,30 @@ def parallel(fn, dim=None, chunks=None, chunksize=None, merge=True, buffer=0,
         chunks = mp.cpu_count()
 
     def wrapper(ds, *args, **kwargs):
-        # if not isinstance(ds, xr.Dataset):
-        #     raise ValueError("`parallel` may only be used on functions "
-        #                      "accepting an xarray.Dataset as "
-        #                      "first argument.")
         if dim not in ds.dims:
             raise ValueError(
                 "The dataset has no dimension '{}'."
                 .format(dim)
             )
-        #
-        # Prechunk the dataset to align memory access with dask
-        #
-        n = ds.sizes[dim]
-        chunksize = int(np.ceil(n / chunks))
-        prechunked = ds.chunk({dim: chunksize})
 
         # Split into parts
-        parts = [delayed(fn)(part, *args, **kwargs) for part in
-                 xr_split(prechunked, dim=dim, chunks=chunks, buffer=buffer)]
-        if merge:
-            result = delayed(xr_merge)(parts, dim=dim, buffer=buffer)
-        else:
-            result = delayed(parts)
+        parts = xr_split(
+            ds, dim=dim, chunks=chunks, buffer=buffer)
 
-        if compute:
-            return result.compute()
+        def _fn(ds):
+            return fn(ds, *args, **kwargs)
+
+        pool = mp.Pool(chunks)
+        output = pool.map(_fn, parts)
+        pool.close()
+        pool.join()
+
+        if merge:
+            result = xr_merge(output, dim=dim, buffer=buffer)
         else:
-            return result
+            result = output
+
+        return result
 
     return wrapper
 
@@ -656,7 +695,7 @@ def apply(ds, fn, signature=None, njobs=1):
         result = xr.DataArray(
             result_arr,
             dims=dims, coords={d: ds.coords[d] for d in dims}
-        ).unstack()
+        )
         return result
 
     # Parallelize
@@ -676,7 +715,7 @@ def apply(ds, fn, signature=None, njobs=1):
             result = ds.apply(apply_func)
 
     # Restore original dimension order
-    result = result.transpose(*output_dims)
+    result = result.unstack().transpose(*output_dims)
 
     # Turn back into Dataset
     if 'var' in result.dims:

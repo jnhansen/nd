@@ -10,7 +10,10 @@ from nd.testing import (generate_test_dataset, generate_test_dataarray,
 from nd import warp, filters, io, change, utils, visualize
 from nd._xarray import patch_doc
 from rasterio.crs import CRS
-import cartopy
+try:
+    import cartopy
+except ModuleNotFoundError:
+    cartopy = None
 
 
 # ---------------
@@ -144,6 +147,7 @@ def test_accessor_nd_to_video(tmpdir):
     assert_equal_files(path_1, path_2)
 
 
+@requires('cartopy')
 def test_accessor_nd_plot_map():
     ds = generate_test_dataset()
 
