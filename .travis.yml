@@ -53,7 +53,9 @@ install:
 - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
   ffmpeg cartopy pytest pytest-cov coverage -c conda-forge
 - source activate test-environment
-- conda install scikit-learn scikit-image codecov
+- conda install scikit-learn
+- conda install scikit-image
+- conda install codecov
 - export CPLUS_INCLUDE_PATH=/usr/include/gdal
 - export C_INCLUDE_PATH=/usr/include/gdal
 - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
