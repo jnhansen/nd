@@ -51,7 +51,7 @@ install:
 - conda update -q conda
 - conda info -a
 - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION numpy
-  ffmpeg cartopy pytest pytest-cov coverage -c conda-forge
+  ffmpeg cartopy pytest pytest-cov coverage proj>=7.0 -c conda-forge
 - source activate test-environment
 - conda install scikit-learn scikit-image
 - pip install codecov
