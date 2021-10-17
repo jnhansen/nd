@@ -2,13 +2,25 @@ Changelog
 =========
 
 
-Version 0.3 *(under development)*
+Version 0.4 *(under development)*
 ---------------------------------
+
+- ...
+
+
+Version 0.3
+-----------
 
 General updates
 ...............
 
 - drop support for Python 3.5
+- ``cartopy`` is now an optional dependency
+
+:mod:`nd.utils`
+...............
+
+- use ``multiprocessing`` rather than ``dask.delayed`` in :func:`nd.utils.parallel()`
 
 
 Version 0.2
