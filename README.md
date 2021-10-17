@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/jnhansen/nd.svg?branch=master)](https://travis-ci.com/jnhansen/nd)
+[![Build Status](https://api.travis-ci.com/jnhansen/nd.svg?branch=master)](https://app.travis-ci.com/github/jnhansen/nd)
 [![codecov](https://codecov.io/gh/jnhansen/nd/branch/master/graph/badge.svg)](https://codecov.io/gh/jnhansen/nd)
 [![Documentation](https://readthedocs.org/projects/nd/badge/?version=latest)](https://nd.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/nd.svg)](https://badge.fury.io/py/nd)
