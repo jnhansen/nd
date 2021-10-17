@@ -2,6 +2,9 @@ cache:
   directories:
   - "~/.cache/pip"
 language: python
+branches:
+  only:
+  - master
 addons:
   apt:
     packages:
