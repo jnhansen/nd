@@ -1,5 +1,5 @@
 import skimage.transform
-import skimage.feature
+import skimage.registration
 from nd.testing import generate_test_dataset
 from nd.utils import get_vars_for_dims
 from nd.warp import Coregistration
@@ -38,7 +38,7 @@ def check_shifts(ds):
     shifts = []
     for t in range(1, ds.dims['time']):
         # Estimate shift
-        shift = skimage.feature.register_translation(
+        shift = skimage.registration.phase_cross_correlation(
             ds.isel(time=t)[ref_var].values, ref, upsample_factor=30)[0]
         shifts.append(shift)
     return np.array(shifts)

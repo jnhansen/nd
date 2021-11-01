@@ -420,12 +420,30 @@ def test_get_geometry(generator, bounds, src_crs, dst_crs):
         warp.get_geometry(ds, crs=src_crs), box)
 
     geom = warp.get_geometry(ds, crs=dst_crs)
-    project = partial(
-        pyproj.transform,
-        warp._to_pyproj(src_crs),
-        warp._to_pyproj(dst_crs))
+
+    try:
+        # pyproj >= 2.1.0
+        project = pyproj.Transformer.from_crs(
+            src_crs, dst_crs, always_xy=True).transform
+        inverse_project = pyproj.Transformer.from_crs(
+            dst_crs, src_crs, always_xy=True).transform
+
+    except Exception:
+        # pyproj < 2.1
+        project = partial(
+            pyproj.transform,
+            warp._to_pyproj(src_crs),
+            warp._to_pyproj(dst_crs))
+        inverse_project = partial(
+            pyproj.transform,
+            warp._to_pyproj(dst_crs),
+            warp._to_pyproj(src_crs))
+
     expected = shapely.ops.transform(project, box)
     assert_equal(geom, expected)
+
+    expected_inverse = shapely.ops.transform(inverse_project, geom)
+    assert expected_inverse.equals_exact(box, tolerance=1e-6)
 
 
 def test_get_extent_dataset():
