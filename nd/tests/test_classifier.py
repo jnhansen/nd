@@ -149,6 +149,25 @@ def test_predict_before_fit():
         c.predict(ds)
 
 
+def test_score():
+    dims = OrderedDict([('y', 100), ('x', 100)])
+    ds, labels = create_mock_classes(dims)
+    c = classify.Classifier(RandomForestClassifier())
+    pred = c.fit(ds, labels).predict(ds)
+    true_score = (pred == labels).mean()
+    test_score = c.score(ds, labels)
+    assert true_score == test_score
+
+
+def test_score_invalid_method():
+    dims = OrderedDict([('y', 100), ('x', 100)])
+    ds, labels = create_mock_classes(dims)
+    c = classify.Classifier(RandomForestClassifier())
+    c.fit(ds, labels)
+    with assert_raises_regex(ValueError, 'not a valid scoring method'):
+        c.score(ds, labels, method='not_a_method')
+
+
 def test_scaling():
     dims = OrderedDict([('y', 100), ('x', 100)])
     ds, true_labels = create_mock_classes(dims)

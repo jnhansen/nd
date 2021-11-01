@@ -28,6 +28,7 @@ autodoc_mock_imports = [
     # 'dateutil',
     # 'matplotlib',
     # 'cython_gsl',
+    'multiprocess',
     'shapely',
     'fiona',
     'pyproj',
