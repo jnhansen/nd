@@ -10,11 +10,20 @@ General updates
 
 - ...
 
+
+Version 0.3.1
+-------------
+
 :mod:`nd.classify`
 ..................
 
 - added :func:`nd.classify.Classifier.make_Xy()`
 - added :func:`nd.classify.Classifier.score()`
+
+:mod:`nd.warp`
+................
+
+- small compatibility updates for new versions of shapely
 
 
 Version 0.3
