@@ -45,7 +45,7 @@ def read_file(path, clip=None):
     return gpd.GeoDataFrame.from_features(records(path, clip))
 
 
-def rasterize(shp, ds, columns=None, encode_labels=True,
+def rasterize(shp, ds, columns=None, encode_labels=True, crs=None,
               date_field=None, date_fmt=None):
     """Rasterize a vector dataset to match a reference raster.
 
@@ -61,10 +61,12 @@ def rasterize(shp, ds, columns=None, encode_labels=True,
         If True, convert categorical data to integer values. The corresponding
         labels are accessible in the metadata.
         (default: True).
+    crs : str or dict or cartopy.crs.CRS, optional
+        The CRS of the vector data.
     date_field : str, optional
         The name of field containing the timestamp.
     date_fmt : str, optional
-        The date format to parse date_field. Passed to pd.to_datetime().
+        The date format to parse date_field. Passed to `pd.to_datetime()`.
 
     Returns
     -------
@@ -81,6 +83,11 @@ def rasterize(shp, ds, columns=None, encode_labels=True,
     else:
         # Work on a copy
         shp = shp.copy()
+
+    if crs is not None:
+        shp.crs = warp._parse_crs(crs)
+    if shp.crs is not None:
+        shp = shp.to_crs(warp.get_crs(ds))
 
     # Prepare output dataset
     layer = xr.Dataset(
@@ -128,7 +135,7 @@ def rasterize(shp, ds, columns=None, encode_labels=True,
         meta = {}
 
         # Treat object dtype as str
-        if data.dtype in [np.object, np.str]:
+        if data.dtype in [object, str]:
             if encode_labels:
                 # Encode categorical labels to integer
                 data, legend = data.factorize()

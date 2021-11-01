@@ -17,6 +17,7 @@ from .io import to_netcdf, open_dataset, disassemble_complex
 from .utils import get_vars_for_dims, get_dims, requires
 try:
     import skimage
+    import skimage.registration
 except ImportError:
     skimage = None
 
@@ -296,9 +297,12 @@ def get_extent(ds):
 def _to_pyproj(crs):
     """Convert a rasterio.crs.CRS to pyproj.Proj"""
     try:
-        return pyproj.Proj(crs.to_wkt())
-    except pyproj.exceptions.CRSError:
-        return pyproj.Proj(crs.to_proj4())
+        return pyproj.Proj(crs)
+    except Exception:
+        try:
+            return pyproj.Proj(crs.to_wkt())
+        except pyproj.exceptions.CRSError:
+            return pyproj.Proj(crs.to_proj4())
 
 
 def get_geometry(ds, crs={'init': 'epsg:4326'}):
@@ -321,10 +325,18 @@ def get_geometry(ds, crs={'init': 'epsg:4326'}):
     """
 
     src_geometry = shapely.geometry.box(*get_bounds(ds))
-    project = partial(
-        pyproj.transform,
-        _to_pyproj(get_crs(ds)),
-        _to_pyproj(_parse_crs(crs)))
+    try:
+        # pyproj >= 2.1.0
+        src_crs = get_crs(ds)
+        dst_crs = _parse_crs(crs)
+        project = pyproj.Transformer.from_crs(
+            src_crs, dst_crs, always_xy=True).transform
+    except Exception:
+        # pyproj < 2.1
+        src_crs = _to_pyproj(get_crs(ds))
+        dst_crs = _to_pyproj(_parse_crs(crs))
+        project = partial(
+            pyproj.transform, src_crs, dst_crs)
     geometry = shapely.ops.transform(project, src_geometry)
     return geometry
 
@@ -1135,7 +1147,7 @@ def _coregister(ds, reference, upsampling, order=3):
             continue
         src = ds_new.isel(time=t)
         # Estimate shift
-        shift = skimage.feature.register_translation(
+        shift = skimage.registration.phase_cross_correlation(
             src[ref_var].values, ref, upsample_factor=upsampling)
         translation = (shift[0][1], shift[0][0])
         # Create transform object
