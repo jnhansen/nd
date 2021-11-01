@@ -1,5 +1,5 @@
 try:
-    from sklearn import preprocessing
+    from sklearn import preprocessing, metrics
 except (ImportError, ModuleNotFoundError):
     raise ImportError('scikit-learn is required for this module.')
 
@@ -126,15 +126,22 @@ class Classifier:
         self.scale = scale
         self._scaler = None
 
-    def fit(self, ds, labels=None):
+    def make_Xy(self, ds, labels=None):
         """
+        Generate scikit-learn compatible X and y arrays
+        from `ds` and `labels`.
+
         Parameters
         ----------
         ds : xarray.Dataset
-            The dataset on which to train the classifier.
-        labels : xarray.DataArray, optional
-            The class labels to train the classifier. To be omitted
-            if the classifier is unsupervised, such as KMeans.
+            The input dataset.
+        labels : xarray.DataArray
+            The corresponding class labels.
+
+        Returns
+        -------
+        tuple(np.array, np.array)
+            X and y
         """
 
         if isinstance(labels, xr.Dataset):
@@ -177,6 +184,20 @@ class Classifier:
             self._scaler.fit(X)
             X = self._scaler.transform(X)
 
+        return (X, y)
+
+    def fit(self, ds, labels=None):
+        """
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            The dataset on which to train the classifier.
+        labels : xarray.DataArray, optional
+            The class labels to train the classifier. To be omitted
+            if the classifier is unsupervised, such as KMeans.
+        """
+
+        X, y = self.make_Xy(ds, labels=labels)
         self.clf.fit(X, y)
         return self
 
@@ -231,3 +252,33 @@ class Classifier:
     def fit_predict(self, ds, labels=None):
         self.fit(ds, labels)
         return self.predict(ds)
+
+    def score(self, ds, labels=None, method='accuracy'):
+        """
+        Compute the classification score.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            The dataset for which to compute the score.
+        labels : xarray.DataArray
+            The corresponding true class labels.
+        method : str, optional
+            The scoring method as implemented in scikit-learn
+            (default: 'accuracy')
+
+        Returns
+        -------
+        float
+            The classification score.
+        """
+
+        try:
+            scorer = metrics.get_scorer(method)
+        except Exception:
+            raise ValueError(
+                "'{}' is not a valid scoring method".format(method))
+
+        X, y = self.make_Xy(ds, labels=labels)
+
+        return scorer(self.clf, X, y)
