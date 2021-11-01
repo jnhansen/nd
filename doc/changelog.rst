@@ -5,7 +5,16 @@ Changelog
 Version 0.4 *(under development)*
 ---------------------------------
 
+General updates
+...............
+
 - ...
+
+:mod:`nd.classify`
+..................
+
+- added :func:`nd.classify.Classifier.make_Xy()`
+- added :func:`nd.classify.Classifier.score()`
 
 
 Version 0.3
